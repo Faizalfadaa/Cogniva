@@ -1,0 +1,21 @@
+{
+  "topicId": "topic_hukum_newton_2",
+  "title": "Hukum Kedua Newton",
+  "description": "Hubungan antara gaya, massa, dan percepatan: F = m × a.",
+  "referenceMaterial": "# Hukum Kedua Newton\n\nHukum kedua Newton menghubungkan gaya total yang bekerja pada benda dengan percepatannya.\n\n## Persamaan inti\n\nF = m × a\n\n- **F** adalah gaya TOTAL (resultan/net) dalam newton (N), bukan satu gaya tunggal saja.\n- **m** adalah massa benda dalam kilogram (kg).\n- **a** adalah percepatan dalam m/s², searah dengan gaya total.\n\n## Makna\n\nPercepatan sebuah benda berbanding lurus dengan gaya total dan berbanding terbalik dengan massanya: a = F / m. Gaya yang sama menghasilkan percepatan lebih kecil pada benda yang lebih bermassa.\n\n## Hal penting yang sering tertukar\n\n- Yang menyebabkan percepatan adalah gaya TOTAL. Jika gaya-gaya seimbang (resultan nol), benda tidak dipercepat meski banyak gaya bekerja.\n- Gaya tidak menyebabkan kecepatan, melainkan PERUBAHAN kecepatan (percepatan). Benda bisa bergerak cepat tanpa gaya total (Hukum Pertama Newton).\n- Massa (kg) berbeda dari berat (gaya gravitasi, N). Berat = m × g.\n\n## Contoh\n\nGaya total 10 N pada benda 2 kg menghasilkan percepatan 5 m/s². Gaya total 10 N pada benda 5 kg menghasilkan percepatan 2 m/s².",
+  "keyConcepts": [
+    "F = m × a menghubungkan gaya total, massa, dan percepatan",
+    "Yang menentukan percepatan adalah gaya TOTAL (resultan), bukan satu gaya",
+    "Percepatan berbanding terbalik dengan massa",
+    "Gaya menyebabkan percepatan (perubahan kecepatan), bukan kecepatan itu sendiri",
+    "Massa (kg) berbeda dari berat (N)"
+  ],
+  "commonMisconceptions": [
+    "Gaya yang lebih besar selalu berarti kecepatan lebih besar, bukan percepatan",
+    "Benda yang bergerak pasti memiliki gaya total ke arah geraknya",
+    "F dalam F=ma adalah salah satu gaya, bukan resultan semua gaya",
+    "Massa dan berat adalah hal yang sama",
+    "Jika tidak ada gaya, benda akan langsung berhenti"
+  ],
+  "difficulty": "menengah"
+}
