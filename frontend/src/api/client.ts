@@ -1,6 +1,6 @@
 /**
- * Klien REST tipis untuk backend Cogniva (Dokumen Arsitektur §7.1).
- * Kerangka M0: hanya membungkus endpoint siklus hidup sesi & topik.
+ * Thin REST client for the Cogniva backend (Architecture Document §7.1).
+ * M0 skeleton: only wraps the session-lifecycle & topic endpoints.
  */
 
 import type { EvaluationResult, Session, Topic } from "../contracts";

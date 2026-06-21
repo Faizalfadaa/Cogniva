@@ -1,1 +1,1 @@
-"""Kontrak & penanganan pesan WebSocket."""
+"""WebSocket message contracts & handling."""

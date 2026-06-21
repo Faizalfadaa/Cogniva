@@ -1,11 +1,11 @@
-"""Jalur sesi real-time via WebSocket (Dokumen Arsitektur §7.2).
+"""Real-time session channel via WebSocket (Architecture Document §7.2).
 
-Endpoint: /ws/sessions/{id}. Pesan dari klien hanya diproses bila status sesi
-mengizinkannya (teaching_input hanya pada MENGAJAR, §4.2).
+Endpoint: /ws/sessions/{id}. Client messages are only processed when the
+session status allows it (teaching_input only in TEACHING, §4.2).
 
-M0: kerangka penanganan pesan + penegakan status. Loop mengajar nyata
-(Vision → ASR → Learner) dirangkai pada M1/M2. Bagian yang belum ada ditandai
-TODO dan dijawab dengan pesan `error` yang dapat dipulihkan, bukan crash.
+M0: message-handling skeleton + status enforcement. The real teaching loop
+(Vision -> ASR -> Learner) is wired up in M1/M2. Missing parts are marked TODO
+and answered with a recoverable `error` message rather than a crash.
 """
 
 from __future__ import annotations
@@ -26,11 +26,11 @@ async def session_socket(websocket: WebSocket, session_id: str) -> None:
 
     session = sessions.get_session(session_id)
     if session is None:
-        await _send(websocket, ErrorMessage(message="Sesi tidak ditemukan"))
+        await _send(websocket, ErrorMessage(message="Session not found"))
         await websocket.close()
         return
 
-    await _send(websocket, StateUpdate(status=str(session.status)))  # noqa: E501 status sudah berupa nilai string
+    await _send(websocket, StateUpdate(status=str(session.status)))
 
     try:
         while True:
@@ -44,7 +44,7 @@ async def _handle(websocket: WebSocket, session_id: str, payload: dict) -> None:
     msg_type = payload.get("type")
     session = sessions.get_session(session_id)
     if session is None:
-        await _send(websocket, ErrorMessage(message="Sesi tidak ditemukan"))
+        await _send(websocket, ErrorMessage(message="Session not found"))
         return
 
     if msg_type == "teaching_input":
@@ -52,33 +52,33 @@ async def _handle(websocket: WebSocket, session_id: str, payload: dict) -> None:
             await _send(
                 websocket,
                 ErrorMessage(
-                    message=f"teaching_input hanya sah pada MENGAJAR "
-                    f"(status sekarang: {session.status})"
+                    message=f"teaching_input is only valid in TEACHING "
+                    f"(current status: {session.status})"
                 ),
             )
             return
-        # TODO(M1/M2): teruskan snapshot ke Vision & audio ke ASR (paralel),
-        # lalu panggil Learner dan stream learner_message kembali.
+        # TODO(M1/M2): forward the snapshot to Vision and audio to ASR (in
+        # parallel), then call the Learner and stream learner_message back.
         await _send(
             websocket,
-            ErrorMessage(message="Loop mengajar belum diimplementasikan (M1/M2)."),
+            ErrorMessage(message="Teaching loop not implemented yet (M1/M2)."),
         )
 
     elif msg_type == "confirmation_response":
-        # TODO(M2): terapkan koreksi interpretasi yang ragu lalu lanjutkan.
+        # TODO(M2): apply the correction to the uncertain interpretation, continue.
         await _send(
             websocket,
-            ErrorMessage(message="Penanganan konfirmasi menyusul (M2)."),
+            ErrorMessage(message="Confirmation handling coming later (M2)."),
         )
 
     elif msg_type == "end_session":
-        # Sinkron dengan REST POST /sessions/{id}/end; mesin status sama.
-        await _send(websocket, StateUpdate(status=SessionStatus.SELESAI.value))
+        # Mirrors REST POST /sessions/{id}/end; same state machine.
+        await _send(websocket, StateUpdate(status=SessionStatus.ENDED.value))
 
     else:
         await _send(
             websocket,
-            ErrorMessage(message=f"Tipe pesan tidak dikenal: {msg_type!r}"),
+            ErrorMessage(message=f"Unknown message type: {msg_type!r}"),
         )
 
 

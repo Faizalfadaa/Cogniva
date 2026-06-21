@@ -1,4 +1,14 @@
-"""Enumerasi terkontrol yang dipakai lintas kontrak (Dokumen Arsitektur §4, §6)."""
+"""Controlled enumerations used across the contracts (Architecture Document §4, §6).
+
+Enum values are anglicized for an international audience. Mapping back to the
+Indonesian architecture PDF (agreed contract change):
+
+    SessionStatus:    PERSIAPAN->SETUP, MENGAJAR->TEACHING,
+                      SELESAI->ENDED, EVALUASI->EVALUATED
+    Difficulty:       dasar->easy, menengah->medium, lanjut->hard
+    FindingCategory:  BENAR->CORRECT, KELIRU->WRONG,
+                      TERLEWAT->MISSED, MEMBINGUNGKAN->CONFUSING
+"""
 
 from __future__ import annotations
 
@@ -6,24 +16,24 @@ from enum import Enum
 
 
 class SessionStatus(str, Enum):
-    """Empat status sesi yang berurutan (§4.1). Hanya maju, tidak mundur."""
+    """The four sequential session states (§4.1). Forward-only, no going back."""
 
-    PERSIAPAN = "PERSIAPAN"
-    MENGAJAR = "MENGAJAR"
-    SELESAI = "SELESAI"
-    EVALUASI = "EVALUASI"
+    SETUP = "SETUP"  # topic chosen, session created, not teaching yet
+    TEACHING = "TEACHING"  # teaching-turn loop active; snapshots flow
+    ENDED = "ENDED"  # session ended, transcript locked, awaiting evaluation
+    EVALUATED = "EVALUATED"  # evaluator ran; results available
 
 
 class Difficulty(str, Enum):
-    """Tingkat kesulitan topik (§6.1)."""
+    """Topic difficulty level (§6.1)."""
 
-    DASAR = "dasar"
-    MENENGAH = "menengah"
-    LANJUT = "lanjut"
+    EASY = "easy"
+    MEDIUM = "medium"
+    HARD = "hard"
 
 
 class ElementType(str, Enum):
-    """Jenis elemen yang terdeteksi Vision pada papan (§6.4)."""
+    """Kinds of element Vision can detect on the board (§6.4)."""
 
     TEXT = "text"
     EQUATION = "equation"
@@ -33,7 +43,7 @@ class ElementType(str, Enum):
 
 
 class LearnerResponseType(str, Enum):
-    """Jenis ucapan murid — selalu dalam peran murid (§6.8)."""
+    """Kinds of learner utterance — always in the student role (§6.8)."""
 
     QUESTION = "question"
     CONFUSION = "confusion"
@@ -42,7 +52,7 @@ class LearnerResponseType(str, Enum):
 
 
 class DerivedFrom(str, Enum):
-    """Asal pemicu respons Learner (§6.8)."""
+    """What triggered the learner's response (§6.8)."""
 
     GAP = "gap"
     MISCONCEPTION = "misconception"
@@ -50,9 +60,9 @@ class DerivedFrom(str, Enum):
 
 
 class FindingCategory(str, Enum):
-    """Kategori temuan evaluasi (§6.9)."""
+    """Evaluation finding categories (§6.9)."""
 
-    BENAR = "BENAR"
-    KELIRU = "KELIRU"
-    TERLEWAT = "TERLEWAT"
-    MEMBINGUNGKAN = "MEMBINGUNGKAN"
+    CORRECT = "CORRECT"
+    WRONG = "WRONG"
+    MISSED = "MISSED"
+    CONFUSING = "CONFUSING"

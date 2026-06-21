@@ -1,47 +1,47 @@
-"""Mesin status sesi (Dokumen Arsitektur §4).
+"""Session state machine (Architecture Document §4).
 
-Orchestrator adalah satu-satunya pihak yang boleh memindahkan status, dan
-setiap transisi dipicu oleh peristiwa yang jelas.
+The orchestrator is the only party allowed to move the status, and every
+transition is triggered by a clear event.
 
-    PERSIAPAN --(start)--> MENGAJAR --(end)--> SELESAI --(evaluate)--> EVALUASI
+    SETUP --(start)--> TEACHING --(end)--> ENDED --(evaluate)--> EVALUATED
 
-Aturan (§4.2):
-- Transisi hanya boleh maju; tidak ada jalur mundur.
-- Pesan teaching_input hanya sah diproses pada status MENGAJAR.
-- Pemicuan evaluasi hanya sah pada status SELESAI, dan idempoten.
-- EVALUASI bersifat terminal.
+Rules (§4.2):
+- Transitions are forward-only; there is no path back.
+- teaching_input is only valid in the TEACHING state.
+- Triggering evaluation is only valid in the ENDED state, and is idempotent.
+- EVALUATED is terminal.
 """
 
 from __future__ import annotations
 
 from .contracts.enums import SessionStatus
 
-# Peristiwa yang memicu transisi
+# Events that trigger transitions
 START = "start"
 END = "end"
 EVALUATE = "evaluate"
 
-# Transisi yang diperbolehkan: (status_sekarang, peristiwa) -> status_berikut
+# Allowed transitions: (current_status, event) -> next_status
 _TRANSITIONS: dict[tuple[SessionStatus, str], SessionStatus] = {
-    (SessionStatus.PERSIAPAN, START): SessionStatus.MENGAJAR,
-    (SessionStatus.MENGAJAR, END): SessionStatus.SELESAI,
-    (SessionStatus.SELESAI, EVALUATE): SessionStatus.EVALUASI,
+    (SessionStatus.SETUP, START): SessionStatus.TEACHING,
+    (SessionStatus.TEACHING, END): SessionStatus.ENDED,
+    (SessionStatus.ENDED, EVALUATE): SessionStatus.EVALUATED,
 }
 
 
 class InvalidTransition(Exception):
-    """Transisi status yang tidak sah menurut mesin status."""
+    """A status transition that is not allowed by the state machine."""
 
     def __init__(self, current: SessionStatus, event: str) -> None:
         self.current = current
         self.event = event
         super().__init__(
-            f"Transisi tidak sah: peristiwa '{event}' pada status '{current}'"
+            f"Invalid transition: event '{event}' in status '{current}'"
         )
 
 
 def next_status(current: SessionStatus, event: str) -> SessionStatus:
-    """Kembalikan status berikut untuk (status, peristiwa) atau lempar error."""
+    """Return the next status for (status, event), or raise InvalidTransition."""
     try:
         return _TRANSITIONS[(SessionStatus(current), event)]
     except KeyError as exc:
@@ -49,10 +49,10 @@ def next_status(current: SessionStatus, event: str) -> SessionStatus:
 
 
 def can_transition(current: SessionStatus, event: str) -> bool:
-    """True bila (status, peristiwa) merupakan transisi yang sah."""
+    """True if (status, event) is an allowed transition."""
     return (SessionStatus(current), event) in _TRANSITIONS
 
 
 def accepts_teaching_input(current: SessionStatus) -> bool:
-    """teaching_input hanya sah pada status MENGAJAR (§4.2)."""
-    return SessionStatus(current) == SessionStatus.MENGAJAR
+    """teaching_input is only valid in the TEACHING state (§4.2)."""
+    return SessionStatus(current) == SessionStatus.TEACHING

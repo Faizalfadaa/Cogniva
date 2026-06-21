@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0-m0",
   "type": "module",
-  "description": "Cogniva frontend SPA — React + TypeScript + Vite + Tailwind (skeleton M0)",
+  "description": "Cogniva frontend SPA — React + TypeScript + Vite + Tailwind (M0 skeleton)",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

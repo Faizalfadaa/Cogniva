@@ -1,8 +1,8 @@
-"""Titik masuk aplikasi FastAPI Cogniva (backend modular-monolith, §2.1).
+"""Cogniva FastAPI application entrypoint (modular-monolith backend, §2.1).
 
-Menggabungkan lapisan REST (siklus hidup sesi) dan WebSocket (jalur sesi
-real-time). Untuk M0 ini adalah kerangka: kontrak data & mesin status sudah
-ditegakkan, sementara logika agen AI menyusul di milestone berikutnya.
+Combines the REST layer (session lifecycle) and the WebSocket layer (real-time
+session channel). For M0 this is a skeleton: the data contracts & state machine
+are already enforced, while the AI agent logic comes in later milestones.
 """
 
 from __future__ import annotations
@@ -14,11 +14,11 @@ from .api import rest, websocket
 
 app = FastAPI(
     title="Cogniva",
-    description="Platform Belajar dengan Prinsip Learning by Teaching — backend M0",
+    description="A Learning-by-Teaching study platform — backend M0",
     version="0.1.0-m0",
 )
 
-# Frontend SPA (Vite dev server) memanggil backend lintas origin saat dev.
+# The frontend SPA (Vite dev server) calls the backend cross-origin in dev.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -33,5 +33,5 @@ app.include_router(websocket.router)
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    """Cek kesehatan sederhana untuk deployment/uji."""
+    """Simple health check for deployment/testing."""
     return {"status": "ok", "milestone": "M0"}

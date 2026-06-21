@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Aksen ungu Cogniva (lihat dokumen arsitektur).
+        // Cogniva purple accent (see the architecture document).
         cogniva: "#7c3aed",
       },
     },

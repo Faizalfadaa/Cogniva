@@ -1,8 +1,8 @@
-"""Learner: LearnerState, Misc, LearnerResponse (Dokumen Arsitektur §6.7, §6.8).
+"""Learner: LearnerState, Misc, LearnerResponse (Architecture Document §6.7, §6.8).
 
-LearnerState adalah model mental murid yang diperbarui tiap giliran. Tidak
-pernah dibagikan ke Evaluator sebagai kunci jawaban (invarian §1.4).
-LearnerResponse selalu dalam peran murid — bertanya, ragu, atau memparafrase.
+LearnerState is the student's mental model, updated each turn. It is never
+shared with the Evaluator as an answer key (invariant §1.4). LearnerResponse
+is always in the student role — asking, doubting, or paraphrasing.
 """
 
 from __future__ import annotations
@@ -14,44 +14,44 @@ from .enums import DerivedFrom, LearnerResponseType
 
 
 class Misc(CamelModel):
-    """Satu miskonsepsi aktif yang sedang dipegang murid (§6.7)."""
+    """A single active misconception the student currently holds (§6.7)."""
 
-    concept: str = Field(description="Konsep yang disalahpahami")
-    belief: str = Field(description="Keyakinan keliru murid atas konsep itu")
+    concept: str = Field(description="The misunderstood concept")
+    belief: str = Field(description="The student's faulty belief about it")
 
 
 class LearnerState(CamelModel):
-    """Model mental murid, diperbarui tiap giliran (§6.7)."""
+    """The student's mental model, updated each turn (§6.7)."""
 
-    session_id: str = Field(description="Sesi pemilik state")
+    session_id: str = Field(description="Session that owns the state")
     understood_concepts: list[str] = Field(
-        default_factory=list, description="Konsep yang sudah dipahami murid"
+        default_factory=list, description="Concepts the student now understands"
     )
     active_misconceptions: list[Misc] = Field(
-        default_factory=list, description="Miskonsepsi aktif { concept, belief }"
+        default_factory=list, description="Active misconceptions { concept, belief }"
     )
     open_gaps: list[str] = Field(
-        default_factory=list, description="Celah pemahaman yang belum terisi"
+        default_factory=list, description="Understanding gaps not yet filled"
     )
     questions_asked: list[str] = Field(
-        default_factory=list, description="Pertanyaan yang sudah pernah diajukan"
+        default_factory=list, description="Questions already asked"
     )
     updated_at_turn: int = Field(
-        default=0, description="Giliran terakhir yang memperbarui state"
+        default=0, description="Last turn that updated the state"
     )
 
 
 class LearnerResponse(CamelModel):
-    """Keluaran Learner pada satu giliran — selalu dalam peran murid (§6.8)."""
+    """The Learner's output for one turn — always in the student role (§6.8)."""
 
-    response_id: str = Field(description="Pengenal unik respons")
-    turn_index: int = Field(description="Giliran asal respons")
+    response_id: str = Field(description="Unique response identifier")
+    turn_index: int = Field(description="Turn the response came from")
     type: LearnerResponseType = Field(
         description='"question" | "confusion" | "acknowledgment" | "paraphrase"'
     )
-    text: str = Field(description="Isi ucapan murid")
+    text: str = Field(description="The student's utterance")
     target_concept: str | None = Field(
-        default=None, description="Konsep yang disasar pertanyaan"
+        default=None, description="Concept the question targets"
     )
     derived_from: DerivedFrom = Field(
         description='"gap" | "misconception" | "new_info"'

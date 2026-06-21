@@ -1,55 +1,59 @@
 # Cogniva
 
-Platform belajar dengan prinsip **Learning by Teaching** — pengguna mengajar AI
-yang berperan sebagai murid, lalu mendapat evaluasi atas kualitas penjelasannya.
+A **Learning-by-Teaching** study platform — the user teaches an AI that plays
+the role of a student, then receives an evaluation of how well they explained.
 
-Repositori ini adalah **kerangka kerja Milestone M0 (Penyelarasan & Kontrak)**.
-Acuan desain: `Cogniva_Dokumen_Arsitektur.pdf`.
+This repository is the **Milestone M0 (Alignment & Contracts) scaffold**.
+Design reference: `Cogniva_Dokumen_Arsitektur.pdf` (in Indonesian).
 
-## Status Milestone M0
+> Note: the architecture PDF is written in Indonesian; the code, comments, and
+> contract enum values in this repo are in English for an international
+> submission. See `docs/CONTRACTS.md` for the enum value mapping.
 
-Deliverable M0 menurut dokumen (§11): _dokumen, kontrak data, repo & kerangka,
-1–2 topik demo_.
+## Milestone M0 status
 
-| Deliverable M0 | Status | Lokasi |
+M0 deliverables per the document (§11): _the document, the data contracts, the
+repo & scaffold, and 1–2 demo topics._
+
+| M0 deliverable | Status | Location |
 | --- | --- | --- |
-| Dokumen arsitektur | ✅ | `Cogniva_Dokumen_Arsitektur.pdf` |
-| Kontrak data (§6) | ✅ | `backend/app/contracts/`, `frontend/src/contracts/` |
-| Mesin status sesi (§4) | ✅ | `backend/app/state_machine.py` |
-| Kerangka API REST + WebSocket (§7) | ✅ | `backend/app/api/` |
-| Repo & kerangka frontend (React+TS+Vite+Tailwind) | ✅ | `frontend/` |
-| 1–2 topik demo (§6.1) | ✅ | `backend/app/data/topics/` |
+| Architecture document | ✅ | `Cogniva_Dokumen_Arsitektur.pdf` |
+| Data contracts (§6) | ✅ | `backend/app/contracts/`, `frontend/src/contracts/` |
+| Session state machine (§4) | ✅ | `backend/app/state_machine.py` |
+| REST + WebSocket API skeleton (§7) | ✅ | `backend/app/api/` |
+| Frontend repo & scaffold (React+TS+Vite+Tailwind) | ✅ | `frontend/` |
+| 1–2 demo topics (§6.1) | ✅ | `backend/app/data/topics/` |
 
-Logika agen AI (Vision, ASR, Learner, Evaluator) **belum** diimplementasikan —
-itu lingkup M1+. Titik-titik tersebut ditandai `TODO(Mx)` di kode dan, untuk M0,
-mengembalikan placeholder/`error` yang dapat dipulihkan, bukan crash.
+The AI agent logic (Vision, ASR, Learner, Evaluator) is **not** implemented yet —
+that is M1+ scope. Those points are marked `TODO(Mx)` in the code and, for M0,
+return placeholders / recoverable `error` messages rather than crashing.
 
-## Struktur
+## Structure
 
 ```
 Cogniva/
-├── Cogniva_Dokumen_Arsitektur.pdf   # acuan desain (output M0)
+├── Cogniva_Dokumen_Arsitektur.pdf   # design reference (M0 output)
 ├── docs/
-│   └── CONTRACTS.md                 # peta kontrak data → kode
-├── backend/                         # Python + FastAPI (modular-monolith)
+│   └── CONTRACTS.md                 # data-contract → code map
+├── backend/                         # Python + FastAPI (modular monolith)
 │   ├── app/
-│   │   ├── contracts/               # model Pydantic — kontrak §6
-│   │   ├── ws/messages.py           # kontrak pesan WebSocket §7.2
-│   │   ├── state_machine.py         # mesin status sesi §4
+│   │   ├── contracts/               # Pydantic models — §6 contracts
+│   │   ├── ws/messages.py           # WebSocket message contracts §7.2
+│   │   ├── state_machine.py         # session state machine §4
 │   │   ├── api/                     # REST §7.1 + WebSocket §7.2
-│   │   ├── data/topics/             # topik demo terkurasi §6.1
-│   │   ├── store.py                 # store in-memory (placeholder §8)
-│   │   └── main.py                  # entrypoint FastAPI
-│   ├── tests/                       # uji mesin status & kontrak
+│   │   ├── data/topics/             # curated demo topics §6.1
+│   │   ├── store.py                 # in-memory store (placeholder for §8)
+│   │   └── main.py                  # FastAPI entrypoint
+│   ├── tests/                       # state-machine & contract tests
 │   └── requirements.txt
 └── frontend/                        # React + TypeScript + Vite + Tailwind
     └── src/
-        ├── contracts/               # mirror TS dari kontrak §6 & pesan §7.2
-        ├── api/client.ts            # klien REST tipis
-        └── App.tsx                  # kerangka UI (memuat topik demo)
+        ├── contracts/               # TS mirror of §6 contracts & §7.2 messages
+        ├── api/client.ts            # thin REST client
+        └── App.tsx                  # UI skeleton (loads the demo topics)
 ```
 
-## Menjalankan
+## Running
 
 ### Backend (port 8000)
 
@@ -59,9 +63,9 @@ python -m pip install -r requirements.txt
 python -m uvicorn app.main:app --reload
 ```
 
-Dokumentasi OpenAPI interaktif: http://localhost:8000/docs
+Interactive OpenAPI docs: http://localhost:8000/docs
 
-Uji:
+Tests:
 
 ```bash
 cd backend
@@ -76,16 +80,16 @@ npm install
 npm run dev
 ```
 
-Pastikan backend berjalan agar daftar topik termuat (CORS sudah diizinkan untuk
-`localhost:5173` di `app/main.py`).
+Make sure the backend is running so the topic list loads (CORS is already
+allowed for `localhost:5173` in `app/main.py`).
 
-## Tumpukan teknologi (§9)
+## Tech stack (§9)
 
 Frontend: React + TypeScript + Vite + Tailwind · Backend: Python + FastAPI ·
-Real-time: WebSocket · Penyimpanan (menyusul): SQLite + penyimpanan objek.
+Real-time: WebSocket · Storage (later): SQLite + object store.
 
-## Catatan kontrak
+## Contract notes
 
-Kontrak data adalah sumber kebenaran tunggal lintas tim (§6, §12). Setiap
-perubahan harus melalui kesepakatan tech lead dan disinkronkan di **kedua** sisi
-(Pydantic backend ⇄ TypeScript frontend). Lihat `docs/CONTRACTS.md`.
+The data contracts are the single source of truth across the team (§6, §12).
+Any change must be agreed with the tech lead and synced on **both** sides
+(backend Pydantic ⇄ frontend TypeScript). See `docs/CONTRACTS.md`.

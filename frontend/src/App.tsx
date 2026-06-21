@@ -3,9 +3,9 @@ import { api } from "./api/client";
 import type { Topic } from "./contracts";
 
 /**
- * Kerangka frontend M0. Membuktikan kontrak end-to-end: memuat daftar topik
- * demo dari backend lalu menampilkannya. Komponen sesungguhnya — Whiteboard &
- * Input (§3.1) serta Dialog/Debrief (§3.2) — menyusul di M1/M2/M3.
+ * M0 frontend skeleton. Proves the contract end-to-end: it loads the demo
+ * topics from the backend and renders them. The real components — Whiteboard
+ * & Input (§3.1) and Dialog/Debrief (§3.2) — come in M1/M2/M3.
  */
 export default function App() {
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -24,19 +24,19 @@ export default function App() {
         <div className="mx-auto max-w-3xl px-6 py-5">
           <h1 className="text-2xl font-bold text-cogniva">Cogniva</h1>
           <p className="text-sm text-slate-500">
-            Platform Belajar dengan Prinsip Learning by Teaching · skeleton M0
+            A Learning-by-Teaching study platform · M0 skeleton
           </p>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-8">
-        <h2 className="mb-4 text-lg font-semibold">Topik demo tersedia</h2>
+        <h2 className="mb-4 text-lg font-semibold">Available demo topics</h2>
 
         {error && (
           <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            Gagal memuat topik: {error}
+            Failed to load topics: {error}
             <div className="mt-1 text-red-500">
-              Pastikan backend berjalan di http://localhost:8000.
+              Make sure the backend is running at http://localhost:8000.
             </div>
           </div>
         )}

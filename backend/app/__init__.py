@@ -1,1 +1,1 @@
-"""Paket backend Cogniva (FastAPI modular-monolith)."""
+"""Cogniva backend package (FastAPI modular-monolith)."""

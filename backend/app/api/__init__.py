@@ -1,1 +1,1 @@
-"""Lapisan API: REST (siklus hidup sesi) + WebSocket (jalur real-time)."""
+"""API layer: REST (session lifecycle) + WebSocket (real-time channel)."""

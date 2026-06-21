@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Dev server di port 5173; backend FastAPI di 8000 (lihat CORS di app/main.py).
+// Dev server on port 5173; FastAPI backend on 8000 (see CORS in app/main.py).
 export default defineConfig({
   plugins: [react()],
   server: {

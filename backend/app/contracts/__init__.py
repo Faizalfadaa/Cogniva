@@ -1,7 +1,7 @@
-"""Kontrak data antar-komponen Cogniva (Dokumen Arsitektur §6).
+"""Cogniva inter-component data contracts (Architecture Document §6).
 
-Inti keluaran Milestone M0. Semua komponen wajib mematuhi bentuk data ini.
-Perubahan apa pun atas kontrak harus melalui kesepakatan dengan tech lead.
+The core output of Milestone M0. Every component must conform to these data
+shapes. Any change to the contracts must be agreed with the tech lead.
 """
 
 from __future__ import annotations

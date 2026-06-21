@@ -1,8 +1,8 @@
-"""SpeechTranscript — hasil transkripsi suara pengajar pada satu giliran.
+"""SpeechTranscript — the teacher's transcribed speech for one turn.
 
-(Dokumen Arsitektur §6.5). Menjadi masukan inti bagi Learner dan bagian
-transkrip yang dibaca Evaluator. Dihasilkan oleh ASR. Bila keyakinan rendah,
-transkrip ditampilkan agar pengguna dapat mengoreksinya (§3.5).
+(Architecture Document §6.5). It is a core input for the Learner and part of
+the transcript the Evaluator reads. Produced by ASR. When confidence is low,
+the transcript is shown so the user can correct it (§3.5).
 """
 
 from __future__ import annotations
@@ -13,13 +13,13 @@ from .base import CamelModel
 
 
 class SpeechTranscript(CamelModel):
-    segment_id: str = Field(description="Pengenal unik segmen suara")
-    session_id: str = Field(description="Sesi pemilik segmen")
-    turn_index: int = Field(description="Indeks giliran terkait")
-    transcript: str = Field(description="Teks hasil transkripsi ucapan pengajar")
+    segment_id: str = Field(description="Unique speech-segment identifier")
+    session_id: str = Field(description="Session that owns the segment")
+    turn_index: int = Field(description="Related turn index")
+    transcript: str = Field(description="Transcribed text of the teacher's speech")
     audio_ref: str | None = Field(
-        default=None, description="Referensi/URL klip audio bila disimpan"
+        default=None, description="Reference/URL to the audio clip if stored"
     )
-    confidence: float = Field(description="Tingkat keyakinan ASR 0..1")
-    language: str = Field(description='Kode bahasa, mis. "id-ID"')
-    captured_at: str = Field(description="Waktu rekam (ISO-8601)")
+    confidence: float = Field(description="ASR confidence level 0..1")
+    language: str = Field(description='Language code, e.g. "en-US"')
+    captured_at: str = Field(description="Recording time (ISO-8601)")

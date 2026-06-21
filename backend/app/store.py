@@ -1,10 +1,12 @@
-"""Penyimpanan in-memory untuk M0/skeleton.
+"""In-memory storage for the M0 skeleton.
 
-Model penyimpanan persisten (SQLite + objek) menyusul di milestone berikutnya
-(Dokumen Arsitektur §8). Untuk M0 cukup store memori agar mesin status dan
-kontrak dapat dijalankan & diuji ujung-ke-ujung tanpa logika agen.
+The persistent storage model (SQLite + object store) comes in a later
+milestone (Architecture Document §8). For M0 an in-memory store is enough so
+the state machine and contracts can run and be tested end-to-end without any
+agent logic.
 
-Repositori topik dimuat dari berkas seed JSON (1-2 topik demo, deliverable M0).
+The topic repository is loaded from JSON seed files (1-2 demo topics, an M0
+deliverable).
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ _SEED_DIR = Path(__file__).parent / "data" / "topics"
 
 
 class TopicRepository:
-    """Topik demo terkurasi, dimuat dari berkas seed JSON di muka (§6.1)."""
+    """Curated demo topics, loaded from JSON seed files up front (§6.1)."""
 
     def __init__(self) -> None:
         self._topics: dict[str, Topic] = {}
@@ -43,7 +45,7 @@ class TopicRepository:
 
 
 class SessionStore:
-    """Store sesi + hasil evaluasi in-memory (placeholder M0 untuk §8)."""
+    """In-memory session + evaluation store (M0 placeholder for §8)."""
 
     def __init__(self) -> None:
         self._sessions: dict[str, Session] = {}
@@ -68,6 +70,6 @@ class SessionStore:
         return self._evaluations.get(session_id)
 
 
-# Singleton store untuk skeleton M0
+# Singleton stores for the M0 skeleton
 topics = TopicRepository()
 sessions = SessionStore()

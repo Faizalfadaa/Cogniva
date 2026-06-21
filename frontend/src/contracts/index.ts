@@ -1,17 +1,17 @@
 /**
- * Kontrak data antar-komponen Cogniva — sisi frontend (Dokumen Arsitektur §6).
+ * Cogniva inter-component data contracts — frontend side (Architecture Document §6).
  *
- * Inti keluaran Milestone M0. Tipe-tipe ini HARUS sepadan dengan model
- * Pydantic backend (backend/app/contracts). Konvensi: field camelCase,
- * pertukaran JSON, waktu ISO-8601 (UTC), field opsional bertanda `?`.
- * Perubahan apa pun atas kontrak ini harus melalui kesepakatan tech lead.
+ * The core output of Milestone M0. These types MUST stay in sync with the
+ * backend Pydantic models (backend/app/contracts). Conventions: camelCase
+ * fields, JSON exchange, ISO-8601 (UTC) timestamps, optional fields marked `?`.
+ * Any change to these contracts must be agreed with the tech lead.
  */
 
-// --- Enumerasi (§4, §6) ----------------------------------------------------
+// --- Enumerations (§4, §6) -------------------------------------------------
 
-export type SessionStatus = "PERSIAPAN" | "MENGAJAR" | "SELESAI" | "EVALUASI";
+export type SessionStatus = "SETUP" | "TEACHING" | "ENDED" | "EVALUATED";
 
-export type Difficulty = "dasar" | "menengah" | "lanjut";
+export type Difficulty = "easy" | "medium" | "hard";
 
 export type ElementType =
   | "text"
@@ -29,10 +29,10 @@ export type LearnerResponseType =
 export type DerivedFrom = "gap" | "misconception" | "new_info";
 
 export type FindingCategory =
-  | "BENAR"
-  | "KELIRU"
-  | "TERLEWAT"
-  | "MEMBINGUNGKAN";
+  | "CORRECT"
+  | "WRONG"
+  | "MISSED"
+  | "CONFUSING";
 
 // --- Topic (§6.1) ----------------------------------------------------------
 
@@ -40,10 +40,10 @@ export interface Topic {
   topicId: string;
   title: string;
   description: string;
-  /** Materi rujukan (markdown) sebagai acuan kebenaran. */
+  /** Reference material (markdown) as the source of truth. */
   referenceMaterial: string;
   keyConcepts: string[];
-  /** Miskonsepsi umum; benih perilaku keliru Learner. */
+  /** Common misconceptions; seeds for the Learner's faulty beliefs. */
   commonMisconceptions: string[];
   difficulty: Difficulty;
 }
@@ -61,13 +61,13 @@ export interface Session {
   evaluationId?: string;
 }
 
-// --- Kanal visual (§6.3, §6.4) --------------------------------------------
+// --- Visual channel (§6.3, §6.4) ------------------------------------------
 
 export interface BoardSnapshot {
   snapshotId: string;
   sessionId: string;
   turnIndex: number;
-  /** Data gambar base64 atau URL objek. */
+  /** Image data as base64 or object URL. */
   image: string;
   format: string;
   capturedAt: string;
@@ -76,7 +76,7 @@ export interface BoardSnapshot {
 export interface Element {
   type: ElementType;
   content: string;
-  /** Kotak pembatas [x, y, w, h]. */
+  /** Bounding box [x, y, w, h]. */
   bbox?: [number, number, number, number];
 }
 
@@ -84,14 +84,14 @@ export interface VisionInterpretation {
   snapshotId: string;
   transcribedText: string;
   elements: Element[];
-  /** Tingkat keyakinan 0..1. */
+  /** Confidence level 0..1. */
   confidence: number;
-  /** true bila keyakinan di bawah ambang. */
+  /** true when confidence is below threshold. */
   needsConfirmation: boolean;
   suggestedClarification?: string;
 }
 
-// --- Kanal suara (§6.5) ----------------------------------------------------
+// --- Voice channel (§6.5) --------------------------------------------------
 
 export interface SpeechTranscript {
   segmentId: string;
@@ -99,9 +99,9 @@ export interface SpeechTranscript {
   turnIndex: number;
   transcript: string;
   audioRef?: string;
-  /** Tingkat keyakinan ASR 0..1. */
+  /** ASR confidence level 0..1. */
   confidence: number;
-  /** Kode bahasa, mis. "id-ID". */
+  /** Language code, e.g. "en-US". */
   language: string;
   capturedAt: string;
 }
@@ -156,7 +156,7 @@ export interface Finding {
 export interface EvaluationResult {
   evaluationId: string;
   sessionId: string;
-  /** Skor keseluruhan 0..100. */
+  /** Overall score 0..100. */
   score: number;
   findings: Finding[];
   summary: string;

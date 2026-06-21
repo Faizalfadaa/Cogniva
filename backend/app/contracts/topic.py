@@ -1,8 +1,8 @@
-"""Topic — definisi topik beserta acuan kebenarannya (Dokumen Arsitektur §6.1).
+"""Topic — a topic definition with its source of truth (Architecture Document §6.1).
 
-Dikurasi di muka untuk topik demo. referenceMaterial mengalir penuh ke
-Evaluator sebagai kunci jawaban; ke Learner HANYA commonMisconceptions yang
-mengalir (invarian: Learner tidak memegang kunci jawaban, §1.4).
+Curated up front for demo topics. referenceMaterial flows in full to the
+Evaluator as the answer key; only commonMisconceptions flow to the Learner
+(invariant: the Learner never holds the answer key, §1.4).
 """
 
 from __future__ import annotations
@@ -14,18 +14,18 @@ from .enums import Difficulty
 
 
 class Topic(CamelModel):
-    topic_id: str = Field(description="Pengenal unik topik")
-    title: str = Field(description='Judul topik, mis. "Fotosintesis"')
-    description: str = Field(description="Deskripsi singkat untuk pemilihan topik")
+    topic_id: str = Field(description="Unique topic identifier")
+    title: str = Field(description='Topic title, e.g. "Photosynthesis"')
+    description: str = Field(description="Short description for topic selection")
     reference_material: str = Field(
-        description="Materi rujukan (markdown) sebagai acuan kebenaran"
+        description="Reference material (markdown) as the source of truth"
     )
     key_concepts: list[str] = Field(
         default_factory=list,
-        description="Konsep kunci yang idealnya tersampaikan pengguna",
+        description="Key concepts the user should ideally convey",
     )
     common_misconceptions: list[str] = Field(
         default_factory=list,
-        description="Miskonsepsi umum; benih perilaku keliru Learner",
+        description="Common misconceptions; seeds for the Learner's faulty beliefs",
     )
-    difficulty: Difficulty = Field(description='"dasar" | "menengah" | "lanjut"')
+    difficulty: Difficulty = Field(description='"easy" | "medium" | "hard"')

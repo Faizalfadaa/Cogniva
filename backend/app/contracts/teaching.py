@@ -1,7 +1,8 @@
-"""TeachingTurn — satu rekaman giliran mengajar (Dokumen Arsitektur §6.6).
+"""TeachingTurn — a single record of one teaching turn (Architecture Document §6.6).
 
-Rangkaian objek inilah yang menyusun transkrip. Tiap giliran menggabungkan
-kanal papan (snapshot + interpretasi) dan kanal suara (transkrip ucapan).
+The sequence of these objects forms the transcript. Each turn combines the
+board channel (snapshot + interpretation) and the voice channel (speech
+transcript).
 """
 
 from __future__ import annotations
@@ -14,15 +15,15 @@ from .speech import SpeechTranscript
 
 
 class TeachingTurn(CamelModel):
-    turn_index: int = Field(description="Indeks giliran dalam sesi")
-    session_id: str = Field(description="Sesi pemilik giliran")
-    snapshot_id: str = Field(description="Snapshot papan giliran ini")
-    interpretation: VisionInterpretation = Field(description="Hasil pembacaan papan")
+    turn_index: int = Field(description="Turn index within the session")
+    session_id: str = Field(description="Session that owns the turn")
+    snapshot_id: str = Field(description="Board snapshot for this turn")
+    interpretation: VisionInterpretation = Field(description="Board reading result")
     speech_transcript: SpeechTranscript | None = Field(
-        default=None, description="Transkrip ucapan pengajar giliran ini"
+        default=None, description="Teacher's speech transcript for this turn"
     )
     typed_input: str | None = Field(
-        default=None, description="Teks ketikan opsional (pelengkap/fallback)"
+        default=None, description="Optional typed text (supplement/fallback)"
     )
-    learner_response_id: str = Field(description="Referensi ke respons Learner")
-    created_at: str = Field(description="Waktu giliran (ISO-8601)")
+    learner_response_id: str = Field(description="Reference to the Learner's response")
+    created_at: str = Field(description="Turn time (ISO-8601)")

@@ -1,13 +1,13 @@
 """Base model for all Cogniva data contracts.
 
-Konvensi kontrak (Dokumen Arsitektur §6):
-- Nama field memakai camelCase saat pertukaran JSON.
-- Waktu memakai ISO-8601 (UTC).
-- Field bertanda tanya (?) di dokumen bersifat opsional.
+Contract conventions (Architecture Document §6):
+- Field names use camelCase on the JSON wire.
+- Timestamps use ISO-8601 (UTC).
+- Fields marked with `?` in the document are optional.
 
-Di sisi Python kita memakai snake_case secara internal dan meng-alias-kan
-ke camelCase untuk serialisasi/deserialisasi JSON, sehingga kontrak di kawat
-tetap sama persis dengan dokumen sementara kode Python tetap idiomatik.
+Internally we use snake_case in Python and alias to camelCase for JSON
+(de)serialization, so the wire contract matches the document exactly while
+the Python code stays idiomatic.
 """
 
 from __future__ import annotations
@@ -19,19 +19,19 @@ from pydantic.alias_generators import to_camel
 
 
 class CamelModel(BaseModel):
-    """Base: serialisasi camelCase, terima camelCase maupun snake_case."""
+    """Base: serialize to camelCase, accept both camelCase and snake_case."""
 
     model_config = ConfigDict(
         alias_generator=to_camel,
         populate_by_name=True,
         use_enum_values=True,
-        # Validasi saat assignment agar status sesi yang diubah mesin status
-        # tetap tersimpan sebagai nilai string (mis. "EVALUASI"), bukan objek
-        # enum — menjaga konsistensi serialisasi di REST maupun WebSocket.
+        # Validate on assignment so a session status mutated by the state
+        # machine is stored as its string value (e.g. "TEACHING") rather than
+        # an enum object — keeping serialization consistent across REST and WS.
         validate_assignment=True,
     )
 
 
 def utc_now_iso() -> str:
-    """Waktu sekarang sebagai string ISO-8601 UTC (kontrak waktu §6)."""
+    """Current time as an ISO-8601 UTC string (time contract, §6)."""
     return datetime.now(timezone.utc).isoformat()

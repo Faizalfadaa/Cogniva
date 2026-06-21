@@ -1,4 +1,4 @@
-"""Memastikan paket `app` dapat diimpor saat menjalankan pytest dari backend/."""
+"""Ensure the `app` package is importable when running pytest from backend/."""
 
 import sys
 from pathlib import Path

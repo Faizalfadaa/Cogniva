@@ -1,8 +1,8 @@
-"""Kontrak pesan WebSocket (Dokumen Arsitektur §7.2).
+"""WebSocket message contracts (Architecture Document §7.2).
 
-Jalur sesi real-time memakai WebSocket pada /ws/sessions/{id}. Setiap pesan
-membawa field `type`. Pesan dari klien ke server hanya diproses bila status
-sesi mengizinkannya (mis. teaching_input hanya pada MENGAJAR).
+The real-time session channel uses WebSocket at /ws/sessions/{id}. Every
+message carries a `type` field. Client-to-server messages are only processed
+when the session status allows it (e.g. teaching_input only in TEACHING).
 """
 
 from __future__ import annotations
@@ -16,51 +16,51 @@ from ..contracts.board import VisionInterpretation
 from ..contracts.learner import LearnerResponse
 from ..contracts.speech import SpeechTranscript
 
-# --- Klien -> Server -------------------------------------------------------
+# --- Client -> Server ------------------------------------------------------
 
 
 class TeachingInput(CamelModel):
-    """{ image, audio?, typedText? } — kirim giliran (saat MENGAJAR)."""
+    """{ image, audio?, typedText? } — submit a turn (while TEACHING)."""
 
     type: Literal["teaching_input"] = "teaching_input"
-    image: str = Field(description="Snapshot papan: base64 atau URL")
-    audio: str | None = Field(default=None, description="Klip suara pengajar")
-    typed_text: str | None = Field(default=None, description="Teks ketikan opsional")
+    image: str = Field(description="Board snapshot: base64 or URL")
+    audio: str | None = Field(default=None, description="Teacher's voice clip")
+    typed_text: str | None = Field(default=None, description="Optional typed text")
 
 
 class ConfirmationResponse(CamelModel):
-    """{ snapshotId, corrected } — koreksi interpretasi yang ragu."""
+    """{ snapshotId, corrected } — correct an uncertain interpretation."""
 
     type: Literal["confirmation_response"] = "confirmation_response"
     snapshot_id: str
-    corrected: str = Field(description="Teks interpretasi yang dikoreksi pengguna")
+    corrected: str = Field(description="Interpretation text corrected by the user")
 
 
 class EndSession(CamelModel):
-    """Minta akhiri sesi."""
+    """Request to end the session."""
 
     type: Literal["end_session"] = "end_session"
 
 
-# --- Server -> Klien -------------------------------------------------------
+# --- Server -> Client ------------------------------------------------------
 
 
 class VisionResult(CamelModel):
-    """{ interpretation } — hasil pembacaan papan."""
+    """{ interpretation } — board reading result."""
 
     type: Literal["vision_result"] = "vision_result"
     interpretation: VisionInterpretation
 
 
 class SpeechResult(CamelModel):
-    """{ transcript } — transkrip ucapan pengajar."""
+    """{ transcript } — teacher's speech transcript."""
 
     type: Literal["speech_result"] = "speech_result"
     transcript: SpeechTranscript
 
 
 class ConfirmationRequest(CamelModel):
-    """{ snapshotId, suggestedClarification } — minta konfirmasi."""
+    """{ snapshotId, suggestedClarification } — request confirmation."""
 
     type: Literal["confirmation_request"] = "confirmation_request"
     snapshot_id: str
@@ -68,21 +68,21 @@ class ConfirmationRequest(CamelModel):
 
 
 class LearnerMessage(CamelModel):
-    """{ response } — ucapan murid (di-stream)."""
+    """{ response } — the student's utterance (streamed)."""
 
     type: Literal["learner_message"] = "learner_message"
     response: LearnerResponse
 
 
 class StateUpdate(CamelModel):
-    """{ status } — perubahan status sesi."""
+    """{ status } — a session status change."""
 
     type: Literal["state_update"] = "state_update"
     status: str
 
 
 class ErrorMessage(CamelModel):
-    """{ message } — galat dapat dipulihkan."""
+    """{ message } — a recoverable error."""
 
     type: Literal["error"] = "error"
     message: str

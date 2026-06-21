@@ -1,26 +1,26 @@
-# Kontrak Data Cogniva (Inti Keluaran M0)
+# Cogniva Data Contracts (Core M0 Output)
 
-Dokumen ringkas yang menautkan **kontrak data antar-komponen** (Dokumen
-Arsitektur §6) ke implementasinya di kode. Kontrak ini adalah sumber kebenaran
-tunggal; perubahan apa pun harus melalui kesepakatan tech lead (§6, §12).
+A concise document linking the **inter-component data contracts** (Architecture
+Document §6) to their implementation in code. These contracts are the single
+source of truth; any change must be agreed with the tech lead (§6, §12).
 
-## Konvensi
+## Conventions
 
-- Nama field memakai **camelCase** saat pertukaran JSON.
-- Pertukaran data memakai **JSON**.
-- Waktu memakai **ISO-8601 (UTC)**.
-- Field bertanda `?` di dokumen bersifat **opsional**.
+- Field names use **camelCase** on the JSON wire.
+- Data is exchanged as **JSON**.
+- Timestamps use **ISO-8601 (UTC)**.
+- Fields marked `?` in the document are **optional**.
 
-## Dua representasi yang harus tetap sepadan
+## Two representations that must stay in sync
 
-| Sisi | Lokasi | Bentuk |
+| Side | Location | Form |
 | --- | --- | --- |
-| Backend | `backend/app/contracts/` | Model Pydantic v2 (snake_case + alias camelCase) |
-| Frontend | `frontend/src/contracts/index.ts` | `interface` TypeScript (camelCase) |
+| Backend | `backend/app/contracts/` | Pydantic v2 models (snake_case + camelCase alias) |
+| Frontend | `frontend/src/contracts/index.ts` | TypeScript `interface` (camelCase) |
 
-## Peta kontrak → berkas
+## Contract → file map
 
-| Kontrak (§) | Backend | Frontend |
+| Contract (§) | Backend | Frontend |
 | --- | --- | --- |
 | Topic (§6.1) | `contracts/topic.py` | `Topic` |
 | Session (§6.2) | `contracts/session.py` | `Session` |
@@ -31,30 +31,46 @@ tunggal; perubahan apa pun harus melalui kesepakatan tech lead (§6, §12).
 | LearnerState + Misc (§6.7) | `contracts/learner.py` | `LearnerState`, `Misc` |
 | LearnerResponse (§6.8) | `contracts/learner.py` | `LearnerResponse` |
 | EvaluationResult + Finding (§6.9) | `contracts/evaluation.py` | `EvaluationResult`, `Finding` |
-| Pesan WebSocket (§7.2) | `ws/messages.py` | `contracts/messages.ts` |
+| WebSocket messages (§7.2) | `ws/messages.py` | `contracts/messages.ts` |
 
-## Mesin status sesi (§4)
+## Enum value mapping (architecture PDF → code)
+
+The architecture PDF is written in Indonesian and specifies some enum values
+verbatim. For this international submission those values are anglicized (an
+agreed contract change). The mapping below keeps traceability to the document.
+
+| Enum | PDF (Indonesian) | Code (English) |
+| --- | --- | --- |
+| SessionStatus | PERSIAPAN / MENGAJAR / SELESAI / EVALUASI | SETUP / TEACHING / ENDED / EVALUATED |
+| Difficulty | dasar / menengah / lanjut | easy / medium / hard |
+| FindingCategory | BENAR / KELIRU / TERLEWAT / MEMBINGUNGKAN | CORRECT / WRONG / MISSED / CONFUSING |
+
+`ElementType`, `LearnerResponseType`, and `DerivedFrom` were already English in
+the PDF and are unchanged.
+
+## Session state machine (§4)
 
 ```
-PERSIAPAN --start--> MENGAJAR --end--> SELESAI --evaluate--> EVALUASI (terminal)
+SETUP --start--> TEACHING --end--> ENDED --evaluate--> EVALUATED (terminal)
 ```
 
-- Hanya maju, tidak ada jalur mundur (§4.2).
-- `teaching_input` hanya sah pada **MENGAJAR**.
-- Pemicuan evaluasi hanya pada **SELESAI** dan **idempoten**.
+- Forward-only, no path back (§4.2).
+- `teaching_input` is only valid in **TEACHING**.
+- Triggering evaluation is only valid in **ENDED** and is **idempotent**.
 
-Implementasi: `backend/app/state_machine.py` (diuji di
+Implementation: `backend/app/state_machine.py` (tested in
 `backend/tests/test_state_machine.py`).
 
 ## API (§7)
 
-- REST (siklus hidup sesi & data): `backend/app/api/rest.py`, awalan `/api`.
-- WebSocket (jalur real-time): `backend/app/api/websocket.py`, `/ws/sessions/{id}`.
+- REST (session lifecycle & data): `backend/app/api/rest.py`, prefix `/api`.
+- WebSocket (real-time channel): `backend/app/api/websocket.py`, `/ws/sessions/{id}`.
 
-## Invarian pedagogis yang dijaga kontrak (§1.4)
+## Pedagogical invariants the contracts protect (§1.4)
 
-1. Selama sesi, AI tetap berperan **murid** (Learner tidak mengoreksi/menggurui).
-2. Evaluasi hanya terjadi **di akhir**, sebagai fase refleksi terpisah.
-3. Learner **tidak memegang kunci jawaban** — hanya `commonMisconceptions` yang
-   mengalir ke Learner, sementara `referenceMaterial` penuh mengalir ke Evaluator.
-4. Evaluator melihat **seluruh sesi** (transkrip lengkap), bukan ujian terisolasi.
+1. During a session the AI stays in the **student** role (the Learner never
+   corrects or lectures the user).
+2. Evaluation happens only **at the end**, as a separate reflection phase.
+3. The Learner **never holds the answer key** — only `commonMisconceptions`
+   flow to the Learner, while the full `referenceMaterial` flows to the Evaluator.
+4. The Evaluator sees the **whole session** (full transcript), not an isolated quiz.

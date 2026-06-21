@@ -1,9 +1,9 @@
-"""Endpoint REST untuk siklus hidup sesi & pengambilan data (Dokumen Arsitektur §7.1).
+"""REST endpoints for the session lifecycle & data retrieval (Architecture Document §7.1).
 
-Awalan jalur adalah /api. Mesin status sesi (§4) ditegakkan di sini.
-Pemanggilan agen (Vision/Learner/Evaluator) masih stub untuk M0 — diisi pada
-M1+. Pemicuan evaluasi bersifat idempoten (§4.2): memanggil dua kali atas sesi
-yang sama mengembalikan hasil yang sama, bukan menjalankan Evaluator ulang.
+The path prefix is /api. The session state machine (§4) is enforced here.
+Agent calls (Vision/Learner/Evaluator) are still stubs for M0 — filled in at
+M1+. Triggering evaluation is idempotent (§4.2): calling it twice for the same
+session returns the same result rather than re-running the Evaluator.
 """
 
 from __future__ import annotations
@@ -26,36 +26,36 @@ class CreateSessionRequest(BaseModel):
     topicId: str
 
 
-# --- Topik -----------------------------------------------------------------
+# --- Topics ----------------------------------------------------------------
 
 
 @router.get("/topics", response_model=list[Topic])
 def list_topics() -> list[Topic]:
-    """Daftar topik demo tersedia."""
+    """List the available demo topics."""
     return topics.list()
 
 
 @router.get("/topics/{topic_id}", response_model=Topic)
 def get_topic(topic_id: str) -> Topic:
-    """Detail satu topik."""
+    """Details of a single topic."""
     topic = topics.get(topic_id)
     if topic is None:
-        raise HTTPException(status_code=404, detail="Topik tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Topic not found")
     return topic
 
 
-# --- Siklus hidup sesi -----------------------------------------------------
+# --- Session lifecycle -----------------------------------------------------
 
 
 @router.post("/sessions", response_model=Session, status_code=201)
 def create_session(req: CreateSessionRequest) -> Session:
-    """Membuat sesi baru atas sebuah topicId → Session (PERSIAPAN)."""
+    """Create a new session for a topicId -> Session (SETUP)."""
     if topics.get(req.topicId) is None:
-        raise HTTPException(status_code=404, detail="Topik tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Topic not found")
     session = Session(
         session_id=sessions.new_id("ses"),
         topic_id=req.topicId,
-        status=SessionStatus.PERSIAPAN,
+        status=SessionStatus.SETUP,
         created_at=utc_now_iso(),
     )
     return sessions.save_session(session)
@@ -63,13 +63,13 @@ def create_session(req: CreateSessionRequest) -> Session:
 
 @router.get("/sessions/{session_id}", response_model=Session)
 def get_session(session_id: str) -> Session:
-    """Mengambil keadaan sesi."""
+    """Get the session state."""
     return _require_session(session_id)
 
 
 @router.post("/sessions/{session_id}/start", response_model=Session)
 def start_session(session_id: str) -> Session:
-    """Memulai mengajar → Session (MENGAJAR)."""
+    """Start teaching -> Session (TEACHING)."""
     session = _require_session(session_id)
     _advance(session, START)
     session.started_at = utc_now_iso()
@@ -78,7 +78,7 @@ def start_session(session_id: str) -> Session:
 
 @router.post("/sessions/{session_id}/end", response_model=Session)
 def end_session(session_id: str) -> Session:
-    """Mengakhiri sesi → Session (SELESAI). Transkrip terkunci."""
+    """End the session -> Session (ENDED). The transcript is locked."""
     session = _require_session(session_id)
     _advance(session, END)
     session.ended_at = utc_now_iso()
@@ -87,27 +87,27 @@ def end_session(session_id: str) -> Session:
 
 @router.post("/sessions/{session_id}/evaluate", response_model=EvaluationResult)
 def evaluate_session(session_id: str) -> EvaluationResult:
-    """Memicu Evaluator (idempoten). Pasca-sesi saja (§3.7, §4.2).
+    """Trigger the Evaluator (idempotent). Post-session only (§3.7, §4.2).
 
-    M0: mengembalikan hasil placeholder bila belum ada. Logika Evaluator nyata
-    menyusul di M3.
+    M0: returns a placeholder result if none exists yet. The real Evaluator
+    logic comes in M3.
     """
     session = _require_session(session_id)
 
     existing = sessions.get_evaluation_by_session(session_id)
     if existing is not None:
-        return existing  # idempoten: jangan jalankan Evaluator ulang
+        return existing  # idempotent: do not re-run the Evaluator
 
-    if session.status == SessionStatus.SELESAI:
+    if session.status == SessionStatus.ENDED:
         _advance(session, EVALUATE)
 
-    # TODO(M3): panggil Evaluator nyata dengan transkrip + referenceMaterial.
+    # TODO(M3): call the real Evaluator with the transcript + referenceMaterial.
     result = EvaluationResult(
         evaluation_id=sessions.new_id("ev"),
         session_id=session_id,
         score=0,
         findings=[],
-        summary="Evaluator belum diimplementasikan (placeholder M0).",
+        summary="Evaluator not implemented yet (M0 placeholder).",
         strengths=[],
         improvements=[],
         generated_at=utc_now_iso(),
@@ -120,21 +120,21 @@ def evaluate_session(session_id: str) -> EvaluationResult:
 
 @router.get("/sessions/{session_id}/evaluation", response_model=EvaluationResult)
 def get_evaluation(session_id: str) -> EvaluationResult:
-    """Mengambil hasil penilaian."""
+    """Get the evaluation result."""
     _require_session(session_id)
     result = sessions.get_evaluation_by_session(session_id)
     if result is None:
-        raise HTTPException(status_code=404, detail="Evaluasi belum tersedia")
+        raise HTTPException(status_code=404, detail="Evaluation not available yet")
     return result
 
 
-# --- Pembantu --------------------------------------------------------------
+# --- Helpers ---------------------------------------------------------------
 
 
 def _require_session(session_id: str) -> Session:
     session = sessions.get_session(session_id)
     if session is None:
-        raise HTTPException(status_code=404, detail="Sesi tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Session not found")
     return session
 
 

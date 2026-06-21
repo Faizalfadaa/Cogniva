@@ -1,6 +1,6 @@
 /**
- * Kontrak pesan WebSocket — sisi frontend (Dokumen Arsitektur §7.2).
- * Setiap pesan membawa field `type`. Harus sepadan dengan
+ * WebSocket message contracts — frontend side (Architecture Document §7.2).
+ * Every message carries a `type` field. Must stay in sync with
  * backend/app/ws/messages.py.
  */
 
@@ -10,7 +10,7 @@ import type {
   VisionInterpretation,
 } from "./index";
 
-// Klien -> Server
+// Client -> Server
 export interface TeachingInput {
   type: "teaching_input";
   image: string;
@@ -33,7 +33,7 @@ export type ClientMessage =
   | ConfirmationResponse
   | EndSession;
 
-// Server -> Klien
+// Server -> Client
 export interface VisionResult {
   type: "vision_result";
   interpretation: VisionInterpretation;
