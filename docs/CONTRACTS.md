@@ -15,8 +15,8 @@ source of truth; any change must be agreed with the tech lead (§6, §12).
 
 | Side | Location | Form |
 | --- | --- | --- |
-| Backend | `backend/app/contracts/` | Pydantic v2 models (snake_case + camelCase alias) |
-| Frontend | `frontend/src/contracts/index.ts` | TypeScript `interface` (camelCase) |
+| Backend | `apps/backend/app/contracts/` | Pydantic v2 models (snake_case + camelCase alias) |
+| Frontend | `apps/frontend/src/contracts/index.ts` | TypeScript `interface` (camelCase) |
 
 ## Contract → file map
 
@@ -58,13 +58,13 @@ SETUP --start--> TEACHING --end--> ENDED --evaluate--> EVALUATED (terminal)
 - `teaching_input` is only valid in **TEACHING**.
 - Triggering evaluation is only valid in **ENDED** and is **idempotent**.
 
-Implementation: `backend/app/state_machine.py` (tested in
-`backend/tests/test_state_machine.py`).
+Implementation: `apps/backend/app/state_machine.py` (tested in
+`apps/backend/tests/test_state_machine.py`).
 
 ## API (§7)
 
-- REST (session lifecycle & data): `backend/app/api/rest.py`, prefix `/api`.
-- WebSocket (real-time channel): `backend/app/api/websocket.py`, `/ws/sessions/{id}`.
+- REST (session lifecycle & data): `apps/backend/app/api/rest.py`, prefix `/api`.
+- WebSocket (real-time channel): `apps/backend/app/api/websocket.py`, `/ws/sessions/{id}`.
 
 ## Pedagogical invariants the contracts protect (§1.4)
 

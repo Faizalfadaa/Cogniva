@@ -55,8 +55,8 @@ bekerja paralel tanpa saling menunggu.
 
 Seluruh kontrak dari §6 dimaterialisasi di **dua sisi yang harus tetap sepadan**:
 
-- **Backend** — model Pydantic v2 di `backend/app/contracts/` (snake_case internal, alias camelCase di kawat).
-- **Frontend** — `interface` TypeScript di `frontend/src/contracts/index.ts`.
+- **Backend** — model Pydantic v2 di `apps/backend/app/contracts/` (snake_case internal, alias camelCase di kawat).
+- **Frontend** — `interface` TypeScript di `apps/frontend/src/contracts/index.ts`.
 
 Kontrak yang tercakup: `Topic`, `Session`, `BoardSnapshot`, `VisionInterpretation` + `Element`,
 `SpeechTranscript`, `TeachingTurn`, `LearnerState` + `Misc`, `LearnerResponse`,
@@ -66,7 +66,7 @@ Konvensi yang dipatuhi: camelCase di JSON, waktu ISO-8601 (UTC), field opsional 
 
 ### 3.2 Mesin Status Sesi (§4)
 
-Implementasi di `backend/app/state_machine.py`, hanya maju (tidak ada jalur mundur):
+Implementasi di `apps/backend/app/state_machine.py`, hanya maju (tidak ada jalur mundur):
 
 ```
 SETUP --start--> TEACHING --end--> ENDED --evaluate--> EVALUATED (terminal)
@@ -77,10 +77,10 @@ Aturan ditegakkan: `teaching_input` hanya sah pada **TEACHING**; pemicuan evalua
 
 ### 3.3 Kerangka API (§7)
 
-- **REST** (`backend/app/api/rest.py`, awalan `/api`) — siklus hidup sesi & data:
+- **REST** (`apps/backend/app/api/rest.py`, awalan `/api`) — siklus hidup sesi & data:
   `POST /sessions`, `GET /sessions/{id}`, `POST /sessions/{id}/start|end|evaluate`,
   `GET /sessions/{id}/evaluation`, `GET /topics`, `GET /topics/{id}`.
-- **WebSocket** (`backend/app/api/websocket.py`, `/ws/sessions/{id}`) — jalur sesi real-time.
+- **WebSocket** (`apps/backend/app/api/websocket.py`, `/ws/sessions/{id}`) — jalur sesi real-time.
 
 ### 3.4 Scaffold Frontend
 
@@ -89,7 +89,7 @@ backend dan menampilkannya. Lolos `tsc` (typecheck) dan `vite build`.
 
 ### 3.5 Topik Demo (§6.1)
 
-Dua topik demo terkurasi (`backend/app/data/topics/`), lengkap dengan `referenceMaterial`,
+Dua topik demo terkurasi (`apps/backend/app/data/topics/`), lengkap dengan `referenceMaterial`,
 `keyConcepts`, dan `commonMisconceptions`:
 
 | Topik | Tingkat |
@@ -162,32 +162,35 @@ Bila keyakinan pembacaan papan rendah (di M1: input hanya gambar tanpa teks), gi
 ## 5. Arsitektur & Struktur Repositori
 
 ```
-Cogniva/
+Cogniva/                             # monorepo (apps / packages / scripts)
 ├── Cogniva_Dokumen_Arsitektur.pdf   # acuan desain
 ├── docs/
 │   ├── CONTRACTS.md                 # peta kontrak data → kode
 │   └── LAPORAN_PROGRES.md           # dokumen ini
-├── backend/                         # Python + FastAPI (modular monolith)
-│   ├── app/
-│   │   ├── contracts/               # model Pydantic — kontrak §6
-│   │   ├── ws/messages.py           # kontrak pesan WebSocket §7.2
-│   │   ├── state_machine.py         # mesin status sesi §4
-│   │   ├── llm/                     # pembungkus LLM §3.3, §7.3
-│   │   ├── agents/                  # Learner (nyata) + Vision (stub M2)
-│   │   ├── orchestrator.py          # satu giliran ujung-ke-ujung §3.3, §5.1
-│   │   ├── config.py                # konfigurasi dari environment
-│   │   ├── api/                     # REST §7.1 + WebSocket §7.2
-│   │   ├── data/topics/             # topik demo terkurasi §6.1
-│   │   ├── store.py                 # store in-memory (sementara, §8)
-│   │   └── main.py                  # entrypoint FastAPI
-│   ├── tests/                       # mesin status, kontrak, learner, orchestrator, ws, llm
-│   ├── .env.example                 # ANTHROPIC_API_KEY + knob penyetelan
-│   └── requirements.txt
-└── frontend/                        # React + TypeScript + Vite + Tailwind
-    └── src/
-        ├── contracts/               # mirror TS kontrak §6 & pesan §7.2
-        ├── api/client.ts            # klien REST tipis
-        └── App.tsx                  # kerangka UI (memuat topik demo)
+├── packages/                        # paket bersama (mendatang)
+├── scripts/                         # skrip repo (mendatang)
+└── apps/
+    ├── backend/                     # Python + FastAPI (modular monolith)
+    │   ├── app/
+    │   │   ├── contracts/           # model Pydantic — kontrak §6
+    │   │   ├── ws/messages.py       # kontrak pesan WebSocket §7.2
+    │   │   ├── state_machine.py     # mesin status sesi §4
+    │   │   ├── llm/                 # pembungkus LLM §3.3, §7.3
+    │   │   ├── agents/              # Learner (nyata) + Vision (stub M2)
+    │   │   ├── orchestrator.py      # satu giliran ujung-ke-ujung §3.3, §5.1
+    │   │   ├── config.py            # konfigurasi dari environment
+    │   │   ├── api/                 # REST §7.1 + WebSocket §7.2
+    │   │   ├── data/topics/         # topik demo terkurasi §6.1
+    │   │   ├── store.py             # store in-memory (sementara, §8)
+    │   │   └── main.py              # entrypoint FastAPI
+    │   ├── tests/                   # mesin status, kontrak, learner, orchestrator, ws, llm
+    │   ├── .env.example             # ANTHROPIC_API_KEY + knob penyetelan
+    │   └── requirements.txt
+    └── frontend/                    # React + TypeScript + Vite + Tailwind
+        └── src/
+            ├── contracts/           # mirror TS kontrak §6 & pesan §7.2
+            ├── api/client.ts        # klien REST tipis
+            └── App.tsx              # kerangka UI (memuat topik demo)
 ```
 
 ---
@@ -261,7 +264,7 @@ npm install
 npm run dev
 ```
 
-Konfigurasi Learner ada di `backend/.env.example` (model, max tokens, ambang keyakinan Vision).
+Konfigurasi Learner ada di `apps/backend/.env.example` (model, max tokens, ambang keyakinan Vision).
 
 ---
 
