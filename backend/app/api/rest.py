@@ -11,6 +11,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from ..agents import seed_learner_state
 from ..contracts.base import utc_now_iso
 from ..contracts.enums import SessionStatus
 from ..contracts.evaluation import EvaluationResult
@@ -69,10 +70,26 @@ def get_session(session_id: str) -> Session:
 
 @router.post("/sessions/{session_id}/start", response_model=Session)
 def start_session(session_id: str) -> Session:
-    """Start teaching -> Session (TEACHING)."""
+    """Start teaching -> Session (TEACHING).
+
+    Seeds the Learner's initial mental model from the topic's common
+    misconceptions (§3.6) so the student starts with believable beginner gaps.
+    """
     session = _require_session(session_id)
     _advance(session, START)
     session.started_at = utc_now_iso()
+
+    if sessions.get_learner_state(session_id) is None:
+        topic = topics.get(session.topic_id)
+        if topic is not None:
+            sessions.save_learner_state(
+                seed_learner_state(
+                    session_id,
+                    topic.common_misconceptions,
+                    topic_title=topic.title,
+                )
+            )
+
     return sessions.save_session(session)
 
 
