@@ -20,16 +20,17 @@ lalu menerima evaluasi atas kualitas penjelasannya. Sampai titik ini:
 - **Milestone M0 (Penyelarasan & Kontrak)** sudah **tuntas**: kontrak data antar-komponen,
   mesin status sesi, kerangka API (REST + WebSocket), scaffold frontend, serta 1–2 topik demo.
 - **Milestone M1 (Kerangka Ujung-ke-Ujung) bagian backend** sudah **tuntas**: satu giliran
-  mengajar penuh kini berjalan ujung-ke-ujung di sisi server — orchestrator menjahit alur,
-  **Learner agent** menjawab sebagai murid menggunakan model Claude, dan setiap giliran
-  tersimpan sebagai transkrip.
+  mengajar penuh kini berjalan ujung-ke-ujung di sisi server (**TypeScript + Fastify**) —
+  orchestrator menjahit alur, **Learner agent** menjawab sebagai murid menggunakan model
+  **Gemini**, dan setiap giliran tersimpan sebagai transkrip.
 
 Seluruh jalur kritis backend yang dibutuhkan demo (backend + Learner) sudah berdiri.
 Yang tersisa untuk M1 adalah sisi **kanvas frontend**; Vision/ASR dan Evaluator menyusul
 di M2 dan M3 sesuai rencana milestone.
 
-**Status pengujian:** 20/20 tes lulus. Loop mengajar terbukti berjalan ujung-ke-ujung
-(termasuk tanpa kunci API, memakai fallback deterministik).
+**Status pengujian:** 16/16 tes lulus. Loop mengajar terbukti berjalan ujung-ke-ujung
+(termasuk tanpa kunci API, memakai fallback deterministik; dan terverifikasi memanggil
+Gemini sungguhan saat kunci tersedia).
 
 ---
 
@@ -55,7 +56,7 @@ bekerja paralel tanpa saling menunggu.
 
 Seluruh kontrak dari §6 dimaterialisasi di **dua sisi yang harus tetap sepadan**:
 
-- **Backend** — model Pydantic v2 di `apps/backend/app/contracts/` (snake_case internal, alias camelCase di kawat).
+- **Backend** — skema Zod + tipe TypeScript di `apps/backend/src/contracts/` (camelCase, sepadan dengan kawat).
 - **Frontend** — `interface` TypeScript di `apps/frontend/src/contracts/index.ts`.
 
 Kontrak yang tercakup: `Topic`, `Session`, `BoardSnapshot`, `VisionInterpretation` + `Element`,
@@ -66,7 +67,7 @@ Konvensi yang dipatuhi: camelCase di JSON, waktu ISO-8601 (UTC), field opsional 
 
 ### 3.2 Mesin Status Sesi (§4)
 
-Implementasi di `apps/backend/app/state_machine.py`, hanya maju (tidak ada jalur mundur):
+Implementasi di `apps/backend/src/modules/session/stateMachine.ts`, hanya maju (tidak ada jalur mundur):
 
 ```
 SETUP --start--> TEACHING --end--> ENDED --evaluate--> EVALUATED (terminal)
@@ -77,10 +78,10 @@ Aturan ditegakkan: `teaching_input` hanya sah pada **TEACHING**; pemicuan evalua
 
 ### 3.3 Kerangka API (§7)
 
-- **REST** (`apps/backend/app/api/rest.py`, awalan `/api`) — siklus hidup sesi & data:
+- **REST** (`apps/backend/src/api/rest/index.ts`, awalan `/api`) — siklus hidup sesi & data:
   `POST /sessions`, `GET /sessions/{id}`, `POST /sessions/{id}/start|end|evaluate`,
   `GET /sessions/{id}/evaluation`, `GET /topics`, `GET /topics/{id}`.
-- **WebSocket** (`apps/backend/app/api/websocket.py`, `/ws/sessions/{id}`) — jalur sesi real-time.
+- **WebSocket** (`apps/backend/src/api/websocket/index.ts`, `/ws/sessions/{id}`) — jalur sesi real-time.
 
 ### 3.4 Scaffold Frontend
 
@@ -89,7 +90,7 @@ backend dan menampilkannya. Lolos `tsc` (typecheck) dan `vite build`.
 
 ### 3.5 Topik Demo (§6.1)
 
-Dua topik demo terkurasi (`apps/backend/app/data/topics/`), lengkap dengan `referenceMaterial`,
+Dua topik demo terkurasi (`apps/backend/src/data/topics/`), lengkap dengan `referenceMaterial`,
 `keyConcepts`, dan `commonMisconceptions`:
 
 | Topik | Tingkat |
@@ -116,17 +117,20 @@ Sasaran M1 (§11): *satu giliran mengajar penuh berjalan*. Sesuai §12, kerangka
 didirikan lebih dulu pada jalur kritis (backend + Learner), baru Vision dan Evaluator
 ditumpuk di atasnya. Itulah yang dikerjakan.
 
+Backend ditulis dalam **TypeScript + Fastify** agar selaras dengan frontend dan struktur
+monorepo (satu bahasa lintas tim; kontrak Zod ⇄ TypeScript).
+
 ### 4.1 Komponen yang Diimplementasikan
 
 | Komponen | Berkas | Fungsi |
 | --- | --- | --- |
-| **Pembungkus LLM** (§3.3, §7.3) | `app/llm/client.py` | Satu pintu untuk semua pemanggilan model: model id seragam, timeout, retry (oleh SDK), dan penguraian keluaran JSON terstruktur. Agen tidak pernah memanggil SDK langsung. |
-| **Learner agent** (§3.6) | `app/agents/learner.py` | Berperan sebagai murid pemula via Claude; memelihara `LearnerState` lintas giliran; menghasilkan `LearnerResponse` terstruktur. |
-| **Vision (stub M2)** (§3.4) | `app/agents/vision.py` | Passthrough: teks ketikan → interpretasi; bila hanya gambar → minta konfirmasi (menguji jalur §5.3). |
-| **Orchestrator** (§3.3, §5.1) | `app/orchestrator.py` | Menjalankan satu giliran ujung-ke-ujung (snapshot → Vision → Learner), menyimpan `TeachingTurn`, menaikkan `turnCount`. |
-| **Loop WebSocket** (§7.2) | `app/api/websocket.py` | `teaching_input` kini menjalankan giliran nyata lalu mengirim balik `vision_result` + `learner_message`; pemanggilan LLM dijalankan di luar event loop. |
-| **Penyemaian state** (§3.6) | `app/api/rest.py` | Saat `start`, `LearnerState` disemai dari `commonMisconceptions` topik. |
-| **Penyimpanan giliran** (§8 sementara) | `app/store.py` | Menyimpan snapshot, transkrip, respons, state, dan daftar `TeachingTurn` per sesi (in-memory). |
+| **Pembungkus LLM** (§3.3, §7.3) | `src/llm/providers/gemini.ts` | Satu pintu untuk semua pemanggilan model: model id seragam, timeout, retry (oleh SDK), dan penguraian keluaran JSON terstruktur. Agen tidak pernah memanggil SDK langsung. |
+| **Learner agent** (§3.6) | `src/agents/learner/index.ts` | Berperan sebagai murid pemula via Gemini; memelihara `LearnerState` lintas giliran; menghasilkan `LearnerResponse` terstruktur. |
+| **Vision (stub M2)** (§3.4) | `src/agents/vision/index.ts` | Passthrough: teks ketikan → interpretasi; bila hanya gambar → minta konfirmasi (menguji jalur §5.3). |
+| **Orchestrator** (§3.3, §5.1) | `src/orchestrator/index.ts` | Menjalankan satu giliran ujung-ke-ujung (snapshot → Vision → Learner), menyimpan `TeachingTurn`, menaikkan `turnCount`. |
+| **Loop WebSocket** (§7.2) | `src/api/websocket/index.ts` | `teaching_input` kini menjalankan giliran nyata lalu mengirim balik `vision_result` + `learner_message`; pemanggilan LLM bersifat async sehingga event loop tetap responsif. |
+| **Penyemaian state** (§3.6) | `src/api/rest/index.ts` | Saat `start`, `LearnerState` disemai dari `commonMisconceptions` topik. |
+| **Penyimpanan giliran** (§8 sementara) | `src/modules/storage/sessionStore.ts` | Menyimpan snapshot, transkrip, respons, state, dan daftar `TeachingTurn` per sesi (in-memory). |
 
 ### 4.2 Alur Satu Giliran Mengajar (yang sudah berjalan)
 
@@ -136,7 +140,7 @@ teaching_input (gambar + teks)
         ▼
    [Vision]  ── interpretasi papan ──┐
  (passthrough M1)                    ├──► [Learner] ──► LearnerResponse
-   (M2: [ASR] ── transkrip suara) ───┘    (persona murid, Claude)
+   (M2: [ASR] ── transkrip suara) ───┘    (persona murid, Gemini)
         │
         ▼
  simpan TeachingTurn · turnCount++ · stream vision_result + learner_message
@@ -147,13 +151,13 @@ Bila keyakinan pembacaan papan rendah (di M1: input hanya gambar tanpa teks), gi
 
 ### 4.3 Learner Agent — Detail
 
-- Memanggil model teks Claude melalui SDK resmi `anthropic`, dengan **keluaran JSON terstruktur**
-  (`output_config.format`) sehingga respons dapat diurai andal.
+- Memanggil model teks Gemini melalui SDK resmi `@google/genai`, dengan **keluaran JSON terstruktur**
+  (`responseMimeType: application/json` + `responseJsonSchema`) sehingga respons dapat diurai andal.
 - **Menjaga invarian §1.4 secara struktural:** fungsi Learner hanya menerima judul/deskripsi topik,
   apa yang dijelaskan pengguna, dan state-nya sendiri — **tidak pernah** menerima kunci jawaban
   (`referenceMaterial` / `keyConcepts`). System prompt mengunci peran murid (tidak mengoreksi,
   tidak menggurui, tidak membocorkan jawaban benar).
-- **Tetap berjalan tanpa kunci API:** bila `ANTHROPIC_API_KEY` tidak diset, Learner memakai
+- **Tetap berjalan tanpa kunci API:** bila `GEMINI_API_KEY` tidak diset, Learner memakai
   **fallback deterministik** yang tetap dalam peran murid, sehingga loop ujung-ke-ujung (dan
   seluruh tes) berjalan luring. Ini menjaga prinsip "alur tetap berjalan".
 
@@ -170,22 +174,22 @@ Cogniva/                             # monorepo (apps / packages / scripts)
 ├── packages/                        # paket bersama (mendatang)
 ├── scripts/                         # skrip repo (mendatang)
 └── apps/
-    ├── backend/                     # Python + FastAPI (modular monolith)
-    │   ├── app/
-    │   │   ├── contracts/           # model Pydantic — kontrak §6
-    │   │   ├── ws/messages.py       # kontrak pesan WebSocket §7.2
-    │   │   ├── state_machine.py     # mesin status sesi §4
-    │   │   ├── llm/                 # pembungkus LLM §3.3, §7.3
+    ├── backend/                     # TypeScript + Fastify (modular monolith)
+    │   ├── src/
+    │   │   ├── main.ts              # entrypoint Fastify (muat .env, listen)
+    │   │   ├── app.ts               # factory app: REST + WebSocket + CORS
+    │   │   ├── config/              # konfigurasi dari environment
+    │   │   ├── contracts/           # skema Zod + tipe — kontrak §6 & pesan §7.2
+    │   │   ├── llm/                 # pembungkus LLM (providers, prompts) §3.3, §7.3
     │   │   ├── agents/              # Learner (nyata) + Vision (stub M2)
-    │   │   ├── orchestrator.py      # satu giliran ujung-ke-ujung §3.3, §5.1
-    │   │   ├── config.py            # konfigurasi dari environment
-    │   │   ├── api/                 # REST §7.1 + WebSocket §7.2
-    │   │   ├── data/topics/         # topik demo terkurasi §6.1
-    │   │   ├── store.py             # store in-memory (sementara, §8)
-    │   │   └── main.py              # entrypoint FastAPI
-    │   ├── tests/                   # mesin status, kontrak, learner, orchestrator, ws, llm
-    │   ├── .env.example             # ANTHROPIC_API_KEY + knob penyetelan
-    │   └── requirements.txt
+    │   │   ├── orchestrator/        # satu giliran ujung-ke-ujung §3.3, §5.1
+    │   │   ├── api/                 # rest/ §7.1 + websocket/ §7.2
+    │   │   ├── modules/             # session, topic, storage (+ teaching/evaluation stub)
+    │   │   └── data/topics/         # topik demo terkurasi §6.1
+    │   ├── tests/                   # mesin status, learner, llm, orchestrator, ws
+    │   ├── .env.example             # GEMINI_API_KEY + knob penyetelan
+    │   ├── tsconfig.json
+    │   └── package.json
     └── frontend/                    # React + TypeScript + Vite + Tailwind
         └── src/
             ├── contracts/           # mirror TS kontrak §6 & pesan §7.2
@@ -199,9 +203,11 @@ Cogniva/                             # monorepo (apps / packages / scripts)
 
 | Keputusan | Pilihan | Alasan |
 | --- | --- | --- |
-| Model LLM Learner | `claude-opus-4-8` (default), dapat diubah via `COGNIVA_LEARNER_MODEL` | Model paling mampu; dapat disetel ke `claude-sonnet-4-6` untuk giliran real-time yang lebih cepat/murah. |
-| SDK | Resmi `anthropic` (Python) v0.111 | Sesuai stack backend; pemanggilan model lewat satu pembungkus. |
-| Keluaran terstruktur | `output_config.format` (json_schema) | Respons Learner dapat diurai andal menjadi `LearnerResponse` + pembaruan state. |
+| Bahasa & framework backend | **TypeScript + Fastify** | Selaras dengan frontend (TS) & struktur monorepo; satu bahasa lintas tim, kontrak Zod ⇄ TypeScript. |
+| Model LLM Learner | `gemini-2.5-flash` (default), via `COGNIVA_LEARNER_MODEL` | Cepat untuk giliran real-time; dapat dinaikkan ke `gemini-2.5-pro` untuk kualitas lebih tinggi. |
+| SDK | Resmi `@google/genai` (TypeScript) | Sesuai stack backend; pemanggilan model lewat satu pembungkus. |
+| Keluaran terstruktur | `responseMimeType: application/json` + `responseJsonSchema` | Respons Learner dapat diurai andal menjadi `LearnerResponse` + pembaruan state. |
+| Validasi kontrak | Zod (skema + tipe) | Validasi runtime + tipe statis dari satu sumber; skema yang sama memberi JSON schema ke Gemini. |
 | Penyimpanan | In-memory (M1) | Cukup untuk kerangka; SQLite + penyimpanan objek menyusul (§8) tanpa mengubah kontrak. |
 | Tanpa kunci API | Fallback Learner deterministik | Skeleton & CI berjalan luring; demo tetap jalan meski kunci belum diset. |
 | Vision/ASR | Stub passthrough (ditandai `TODO(M2)`) | Jalur kritis berdiri dulu; multimodal ditumpuk di M2. |
@@ -223,20 +229,20 @@ Cogniva/                             # monorepo (apps / packages / scripts)
 
 ## 8. Pengujian & Verifikasi
 
-**20/20 tes lulus** (`python -m pytest`). Rincian:
+**16/16 tes lulus** (`npm test`, Vitest). Rincian:
 
 | Berkas uji | Jml | Cakupan |
 | --- | --- | --- |
-| `test_state_machine.py` | 5 | Transisi maju penuh, tanpa mundur, terminal, evaluate hanya dari ENDED, teaching_input hanya saat TEACHING. |
-| `test_contracts.py` | 3 | Serialisasi camelCase, contoh `EvaluationResult` (§6.9), pemuatan topik seed. |
-| `test_learner.py` | 5 | Penyemaian state dari miskonsepsi, fallback tetap peran murid, pencatatan pertanyaan, pemetaan keluaran LLM ke kontrak, fallback saat LLM gagal. |
-| `test_orchestrator.py` | 2 | Satu giliran penuh tersimpan & `turnCount` naik; input gambar saja → minta konfirmasi. |
-| `test_llm_client.py` | 3 | Penguraian JSON terstruktur + bentuk request; penolakan (refusal); JSON cacat. |
-| `test_teaching_ws.py` | 2 | Alur WebSocket nyata `create → start → teach`; penolakan teaching_input sebelum start. |
+| `stateMachine.test.ts` | 5 | Transisi maju penuh, tanpa mundur, terminal, evaluate hanya dari ENDED, teaching_input hanya saat TEACHING. |
+| `learner.test.ts` | 4 | Penyemaian state dari miskonsepsi, fallback tetap peran murid, pencatatan pertanyaan fallback, pemetaan keluaran LLM terstruktur ke kontrak. |
+| `llmClient.test.ts` | 3 | Penguraian JSON terstruktur + bentuk request; blokir keamanan (safety block); JSON cacat. |
+| `orchestrator.test.ts` | 2 | Satu giliran penuh tersimpan & `turnCount` naik; input gambar saja → minta konfirmasi. |
+| `teachingWs.test.ts` | 2 | Alur WebSocket nyata `create → start → teach`; penolakan teaching_input sebelum start. |
 
-Selain itu, **smoke test ujung-ke-ujung** (mode fallback) memverifikasi urutan
-`state_update → vision_result → learner_message`, kenaikan `turnCount`, jalur konfirmasi,
-serta bahwa jalur LLM nyata terbentuk saat kunci tersedia. Frontend lolos `typecheck` dan `build`.
+Selain itu, **smoke test ujung-ke-ujung** memverifikasi urutan
+`state_update → vision_result → learner_message`, kenaikan `turnCount`, dan jalur konfirmasi.
+Jalur LLM nyata juga **diuji langsung ke Gemini** (memakai kunci): Learner membalas in-character
+(mis. memparafrase miskonsepsi yang sengaja ditanam). Frontend lolos `typecheck` dan `build`.
 
 ---
 
@@ -245,21 +251,21 @@ serta bahwa jalur LLM nyata terbentuk saat kunci tersedia. Frontend lolos `typec
 ### Backend (port 8000)
 
 ```bash
-cd backend
-python -m pip install -r requirements.txt
+cd apps/backend
+npm install
 # Opsional: set kunci untuk Learner nyata (tanpa ini, fallback dipakai)
-#   set ANTHROPIC_API_KEY=...   (Windows)
-#   export ANTHROPIC_API_KEY=... (bash)
-python -m uvicorn app.main:app --reload
-# Dokumentasi API interaktif: http://localhost:8000/docs
+#   set GEMINI_API_KEY=...   (Windows)
+#   export GEMINI_API_KEY=... (bash)
+npm run dev
+# Cek kesehatan: http://localhost:8000/health
 ```
 
-Uji: `cd backend && python -m pytest`
+Uji: `cd apps/backend && npm test`  (Vitest)
 
 ### Frontend (port 5173)
 
 ```bash
-cd frontend
+cd apps/frontend
 npm install
 npm run dev
 ```
@@ -287,11 +293,11 @@ M2/M3 bisa menempel tanpa mengubah antarmuka. Titik penyambungan sudah ditandai 
 - **Pembacaan tulisan tangan (Vision)** adalah risiko teknis terbesar (§10). Mitigasi sudah
   disiapkan sejak awal lewat jalur konfirmasi + fallback teks; tinggal mengaktifkan model nyata di M2.
 - **Biaya & latensi LLM** — pembungkus terpusat memudahkan penerapan timeout/retry dan
-  penggantian model tanpa menyentuh agen; model Learner dapat diturunkan ke Sonnet untuk
-  loop real-time bila perlu.
+  penggantian model tanpa menyentuh agen; model Learner dapat disetel (`gemini-2.5-flash` untuk
+  cepat, `gemini-2.5-pro` untuk kualitas) lewat satu variabel environment.
 - **Persistensi** masih in-memory; perlu beralih ke SQLite + penyimpanan objek (§8) sebelum
   demo yang butuh ketahanan ulang-baca, tanpa mengubah kontrak.
 - **Disiplin kontrak** — setiap perubahan kontrak harus disinkronkan di kedua sisi
-  (Pydantic ⇄ TypeScript) dan melalui kesepakatan tech lead (§12). Lihat `docs/CONTRACTS.md`.
+  (Zod ⇄ TypeScript) dan melalui kesepakatan tech lead (§12). Lihat `docs/CONTRACTS.md`.
 - **Jadwal** — submission 1 Juli 2026; jalur kritis (backend + Learner) sudah berdiri, menyisakan
   runway untuk kanvas, Vision, dan Evaluator.
