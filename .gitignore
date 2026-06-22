@@ -6,15 +6,33 @@ venv/
 .pytest_cache/
 *.egg-info/
 
-# Node / frontend
+# Dependencies
 node_modules/
+
+# Build outputs
 dist/
+build/
+out/
 .vite/
+
+# TypeScript
+*.tsbuildinfo
 
 # Data lokal / runtime
 *.sqlite
 *.sqlite3
-backend/storage/
+apps/backend/storage/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Coverage
+coverage/
 
 # Editor & OS
 .vscode/
@@ -22,6 +40,6 @@ backend/storage/
 .DS_Store
 Thumbs.db
 
-# Env
-.env
-.env.local
+# Temporary
+tmp/
+temp/
