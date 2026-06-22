@@ -21,7 +21,6 @@ import { utcNowIso } from "../contracts/common.js";
 import type { LearnerResponse, LearnerState } from "../contracts/learner.js";
 import type { Session } from "../contracts/session.js";
 import type { Topic } from "../contracts/topic.js";
-import { LLMClient } from "../llm/index.js";
 import { newId, sessions } from "../modules/storage/sessionStore.js";
 
 /** A learner the orchestrator can drive (real agent or a test fake). */
@@ -127,21 +126,16 @@ export class Orchestrator {
 
 let current: Orchestrator | null = null;
 
-/** Construct an Orchestrator. With useConfig, build the LLM from env. */
+/**
+ * Construct an Orchestrator. The Learner resolves its own LLM internally
+ * (Gemini when a credential is set, otherwise the deterministic mock).
+ * `useConfig: false` forces the offline mock — used by tests.
+ */
 export function buildOrchestrator({
-  llm = null,
   useConfig = true,
-}: { llm?: LLMClient | null; useConfig?: boolean } = {}): Orchestrator {
-  let resolved = llm;
-  if (resolved === null && useConfig && config.llmAvailable()) {
-    resolved = new LLMClient({
-      model: config.LEARNER_MODEL,
-      maxTokens: config.LLM_MAX_TOKENS,
-      timeout: config.LLM_TIMEOUT,
-    });
-  }
+}: { useConfig?: boolean } = {}): Orchestrator {
   return new Orchestrator({
-    learner: new LearnerAgent(resolved),
+    learner: new LearnerAgent({ forceMock: !useConfig }),
     vision: new VisionAgent({ confidenceThreshold: config.VISION_CONFIDENCE_THRESHOLD }),
   });
 }

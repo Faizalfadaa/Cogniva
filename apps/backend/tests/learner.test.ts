@@ -1,17 +1,22 @@
 /**
  * Learner agent tests (Architecture Document §3.6, §6.7, §6.8).
  *
- * These exercise the deterministic fallback and a fake-LLM mapping. They also
- * guard the core invariant surface: the Learner produces only student-role
- * responses and seeds state from common misconceptions.
+ * The learning logic comes from the team's module (runLearnerTurn + guard +
+ * mock); this suite exercises it through the orchestrator's adapter and the
+ * guard directly, in deterministic mock mode (no network, no API key).
  */
 
 import { describe, expect, it } from "vitest";
 
 import { LearnerAgent, seedLearnerState } from "../src/agents/index.js";
+import { runLearnerTurn } from "../src/agents/learner/learner.agent.js";
+import {
+  createFallbackOutput,
+  isLearnerTextSafe,
+  normalizeLearnerOutput,
+} from "../src/agents/learner/learner.guard.js";
 import type { VisionInterpretation } from "../src/contracts/board.js";
 import type { LearnerState } from "../src/contracts/learner.js";
-import type { LLM, StructuredArgs } from "../src/llm/index.js";
 
 const STUDENT_TYPES = ["question", "confusion", "acknowledgment", "paraphrase"];
 const DERIVED = ["gap", "misconception", "new_info"];
@@ -26,108 +31,115 @@ function interp(text: string): VisionInterpretation {
   };
 }
 
-describe("learner agent", () => {
-  it("seeds state from misconceptions only", () => {
+function freshState(sessionId = "ses_1"): LearnerState {
+  return {
+    sessionId,
+    understoodConcepts: [],
+    activeMisconceptions: [],
+    openGaps: [],
+    questionsAsked: [],
+    updatedAtTurn: 0,
+  };
+}
+
+describe("seedLearnerState", () => {
+  it("seeds misconceptions from the topic only", () => {
     const state = seedLearnerState(
       "ses_1",
-      ["O2 comes from CO2", "the dark reactions need darkness"],
-      { topicTitle: "Photosynthesis" },
+      ["O2 berasal dari CO2", "reaksi gelap perlu kegelapan"],
+      { topicTitle: "Fotosintesis" },
     );
     expect(state.understoodConcepts).toEqual([]);
     expect(state.activeMisconceptions).toHaveLength(2);
-    expect(state.activeMisconceptions[0].belief).toBe("O2 comes from CO2");
+    expect(state.activeMisconceptions[0]).toEqual({
+      concept: "Fotosintesis",
+      belief: "O2 berasal dari CO2",
+    });
     expect(state.updatedAtTurn).toBe(0);
   });
 
-  it("fallback stays in the student role", async () => {
-    const agent = new LearnerAgent(null); // no LLM -> deterministic fallback
-    const state = seedLearnerState("ses_1", ["O2 comes from CO2"], {
-      topicTitle: "Photosynthesis",
+  it("caps the seeded misconceptions at 3", () => {
+    const state = seedLearnerState("ses_1", ["a", "b", "c", "d", "e"], {
+      topicTitle: "T",
     });
-    const [response, newState] = await agent.respond({
-      topicTitle: "Photosynthesis",
-      topicDescription: "How plants make food.",
-      interpretation: interp("Plants take in CO2 and release O2."),
+    expect(state.activeMisconceptions).toHaveLength(3);
+  });
+});
+
+describe("LearnerAgent adapter (mock mode)", () => {
+  it("returns a student-role response and advances the state", async () => {
+    const agent = new LearnerAgent({ forceMock: true });
+    const [response, next] = await agent.respond({
+      topicTitle: "Variabel",
+      topicDescription: "",
+      interpretation: interp("Variabel adalah tempat menyimpan nilai dalam program."),
       speech: null,
-      state,
-      turnIndex: 0,
+      state: freshState(),
+      turnIndex: 1,
     });
+
     expect(STUDENT_TYPES).toContain(response.type);
     expect(DERIVED).toContain(response.derivedFrom);
     expect(response.text.trim()).toBeTruthy();
-    expect(newState.updatedAtTurn).toBe(0);
+    expect(response.turnIndex).toBe(1);
+    expect(next.updatedAtTurn).toBe(1);
+    // Adapter normalizes the optional targetConcept to `string | null`.
+    expect(response.targetConcept === null || typeof response.targetConcept === "string").toBe(true);
+  });
+});
+
+describe("runLearnerTurn (mock)", () => {
+  it("records the question it asks about an unclear term", async () => {
+    const out = await runLearnerTurn(
+      {
+        sessionId: "ses_1",
+        turnIndex: 2,
+        teachingText: 'Yang penting di sini adalah istilah "fotosintesis".',
+        currentState: freshState(),
+      },
+      { useMock: true },
+    );
+
+    expect(out.nextState.updatedAtTurn).toBe(2);
+    expect(out.response.type).toBe("question");
+    expect(out.nextState.questionsAsked).toContain(out.response.text);
+  });
+});
+
+describe("learner guard", () => {
+  it("flags teacher-like or overly long text as unsafe", () => {
+    expect(isLearnerTextSafe("Aku masih bingung, bisa diulang?")).toBe(true);
+    expect(isLearnerTextSafe("Yang benar adalah fotosintesis menghasilkan oksigen.")).toBe(false);
+    expect(isLearnerTextSafe(Array(60).fill("kata").join(" "))).toBe(false);
   });
 
-  it("records the fallback question in state", async () => {
-    const agent = new LearnerAgent(null);
-    // No misconceptions, one gap -> fallback asks a question about the gap.
-    const state: LearnerState = {
+  it("coerces an invalid LLM response into a safe student shape", () => {
+    const raw = {
+      nextState: freshState(),
+      response: { type: "lecture", text: "Hmm, aku belum paham.", derivedFrom: "whatever" },
+    } as unknown as Parameters<typeof normalizeLearnerOutput>[0];
+
+    const out = normalizeLearnerOutput(raw, {
       sessionId: "ses_1",
-      understoodConcepts: [],
-      activeMisconceptions: [],
-      openGaps: ["the Calvin cycle"],
-      questionsAsked: [],
-      updatedAtTurn: 0,
-    };
-    const [response, newState] = await agent.respond({
-      topicTitle: "Photosynthesis",
-      topicDescription: "",
-      interpretation: interp("..."),
-      speech: null,
-      state,
-      turnIndex: 2,
+      turnIndex: 1,
+      teachingText: "x",
+      currentState: freshState(),
     });
-    expect(response.type).toBe("question");
-    expect(newState.questionsAsked).toContain(response.text);
-    expect(newState.updatedAtTurn).toBe(2);
+
+    expect(STUDENT_TYPES).toContain(out.response.type);
+    expect(DERIVED).toContain(out.response.derivedFrom);
+    expect(out.nextState.updatedAtTurn).toBe(1);
   });
 
-  it("maps a structured LLM payload to contracts", async () => {
-    const payload = {
-      response: {
-        type: "question",
-        text: "If O2 comes from CO2, why do we need water at all?",
-        targetConcept: "source of oxygen",
-        derivedFrom: "misconception",
-      },
-      understoodConcepts: ["plants need light"],
-      activeMisconceptions: [{ concept: "source of oxygen", belief: "O2 comes from CO2" }],
-      openGaps: ["the Calvin cycle"],
-    };
-
-    const calls: StructuredArgs[] = [];
-    const fakeLlm: LLM = {
-      async structured(args) {
-        calls.push(args);
-        return payload;
-      },
-    };
-
-    const agent = new LearnerAgent(fakeLlm);
-    const state = seedLearnerState("ses_1", ["O2 comes from CO2"], {
-      topicTitle: "Photosynthesis",
-    });
-    const [response, newState] = await agent.respond({
-      topicTitle: "Photosynthesis",
-      topicDescription: "How plants make food.",
-      interpretation: interp("Plants release O2."),
-      speech: null,
-      state,
+  it("produces an in-character fallback when the LLM fails", () => {
+    const out = createFallbackOutput({
+      sessionId: "ses_1",
       turnIndex: 3,
+      teachingText: "",
+      currentState: freshState(),
     });
-
-    expect(calls).toHaveLength(1);
-    expect(response.type).toBe("question");
-    expect(response.text).toBe(payload.response.text);
-    expect(response.targetConcept).toBe("source of oxygen");
-    expect(response.derivedFrom).toBe("misconception");
-    expect(newState.understoodConcepts).toEqual(["plants need light"]);
-    expect(newState.activeMisconceptions[0]).toEqual({
-      concept: "source of oxygen",
-      belief: "O2 comes from CO2",
-    });
-    expect(newState.openGaps).toEqual(["the Calvin cycle"]);
-    expect(newState.questionsAsked).toContain(response.text);
-    expect(newState.updatedAtTurn).toBe(3);
+    expect(["question", "confusion"]).toContain(out.response.type);
+    expect(out.response.text.trim()).toBeTruthy();
+    expect(out.nextState.updatedAtTurn).toBe(3);
   });
 });

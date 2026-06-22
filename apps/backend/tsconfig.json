@@ -8,6 +8,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "moduleDetection": "force",
+    "esModuleInterop": true,
     "noEmit": true,
     "strict": true,
     "noUnusedLocals": true,
