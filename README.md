@@ -3,7 +3,9 @@
 A **Learning-by-Teaching** study platform — the user teaches an AI that plays
 the role of a student, then receives an evaluation of how well they explained.
 
-This repository is the **Milestone M0 (Alignment & Contracts) scaffold**.
+This repository implements **Milestone M0 (Alignment & Contracts)** and the
+**M1 (end-to-end skeleton) backend** — one full teaching turn runs through the
+backend orchestrator and Learner agent.
 Design reference: `Cogniva_Dokumen_Arsitektur.pdf` (in Indonesian).
 
 > Note: the architecture PDF is written in Indonesian; the code, comments, and
@@ -24,9 +26,34 @@ repo & scaffold, and 1–2 demo topics._
 | Frontend repo & scaffold (React+TS+Vite+Tailwind) | ✅ | `frontend/` |
 | 1–2 demo topics (§6.1) | ✅ | `backend/app/data/topics/` |
 
-The AI agent logic (Vision, ASR, Learner, Evaluator) is **not** implemented yet —
-that is M1+ scope. Those points are marked `TODO(Mx)` in the code and, for M0,
-return placeholders / recoverable `error` messages rather than crashing.
+## Milestone M1 status (backend)
+
+M1 per the document (§11): _Backend + canvas + Learner — one full teaching turn
+runs._ The backend half is implemented:
+
+| M1 backend piece | Status | Location |
+| --- | --- | --- |
+| Orchestrator — one teaching turn end to end (§3.3, §5.1) | ✅ | `backend/app/orchestrator.py` |
+| Learner agent — student persona, real LLM (§3.6) | ✅ | `backend/app/agents/learner.py` |
+| Centralized LLM wrapper (§3.3, §7.3) | ✅ | `backend/app/llm/client.py` |
+| WebSocket teaching loop wired (§7.2) | ✅ | `backend/app/api/websocket.py` |
+| Vision / ASR | ⏳ M2 stub | `backend/app/agents/vision.py` |
+| Evaluator | ⏳ M3 | placeholder in `rest.py` |
+
+The **Learner** calls a Claude text model (via the official `anthropic` SDK)
+with a strict student persona and structured-JSON output, maintaining its
+`LearnerState` across turns. It receives only the topic title/description, what
+was explained, and its own state — never the answer key (`referenceMaterial` /
+`keyConcepts`), structurally honoring the §1.4 invariants.
+
+**No API key? Still runs.** Without `ANTHROPIC_API_KEY`, the Learner uses a
+deterministic in-character fallback so the end-to-end loop (and the test suite)
+works offline. Set the key to get the real LLM-driven student. See
+`backend/.env.example`.
+
+Vision/ASR are M2 (the canvas-image channel); the Evaluator is M3. Those points
+are marked `TODO(Mx)` in the code and return passthrough stubs / recoverable
+`error` messages rather than crashing.
 
 ## Structure
 
@@ -40,11 +67,16 @@ Cogniva/
 │   │   ├── contracts/               # Pydantic models — §6 contracts
 │   │   ├── ws/messages.py           # WebSocket message contracts §7.2
 │   │   ├── state_machine.py         # session state machine §4
+│   │   ├── llm/                     # centralized LLM wrapper §3.3, §7.3
+│   │   ├── agents/                  # Learner (real) + Vision (M2 stub) §3.4-§3.6
+│   │   ├── orchestrator.py          # one teaching turn end to end §3.3, §5.1
+│   │   ├── config.py                # env-driven config (model, thresholds)
 │   │   ├── api/                     # REST §7.1 + WebSocket §7.2
 │   │   ├── data/topics/             # curated demo topics §6.1
 │   │   ├── store.py                 # in-memory store (placeholder for §8)
 │   │   └── main.py                  # FastAPI entrypoint
-│   ├── tests/                       # state-machine & contract tests
+│   ├── tests/                       # state machine, contracts, learner, orchestrator, ws
+│   ├── .env.example                 # ANTHROPIC_API_KEY + tuning knobs
 │   └── requirements.txt
 └── frontend/                        # React + TypeScript + Vite + Tailwind
     └── src/
