@@ -20,11 +20,11 @@ repo & scaffold, and 1–2 demo topics._
 | M0 deliverable | Status | Location |
 | --- | --- | --- |
 | Architecture document | ✅ | `Cogniva_Dokumen_Arsitektur.pdf` |
-| Data contracts (§6) | ✅ | `apps/backend/app/contracts/`, `apps/frontend/src/contracts/` |
-| Session state machine (§4) | ✅ | `apps/backend/app/state_machine.py` |
-| REST + WebSocket API skeleton (§7) | ✅ | `apps/backend/app/api/` |
+| Data contracts (§6) | ✅ | `apps/backend/src/contracts/`, `apps/frontend/src/contracts/` |
+| Session state machine (§4) | ✅ | `apps/backend/src/modules/session/stateMachine.ts` |
+| REST + WebSocket API skeleton (§7) | ✅ | `apps/backend/src/api/` |
 | Frontend repo & scaffold (React+TS+Vite+Tailwind) | ✅ | `apps/frontend/` |
-| 1–2 demo topics (§6.1) | ✅ | `apps/backend/app/data/topics/` |
+| 1–2 demo topics (§6.1) | ✅ | `apps/backend/src/data/topics/` |
 
 ## Milestone M1 status (backend)
 
@@ -33,14 +33,14 @@ runs._ The backend half is implemented:
 
 | M1 backend piece | Status | Location |
 | --- | --- | --- |
-| Orchestrator — one teaching turn end to end (§3.3, §5.1) | ✅ | `apps/backend/app/orchestrator.py` |
-| Learner agent — student persona, real LLM (§3.6) | ✅ | `apps/backend/app/agents/learner.py` |
-| Centralized LLM wrapper (§3.3, §7.3) | ✅ | `apps/backend/app/llm/client.py` |
-| WebSocket teaching loop wired (§7.2) | ✅ | `apps/backend/app/api/websocket.py` |
-| Vision / ASR | ⏳ M2 stub | `apps/backend/app/agents/vision.py` |
-| Evaluator | ⏳ M3 | placeholder in `rest.py` |
+| Orchestrator — one teaching turn end to end (§3.3, §5.1) | ✅ | `apps/backend/src/orchestrator/index.ts` |
+| Learner agent — student persona, real LLM (§3.6) | ✅ | `apps/backend/src/agents/learner/index.ts` |
+| Centralized LLM wrapper (§3.3, §7.3) | ✅ | `apps/backend/src/llm/providers/gemini.ts` |
+| WebSocket teaching loop wired (§7.2) | ✅ | `apps/backend/src/api/websocket/index.ts` |
+| Vision / ASR | ⏳ M2 stub | `apps/backend/src/agents/vision/index.ts` |
+| Evaluator | ⏳ M3 | placeholder in `api/rest/index.ts` |
 
-The **Learner** calls a Gemini text model (via the official `google-genai` SDK)
+The **Learner** calls a Gemini text model (via the official `@google/genai` SDK)
 with a strict student persona and structured-JSON output, maintaining its
 `LearnerState` across turns. It receives only the topic title/description, what
 was explained, and its own state — never the answer key (`referenceMaterial` /
@@ -65,22 +65,22 @@ Cogniva/                             # monorepo (apps / packages / scripts)
 ├── packages/                        # shared packages (future)
 ├── scripts/                         # repo scripts (future)
 └── apps/
-    ├── backend/                     # Python + FastAPI (modular monolith)
-    │   ├── app/
-    │   │   ├── contracts/           # Pydantic models — §6 contracts
-    │   │   ├── ws/messages.py       # WebSocket message contracts §7.2
-    │   │   ├── state_machine.py     # session state machine §4
-    │   │   ├── llm/                 # centralized LLM wrapper §3.3, §7.3
+    ├── backend/                     # TypeScript + Fastify (modular monolith)
+    │   ├── src/
+    │   │   ├── main.ts              # Fastify entrypoint (loads .env, listens)
+    │   │   ├── app.ts               # app factory: REST + WebSocket + CORS
+    │   │   ├── config/              # env-driven config (model, thresholds)
+    │   │   ├── contracts/           # Zod schemas + types — §6 contracts & §7.2 messages
+    │   │   ├── llm/                 # centralized LLM wrapper (providers, prompts) §3.3
     │   │   ├── agents/              # Learner (real) + Vision (M2 stub) §3.4-§3.6
-    │   │   ├── orchestrator.py      # one teaching turn end to end §3.3, §5.1
-    │   │   ├── config.py            # env-driven config (model, thresholds)
-    │   │   ├── api/                 # REST §7.1 + WebSocket §7.2
-    │   │   ├── data/topics/         # curated demo topics §6.1
-    │   │   ├── store.py             # in-memory store (placeholder for §8)
-    │   │   └── main.py              # FastAPI entrypoint
-    │   ├── tests/                   # state machine, contracts, learner, orchestrator, ws
+    │   │   ├── orchestrator/        # one teaching turn end to end §3.3, §5.1
+    │   │   ├── api/                 # rest/ §7.1 + websocket/ §7.2
+    │   │   ├── modules/             # session, topic, storage (+ teaching/evaluation stubs)
+    │   │   └── data/topics/         # curated demo topics §6.1
+    │   ├── tests/                   # state machine, learner, llm, orchestrator, ws
     │   ├── .env.example             # GEMINI_API_KEY + tuning knobs
-    │   └── requirements.txt
+    │   ├── tsconfig.json
+    │   └── package.json
     └── frontend/                    # React + TypeScript + Vite + Tailwind
         └── src/
             ├── contracts/           # TS mirror of §6 contracts & §7.2 messages
@@ -94,17 +94,17 @@ Cogniva/                             # monorepo (apps / packages / scripts)
 
 ```bash
 cd apps/backend
-python -m pip install -r requirements.txt
-python -m uvicorn app.main:app --reload
+npm install
+npm run dev           # watch mode on :8000 (configurable via PORT)
 ```
 
-Interactive OpenAPI docs: http://localhost:8000/docs
+Health check: http://localhost:8000/health
 
-Tests:
+Tests (Vitest):
 
 ```bash
 cd apps/backend
-python -m pytest
+npm test
 ```
 
 ### Frontend (port 5173)
@@ -116,15 +116,15 @@ npm run dev
 ```
 
 Make sure the backend is running so the topic list loads (CORS is already
-allowed for `localhost:5173` in `app/main.py`).
+allowed for `localhost:5173` in `src/app.ts`).
 
 ## Tech stack (§9)
 
-Frontend: React + TypeScript + Vite + Tailwind · Backend: Python + FastAPI ·
+Frontend: React + TypeScript + Vite + Tailwind · Backend: TypeScript + Fastify ·
 Real-time: WebSocket · Storage (later): SQLite + object store.
 
 ## Contract notes
 
 The data contracts are the single source of truth across the team (§6, §12).
 Any change must be agreed with the tech lead and synced on **both** sides
-(backend Pydantic ⇄ frontend TypeScript). See `docs/CONTRACTS.md`.
+(backend Zod ⇄ frontend TypeScript). See `docs/CONTRACTS.md`.

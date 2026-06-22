@@ -15,23 +15,23 @@ source of truth; any change must be agreed with the tech lead (§6, §12).
 
 | Side | Location | Form |
 | --- | --- | --- |
-| Backend | `apps/backend/app/contracts/` | Pydantic v2 models (snake_case + camelCase alias) |
+| Backend | `apps/backend/src/contracts/` | Zod schemas + inferred types (camelCase) |
 | Frontend | `apps/frontend/src/contracts/index.ts` | TypeScript `interface` (camelCase) |
 
 ## Contract → file map
 
 | Contract (§) | Backend | Frontend |
 | --- | --- | --- |
-| Topic (§6.1) | `contracts/topic.py` | `Topic` |
-| Session (§6.2) | `contracts/session.py` | `Session` |
-| BoardSnapshot (§6.3) | `contracts/board.py` | `BoardSnapshot` |
-| VisionInterpretation + Element (§6.4) | `contracts/board.py` | `VisionInterpretation`, `Element` |
-| SpeechTranscript (§6.5) | `contracts/speech.py` | `SpeechTranscript` |
-| TeachingTurn (§6.6) | `contracts/teaching.py` | `TeachingTurn` |
-| LearnerState + Misc (§6.7) | `contracts/learner.py` | `LearnerState`, `Misc` |
-| LearnerResponse (§6.8) | `contracts/learner.py` | `LearnerResponse` |
-| EvaluationResult + Finding (§6.9) | `contracts/evaluation.py` | `EvaluationResult`, `Finding` |
-| WebSocket messages (§7.2) | `ws/messages.py` | `contracts/messages.ts` |
+| Topic (§6.1) | `contracts/topic.ts` | `Topic` |
+| Session (§6.2) | `contracts/session.ts` | `Session` |
+| BoardSnapshot (§6.3) | `contracts/board.ts` | `BoardSnapshot` |
+| VisionInterpretation + Element (§6.4) | `contracts/board.ts` | `VisionInterpretation`, `Element` |
+| SpeechTranscript (§6.5) | `contracts/speech.ts` | `SpeechTranscript` |
+| TeachingTurn (§6.6) | `contracts/teaching.ts` | `TeachingTurn` |
+| LearnerState + Misc (§6.7) | `contracts/learner.ts` | `LearnerState`, `Misc` |
+| LearnerResponse (§6.8) | `contracts/learner.ts` | `LearnerResponse` |
+| EvaluationResult + Finding (§6.9) | `contracts/evaluation.ts` | `EvaluationResult`, `Finding` |
+| WebSocket messages (§7.2) | `contracts/messages.ts` | `contracts/messages.ts` |
 
 ## Enum value mapping (architecture PDF → code)
 
@@ -58,13 +58,13 @@ SETUP --start--> TEACHING --end--> ENDED --evaluate--> EVALUATED (terminal)
 - `teaching_input` is only valid in **TEACHING**.
 - Triggering evaluation is only valid in **ENDED** and is **idempotent**.
 
-Implementation: `apps/backend/app/state_machine.py` (tested in
-`apps/backend/tests/test_state_machine.py`).
+Implementation: `apps/backend/src/modules/session/stateMachine.ts` (tested in
+`apps/backend/tests/stateMachine.test.ts`).
 
 ## API (§7)
 
-- REST (session lifecycle & data): `apps/backend/app/api/rest.py`, prefix `/api`.
-- WebSocket (real-time channel): `apps/backend/app/api/websocket.py`, `/ws/sessions/{id}`.
+- REST (session lifecycle & data): `apps/backend/src/api/rest/index.ts`, prefix `/api`.
+- WebSocket (real-time channel): `apps/backend/src/api/websocket/index.ts`, `/ws/sessions/{id}`.
 
 ## Pedagogical invariants the contracts protect (§1.4)
 

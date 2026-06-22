@@ -2,7 +2,7 @@
  * Cogniva inter-component data contracts — frontend side (Architecture Document §6).
  *
  * The core output of Milestone M0. These types MUST stay in sync with the
- * backend Pydantic models (backend/app/contracts). Conventions: camelCase
+ * backend Zod schemas (apps/backend/src/contracts). Conventions: camelCase
  * fields, JSON exchange, ISO-8601 (UTC) timestamps, optional fields marked `?`.
  * Any change to these contracts must be agreed with the tech lead.
  */
