@@ -40,13 +40,13 @@ runs._ The backend half is implemented:
 | Vision / ASR | ⏳ M2 stub | `backend/app/agents/vision.py` |
 | Evaluator | ⏳ M3 | placeholder in `rest.py` |
 
-The **Learner** calls a Claude text model (via the official `anthropic` SDK)
+The **Learner** calls a Gemini text model (via the official `google-genai` SDK)
 with a strict student persona and structured-JSON output, maintaining its
 `LearnerState` across turns. It receives only the topic title/description, what
 was explained, and its own state — never the answer key (`referenceMaterial` /
 `keyConcepts`), structurally honoring the §1.4 invariants.
 
-**No API key? Still runs.** Without `ANTHROPIC_API_KEY`, the Learner uses a
+**No API key? Still runs.** Without `GEMINI_API_KEY`, the Learner uses a
 deterministic in-character fallback so the end-to-end loop (and the test suite)
 works offline. Set the key to get the real LLM-driven student. See
 `backend/.env.example`.
@@ -76,7 +76,7 @@ Cogniva/
 │   │   ├── store.py                 # in-memory store (placeholder for §8)
 │   │   └── main.py                  # FastAPI entrypoint
 │   ├── tests/                       # state machine, contracts, learner, orchestrator, ws
-│   ├── .env.example                 # ANTHROPIC_API_KEY + tuning knobs
+│   ├── .env.example                 # GEMINI_API_KEY + tuning knobs
 │   └── requirements.txt
 └── frontend/                        # React + TypeScript + Vite + Tailwind
     └── src/
