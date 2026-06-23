@@ -136,26 +136,27 @@ TUGAS:
 6. Buat satu respons pendek sebagai murid.
 7. Respons harus berupa question, confusion, acknowledgment, atau paraphrase.
 
-FORMAT OUTPUT JSON:
+NILAI YANG DIIZINKAN:
+- "type" harus salah satu dari: question, confusion, acknowledgment, paraphrase.
+- "derivedFrom" harus salah satu dari: gap, misconception, new_info.
+
+Balas HANYA dengan JSON valid berbentuk seperti ini (ganti nilai contohnya, jangan tulis tanda "|"):
 {
   "nextState": {
     "sessionId": "${input.sessionId}",
-    "understoodConcepts": ["..."],
+    "understoodConcepts": ["konsep yang mulai kamu pahami"],
     "activeMisconceptions": [
-      {
-        "concept": "...",
-        "belief": "..."
-      }
+      { "concept": "nama konsep", "belief": "keyakinan keliru kamu" }
     ],
-    "openGaps": ["..."],
-    "questionsAsked": ["..."],
+    "openGaps": ["bagian yang belum jelas"],
+    "questionsAsked": ["pertanyaan yang sudah kamu tanyakan"],
     "updatedAtTurn": ${input.turnIndex}
   },
   "response": {
-    "type": "question" | "confusion" | "acknowledgment" | "paraphrase",
-    "text": "...",
-    "targetConcept": "...",
-    "derivedFrom": "gap" | "misconception" | "new_info"
+    "type": "question",
+    "text": "pertanyaan atau komentar singkat sebagai murid",
+    "targetConcept": "konsep yang kamu soroti",
+    "derivedFrom": "gap"
   }
 }
 `;

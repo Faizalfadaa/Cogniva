@@ -26,6 +26,17 @@ export const LLM_MAX_TOKENS: number = num(process.env.COGNIVA_LLM_MAX_TOKENS, 20
 /** Request timeout in seconds. */
 export const LLM_TIMEOUT: number = num(process.env.COGNIVA_LLM_TIMEOUT, 60);
 
+/**
+ * Thinking-token budget for the model. 0 disables thinking — best for the
+ * low-latency, structured Learner turn on gemini-2.5-flash (thinking tokens
+ * otherwise eat into maxOutputTokens and can truncate the JSON). Set to -1 for
+ * the model's dynamic budget if you switch to a model that needs reasoning.
+ */
+export const LLM_THINKING_BUDGET: number = num(
+  process.env.COGNIVA_LLM_THINKING_BUDGET,
+  0,
+);
+
 // --- Vision (§3.4) ---------------------------------------------------------
 
 /**

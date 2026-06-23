@@ -55,6 +55,8 @@ export interface LLMClientOptions {
   maxTokens: number;
   /** Request timeout in seconds. */
   timeout: number;
+  /** Thinking-token budget; 0 disables thinking (default). */
+  thinkingBudget?: number;
 }
 
 /** Wraps a Gemini client and returns parsed JSON objects. */
@@ -63,8 +65,9 @@ export class LLMClient implements LLM {
   client: GenAILike;
   readonly model: string;
   readonly maxTokens: number;
+  readonly thinkingBudget: number;
 
-  constructor({ model, maxTokens, timeout }: LLMClientOptions) {
+  constructor({ model, maxTokens, timeout, thinkingBudget }: LLMClientOptions) {
     const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
     // httpOptions.timeout is in milliseconds.
     this.client = new GoogleGenAI({
@@ -73,6 +76,7 @@ export class LLMClient implements LLM {
     }) as unknown as GenAILike;
     this.model = model;
     this.maxTokens = maxTokens;
+    this.thinkingBudget = thinkingBudget ?? 0;
   }
 
   /**
@@ -91,6 +95,7 @@ export class LLMClient implements LLM {
           maxOutputTokens: this.maxTokens,
           responseMimeType: "application/json",
           responseJsonSchema: schema,
+          thinkingConfig: { thinkingBudget: this.thinkingBudget },
         },
       });
     } catch (err) {
@@ -109,11 +114,20 @@ export class LLMClient implements LLM {
     }
 
     try {
-      return JSON.parse(text) as Record<string, unknown>;
+      return JSON.parse(stripJsonFence(text)) as Record<string, unknown>;
     } catch (err) {
       throw new LLMError(`model returned invalid JSON: ${errMsg(err)}`);
     }
   }
+}
+
+/** Tolerate models that wrap JSON in a ```json code fence. */
+function stripJsonFence(text: string): string {
+  return text
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
 }
 
 function errMsg(err: unknown): string {

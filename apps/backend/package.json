@@ -8,6 +8,7 @@
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
     "demo:learner": "tsx tests/learner.demo.ts",
+    "chat:learner": "tsx tests/learner.chat.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "test": "vitest run",

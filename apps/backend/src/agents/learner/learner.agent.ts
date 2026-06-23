@@ -54,7 +54,8 @@ async function callRealAI(
   const llm = new LLMClient({
     model: config.LEARNER_MODEL,
     maxTokens: config.LLM_MAX_TOKENS,
-    timeout: config.LLM_TIMEOUT
+    timeout: config.LLM_TIMEOUT,
+    thinkingBudget: config.LLM_THINKING_BUDGET
   });
   const data = await llm.structured({
     system,
