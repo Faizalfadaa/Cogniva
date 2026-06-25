@@ -1,0 +1,21 @@
+{
+  "topicId": "topic_newtons_second_law",
+  "title": "Newton's Second Law",
+  "description": "The relationship between force, mass, and acceleration: F = m x a.",
+  "referenceMaterial": "# Newton's Second Law\n\nNewton's second law relates the net force acting on an object to its acceleration.\n\n## Core equation\n\nF = m x a\n\n- **F** is the NET (resultant) force in newtons (N), not just a single force.\n- **m** is the object's mass in kilograms (kg).\n- **a** is acceleration in m/s^2, in the same direction as the net force.\n\n## Meaning\n\nAn object's acceleration is directly proportional to the net force and inversely proportional to its mass: a = F / m. The same force produces a smaller acceleration on a more massive object.\n\n## Commonly confused points\n\n- What causes acceleration is the NET force. If forces are balanced (resultant zero), the object does not accelerate even though many forces act on it.\n- Force does not cause velocity, but a CHANGE in velocity (acceleration). An object can move fast with no net force (Newton's first law).\n- Mass (kg) differs from weight (the force of gravity, N). Weight = m x g.\n\n## Examples\n\nA net force of 10 N on a 2 kg object produces an acceleration of 5 m/s^2. A net force of 10 N on a 5 kg object produces an acceleration of 2 m/s^2.",
+  "keyConcepts": [
+    "F = m x a relates net force, mass, and acceleration",
+    "Acceleration is determined by the NET (resultant) force, not a single force",
+    "Acceleration is inversely proportional to mass",
+    "Force causes acceleration (a change in velocity), not velocity itself",
+    "Mass (kg) is different from weight (N)"
+  ],
+  "commonMisconceptions": [
+    "A larger force always means a larger speed, rather than a larger acceleration",
+    "A moving object must have a net force in its direction of motion",
+    "The F in F=ma is one of the forces rather than the resultant of all forces",
+    "Mass and weight are the same thing",
+    "Without a force, an object immediately stops"
+  ],
+  "difficulty": "medium"
+}
