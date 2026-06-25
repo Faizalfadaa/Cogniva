@@ -29,7 +29,7 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "@types/node": "^26.0.1",
+    "@types/node": "^22.0.0",
     "vitest": "^4.1.9"
   }
 }
