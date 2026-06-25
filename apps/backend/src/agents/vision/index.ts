@@ -1,29 +1,40 @@
 /**
- * Vision agent — M1 passthrough stub (Architecture Document §3.4).
+ * Vision agent — real multimodal board reading (Architecture Document §3.4).
  *
- * In M1 there is no real board reading yet; the teaching content arrives as the
- * typed-text channel (the structured fallback §10 mandates). This stub turns
- * that typed text into a VisionInterpretation so the end-to-end loop runs. When
- * only an image is provided (no typed text), it can't read it yet and asks the
- * user to confirm by typing — exercising the confirmation path (§5.3).
+ * Keeps the exact M1 stub behavior for the typed-text fallback channel
+ * (§5.3, §10): when typedText is present, it's used directly with full
+ * confidence and no model call. The only change from the M1 stub is what
+ * happens when there's an image and no typed text — instead of always
+ * asking for confirmation, it now actually reads the board.
  *
- * Real multimodal board reading replaces this in M2; the contract it returns
- * (VisionInterpretation) does not change.
+ * Interface change from M1: `interpret()` is now async (real board reading
+ * requires an LLM call). The orchestrator's single call site was updated to
+ * `await` it — see GAPS_VISION.md for the exact diff.
  */
 
 import type { BoardSnapshot, VisionInterpretation } from "../../contracts/board.js";
+import { runVisionTurn } from "./vision.agent.js";
+import type { RunVisionOptions } from "./vision.types.js";
 
 export class VisionAgent {
   readonly confidenceThreshold: number;
+  private readonly options: RunVisionOptions;
 
-  constructor({ confidenceThreshold }: { confidenceThreshold: number }) {
+  constructor({
+    confidenceThreshold,
+    ...options
+  }: { confidenceThreshold: number } & RunVisionOptions) {
     this.confidenceThreshold = confidenceThreshold;
+    this.options = options;
   }
 
-  interpret(
+  async interpret(
     snapshot: BoardSnapshot,
     typedText: string | null | undefined,
-  ): VisionInterpretation {
+    topic = "",
+  ): Promise<VisionInterpretation> {
+    // Typed-text fallback (§5.3, §6.6 typedInput) — unchanged from the M1
+    // stub. No model call: the user already gave us clean text.
     if (typedText && typedText.trim()) {
       const confidence = 1.0;
       return {
@@ -35,17 +46,26 @@ export class VisionAgent {
       };
     }
 
-    // TODO(M2): call a multimodal model to read the whiteboard image.
-    const confidence = 0.0;
-    return {
-      snapshotId: snapshot.snapshotId,
-      transcribedText: "",
-      elements: [],
-      confidence,
-      needsConfirmation: confidence < this.confidenceThreshold,
-      suggestedClarification:
-        "Board reading isn't enabled yet (coming in M2). Please type " +
-        "what you wrote or explained so the student can follow along.",
-    };
+    if (!snapshot.image) {
+      return {
+        snapshotId: snapshot.snapshotId,
+        transcribedText: "",
+        elements: [],
+        confidence: 0,
+        needsConfirmation: true,
+        suggestedClarification:
+          "Belum ada gambar papan atau teks. Bisa tulis atau ketik apa yang dijelaskan?",
+      };
+    }
+
+    return runVisionTurn(
+      {
+        snapshotId: snapshot.snapshotId,
+        topic,
+        imageBase64: snapshot.image,
+        mimeType: `image/${snapshot.format || "png"}`,
+      },
+      this.options,
+    );
   }
 }

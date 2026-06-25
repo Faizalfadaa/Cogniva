@@ -25,6 +25,13 @@ export interface StructuredArgs {
   system: string;
   user: string;
   schema: Record<string, unknown>;
+  /** Optional image part for multimodal agents (Vision, §3.4). Omitted by
+   * text-only agents (Learner, Evaluator) -- adding this field does not
+   * change their call shape or behavior. */
+  image?: { data: string; mimeType: string };
+  /** Optional audio part for the ASR agent (§3.5). Same additive shape as
+   * `image`: text-only agents omit it and are unaffected. */
+  audio?: { data: string; mimeType: string };
 }
 
 /**
@@ -84,12 +91,24 @@ export class LLMClient implements LLM {
    * Throws LLMError on any failure (network, safety block, bad JSON) so the
    * caller can fall back gracefully.
    */
-  async structured({ system, user, schema }: StructuredArgs): Promise<Record<string, unknown>> {
+  async structured({ system, user, schema, image, audio }: StructuredArgs): Promise<Record<string, unknown>> {
     let response: { text?: string; promptFeedback?: { blockReason?: string } | null };
     try {
+      // Text-only agents (Learner, Evaluator) keep passing `user` as a plain
+      // string, unchanged. Multimodal agents attach inline-data parts -- Vision
+      // an image (§3.4), ASR an audio clip (§3.5) -- riding the same seam.
+      // `data` here is the base64 string itself, per the SDK's Blob shape.
+      const mediaParts = [image, audio]
+        .filter((m): m is { data: string; mimeType: string } => Boolean(m))
+        .map((m) => ({ inlineData: { data: m.data, mimeType: m.mimeType } }));
+
+      const contents = mediaParts.length
+        ? [{ role: "user", parts: [...mediaParts, { text: user }] }]
+        : user;
+
       response = await this.client.models.generateContent({
         model: this.model,
-        contents: user,
+        contents,
         config: {
           systemInstruction: system,
           maxOutputTokens: this.maxTokens,
