@@ -9,9 +9,8 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 
-import { seedLearnerState } from "../../agents/index.js";
+import { getEvaluator, seedLearnerState, type TranscriptTurn } from "../../agents/index.js";
 import { utcNowIso } from "../../contracts/common.js";
-import type { EvaluationResult } from "../../contracts/evaluation.js";
 import type { Session } from "../../contracts/session.js";
 import {
   END,
@@ -95,26 +94,56 @@ export async function restRoutes(app: FastifyInstance): Promise<void> {
     const session = requireSession(req.params, reply);
     if (!session) return reply;
 
+    // Idempotent (§4.2): a second call returns the same result without re-running.
     const existing = sessions.getEvaluationBySession(session.sessionId);
-    if (existing) return existing; // idempotent: do not re-run the Evaluator
+    if (existing) return existing;
 
-    if (session.status === "ENDED") {
-      if (!advance(session, EVALUATE, reply)) return reply;
+    // Evaluation is only valid once the session has ENDED (§4.2). EVALUATED is
+    // handled above (existing result); SETUP/TEACHING are too early.
+    if (session.status !== "ENDED") {
+      return reply
+        .code(409)
+        .send({ detail: `Cannot evaluate in status '${session.status}'; end the session first` });
     }
 
-    // TODO(M3): call the real Evaluator with the transcript + referenceMaterial.
-    const result: EvaluationResult = {
-      evaluationId: newId("ev"),
-      sessionId: session.sessionId,
-      score: 0,
-      findings: [],
-      summary: "Evaluator not implemented yet (M0 placeholder).",
-      strengths: [],
-      improvements: [],
-      generatedAt: utcNowIso(),
-    };
+    const topic = topics.get(session.topicId);
+    if (!topic) return notFound(reply, "Topic not found for session");
+
+    // Project the stored teaching turns (§6.6) down to the transcript the
+    // Evaluator reads: board reading + spoken transcript + the student's reply.
+    const transcript: TranscriptTurn[] = sessions.listTurns(session.sessionId).map((turn) => {
+      const learner = sessions.getResponse(turn.learnerResponseId);
+      return {
+        turnIndex: turn.turnIndex,
+        boardText: turn.interpretation.transcribedText,
+        speech: turn.speechTranscript?.transcript || undefined,
+        learnerUtterance: learner?.text,
+      };
+    });
+
+    // The Evaluator never throws (it falls back to a deterministic assessment),
+    // but guard anyway: on failure leave the session ENDED so it can be retried
+    // without corrupting session data (§10).
+    let result;
+    try {
+      result = await getEvaluator().evaluate(
+        {
+          sessionId: session.sessionId,
+          turns: transcript,
+          referenceMaterial: topic.referenceMaterial,
+          keyConcepts: topic.keyConcepts,
+          commonMisconceptions: topic.commonMisconceptions,
+        },
+        newId("ev"),
+      );
+    } catch (err) {
+      req.log.error(err);
+      return reply.code(500).send({ detail: "Evaluation failed; please retry" });
+    }
+
     sessions.saveEvaluation(result);
     session.evaluationId = result.evaluationId;
+    if (!advance(session, EVALUATE, reply)) return reply; // ENDED -> EVALUATED
     sessions.saveSession(session);
     return result;
   });

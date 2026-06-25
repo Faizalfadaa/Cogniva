@@ -1,76 +1,88 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { runEvaluator } from "../evaluator";
-import * as geminiClientModule from "../geminiClient";
-import { EvaluatorInput } from "../types";
+import { describe, it, expect } from "vitest";
 
-vi.mock("../geminiClient", () => ({
-  createGeminiClient: vi.fn(),
-}));
+import type { LLM, StructuredArgs } from "../../../llm/index.js";
+import { runEvaluator } from "../evaluator.js";
+import type { EvaluatorInput } from "../types.js";
 
-describe("runEvaluator", () => {
-  const mockInput: EvaluatorInput = {
-    sessionId: "sess-1",
-    turns: [
-      {
-        turnIndex: 0,
-        sessionId: "sess-1",
-        interpretation: { transcribedText: "Photosynthesis makes food.", elements: [] },
-        typedInput: "Photosynthesis makes food.",
-        learnerResponseId: "r-1",
-        createdAt: "2026-06-25T00:00:00Z",
-      },
-    ],
-    referenceMaterial: "Plants make food using sunlight.",
-    keyConcepts: ["Sunlight", "Water", "Carbon Dioxide"],
-    commonMisconceptions: ["Plants eat dirt."],
-  };
+const baseInput: EvaluatorInput = {
+  sessionId: "sess-1",
+  turns: [
+    {
+      turnIndex: 0,
+      boardText: "Photosynthesis converts sunlight into glucose.",
+      learnerUtterance: "Jadi cahayanya diubah jadi gula?",
+    },
+  ],
+  referenceMaterial: "Plants make glucose using sunlight, water and carbon dioxide.",
+  keyConcepts: [
+    "Photosynthesis converts sunlight into glucose",
+    "Plants release oxygen",
+  ],
+  commonMisconceptions: ["Plants eat dirt"],
+};
 
-  const validMockResponse = JSON.stringify({
-    score: 85,
-    summary: "Good start.",
-    strengths: ["Clear explanation"],
-    improvements: ["Mention sunlight"],
-    findings: [
-      {
-        category: "TERLEWAT",
-        concept: "Sunlight",
-        detail: "Did not mention sunlight.",
-        evidenceTurnIndex: 0,
-      },
-    ],
-  });
+/** A tiny LLM seam stub so the real path runs without the SDK. */
+function fakeLLM(impl: (args: StructuredArgs) => Promise<Record<string, unknown>>): LLM {
+  return { structured: impl };
+}
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+describe("runEvaluator (offline / mock)", () => {
+  it("scores by keyword coverage and uses English finding categories", async () => {
+    const result = await runEvaluator(baseInput, "ev_test1234", { useMock: true });
 
-  it("successfully evaluates and parses the response", async () => {
-    const mockGenerate = vi.fn().mockResolvedValue(validMockResponse);
-    vi.mocked(geminiClientModule.createGeminiClient).mockReturnValue({
-      generate: mockGenerate,
-    });
-
-    const result = await runEvaluator(mockInput, "fake-api-key");
-
+    expect(result.evaluationId).toBe("ev_test1234");
     expect(result.sessionId).toBe("sess-1");
-    expect(result.evaluationId).toMatch(/^ev_[a-f0-9]{8}$/);
-    expect(result.score).toBe(85);
-    expect(result.findings).toHaveLength(1);
-    expect(result.findings[0].category).toBe("TERLEWAT");
-    expect(mockGenerate).toHaveBeenCalledTimes(1);
+    expect(result.score).toBeGreaterThan(0); // "glucose"/"sunlight" covered in turn 0
+    expect(result.score).toBeLessThanOrEqual(100);
+    // First concept is covered (CORRECT), second is missed (MISSED).
+    const categories = result.findings.map((f) => f.category);
+    expect(categories).toContain("CORRECT");
+    expect(categories).toContain("MISSED");
+    for (const c of categories) {
+      expect(["CORRECT", "WRONG", "MISSED", "CONFUSING"]).toContain(c);
+    }
   });
 
-  it("retries on invalid JSON and eventually throws", async () => {
-    const mockGenerate = vi.fn().mockResolvedValue("invalid json");
-    vi.mocked(geminiClientModule.createGeminiClient).mockReturnValue({
-      generate: mockGenerate,
+  it("returns score 0 with no recorded turns", async () => {
+    const result = await runEvaluator(
+      { ...baseInput, turns: [] },
+      "ev_empty",
+      { useMock: true },
+    );
+    expect(result.score).toBe(0);
+  });
+});
+
+describe("runEvaluator (real path via injected LLM)", () => {
+  it("normalizes and clamps the model output", async () => {
+    const llm = fakeLLM(async () => ({
+      score: 130, // out of range -> clamped to 100
+      summary: "Penjelasan kuat di tahap terang.",
+      strengths: ["alur cahaya", ""], // empty entry dropped
+      improvements: ["tambahkan siklus Calvin"],
+      findings: [
+        { category: "CORRECT", concept: "klorofil", detail: "tepat", evidenceTurnIndex: 0 },
+        { category: "BOGUS", concept: "x", detail: "y", evidenceTurnIndex: 0 }, // dropped
+      ],
+    }));
+
+    const result = await runEvaluator(baseInput, "ev_real", { llm });
+
+    expect(result.score).toBe(100);
+    expect(result.strengths).toEqual(["alur cahaya"]);
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].category).toBe("CORRECT");
+  });
+
+  it("falls back to the deterministic evaluator when the LLM throws", async () => {
+    const llm = fakeLLM(async () => {
+      throw new Error("network down");
     });
 
-    await expect(runEvaluator(mockInput, "fake-api-key", 2)).rejects.toThrow(
-      /Evaluator failed after 2 retries/
-    );
+    const result = await runEvaluator(baseInput, "ev_fallback", { llm });
 
-    // 1 initial attempt + 2 retries = 3 calls
-    expect(mockGenerate).toHaveBeenCalledTimes(3);
+    // Fallback still yields a valid, renderable result rather than throwing.
+    expect(result.evaluationId).toBe("ev_fallback");
+    expect(result.findings.length).toBeGreaterThan(0);
   });
 });

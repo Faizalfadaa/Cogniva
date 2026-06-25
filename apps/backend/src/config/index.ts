@@ -57,6 +57,16 @@ export const VISION_CONFIDENCE_THRESHOLD: number = num(
   0.6,
 );
 
+// --- Evaluator (§3.7) ------------------------------------------------------
+
+/**
+ * Text model for post-session evaluation. Defaults to the same fast model as the
+ * Learner; set COGNIVA_EVALUATOR_MODEL=gemini-2.5-pro for a more thorough
+ * assessment (latency is not critical here — it runs once, after the session).
+ */
+export const EVALUATOR_MODEL: string =
+  process.env.COGNIVA_EVALUATOR_MODEL ?? "gemini-2.5-flash";
+
 // --- ASR (§3.5) ------------------------------------------------------------
 
 /**
