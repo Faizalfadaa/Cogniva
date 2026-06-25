@@ -80,14 +80,29 @@ describe("orchestrator", () => {
     expect(sessions.getLearnerState(session.sessionId)).toBeDefined();
   });
 
-  it("requests confirmation for an image-only turn", async () => {
+  it("proceeds to the learner on an image-only turn (M2: Vision can read it now)", async () => {
     const session = newSession();
     const topic = topics.get("topic_photosynthesis")!;
     const orch = orchestrator();
 
-    // No typed text + only an image -> Vision (M1 stub) can't read it yet.
+    // No typed text, only an image -> real Vision (mock mode, no API key in
+    // tests) reads it successfully, so the turn proceeds to the Learner.
     const result = await orch.runTeachingTurn(session, topic, {
       image: "base64data",
+      typedText: null,
+    });
+
+    expect(result.kind).toBe("learner");
+    expect(session.turnCount).toBe(1);
+  });
+
+  it("requests confirmation when there is neither image nor typed text", async () => {
+    const session = newSession();
+    const topic = topics.get("topic_photosynthesis")!;
+    const orch = orchestrator();
+
+    const result = await orch.runTeachingTurn(session, topic, {
+      image: null,
       typedText: null,
     });
 

@@ -54,10 +54,10 @@ async function handleMessage(send: Send, sessionId: string, raw: string): Promis
   const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
 
   if (type === "teaching_input") {
-    await runTurn(send, sessionId, str(payload.image), str(payload.typedText));
+    await runTurn(send, sessionId, str(payload.image), str(payload.typedText), str(payload.audio));
   } else if (type === "confirmation_response") {
     // The user corrected an uncertain board reading; rerun the turn with it.
-    await runTurn(send, sessionId, null, str(payload.corrected));
+    await runTurn(send, sessionId, null, str(payload.corrected), null);
   } else if (type === "end_session") {
     // Mirrors REST POST /sessions/:id/end; same state machine.
     send({ type: "state_update", status: "ENDED" });
@@ -71,6 +71,7 @@ async function runTurn(
   sessionId: string,
   image: string | null,
   typedText: string | null,
+  audio: string | null,
 ): Promise<void> {
   const session = sessions.getSession(sessionId);
   if (!session) {
@@ -92,7 +93,7 @@ async function runTurn(
 
   let result;
   try {
-    result = await getOrchestrator().runTeachingTurn(session, topic, { image, typedText });
+    result = await getOrchestrator().runTeachingTurn(session, topic, { image, audio, typedText });
   } catch (err) {
     log(`Teaching turn failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
     send({
@@ -113,6 +114,9 @@ async function runTurn(
 
   if (result.interpretation) {
     send({ type: "vision_result", interpretation: result.interpretation });
+  }
+  if (result.speech) {
+    send({ type: "speech_result", transcript: result.speech });
   }
   if (result.response) {
     send({ type: "learner_message", response: result.response });

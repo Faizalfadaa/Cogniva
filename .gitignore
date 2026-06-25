@@ -44,3 +44,12 @@ Thumbs.db
 tmp/
 temp/
 ~$*
+
+# Personal tooling notes (not part of the project)
+RTK.md
+
+# Test audio — each contributor supplies their own (.gitkeep keeps the folder)
+apps/backend/suara-uji/*.wav
+
+# Design doc (shared separately, not version-controlled as binary)
+Cogniva.docx

@@ -8,18 +8,20 @@
  *
  *     teaching input --> [Vision] --> interpretation --+
  *                                                       +--> [Learner] --> response
- *                        (M2: [ASR] --> speech) --------+
+ *                        [ASR] --> speech -------------+
  *
  * If the board reading needs confirmation (low confidence, §5.3), the turn
  * pauses and asks the user instead of running the Learner.
  */
 
-import { LearnerAgent, VisionAgent, seedLearnerState, type RespondArgs } from "../agents/index.js";
+import { LearnerAgent, VisionAgent, AsrAgent, seedLearnerState, type RespondArgs } from "../agents/index.js";
+import type { AudioClip } from "../agents/asr/asr.types.js";
 import * as config from "../config/index.js";
 import type { BoardSnapshot, VisionInterpretation } from "../contracts/board.js";
 import { utcNowIso } from "../contracts/common.js";
 import type { LearnerResponse, LearnerState } from "../contracts/learner.js";
 import type { Session } from "../contracts/session.js";
+import type { SpeechTranscript } from "../contracts/speech.js";
 import type { Topic } from "../contracts/topic.js";
 import { newId, sessions } from "../modules/storage/sessionStore.js";
 
@@ -33,13 +35,24 @@ export interface Vision {
   interpret(
     snapshot: BoardSnapshot,
     typedText: string | null | undefined,
-  ): VisionInterpretation;
+    topic?: string,
+  ): Promise<VisionInterpretation>;
+}
+
+/** An ASR agent the orchestrator can drive (real agent or a test fake). */
+export interface Asr {
+  transcribe(
+    clip: AudioClip,
+    typedText: string | null | undefined,
+    topic?: string,
+  ): Promise<SpeechTranscript>;
 }
 
 /** Outcome of one teaching turn the orchestrator hands back to the API layer. */
 export interface TurnResult {
   kind: "learner" | "confirmation";
   interpretation?: VisionInterpretation;
+  speech?: SpeechTranscript;
   response?: LearnerResponse;
   snapshotId?: string;
   suggestedClarification?: string;
@@ -47,23 +60,27 @@ export interface TurnResult {
 
 export interface TeachingInput {
   image: string | null | undefined;
+  /** Base64 audio clip for the voice channel (§3.5). Optional. */
+  audio?: string | null | undefined;
   typedText: string | null | undefined;
 }
 
 export class Orchestrator {
   private readonly learner: Learner;
   private readonly vision: Vision;
+  private readonly asr?: Asr;
 
-  constructor({ learner, vision }: { learner: Learner; vision: Vision }) {
+  constructor({ learner, vision, asr }: { learner: Learner; vision: Vision; asr?: Asr }) {
     this.learner = learner;
     this.vision = vision;
+    this.asr = asr;
   }
 
   /** Run one turn during TEACHING and persist it. */
   async runTeachingTurn(
     session: Session,
     topic: Topic,
-    { image, typedText }: TeachingInput,
+    { image, audio, typedText }: TeachingInput,
   ): Promise<TurnResult> {
     const turnIndex = session.turnCount;
 
@@ -77,7 +94,7 @@ export class Orchestrator {
     };
     sessions.saveSnapshot(snapshot);
 
-    const interpretation = this.vision.interpret(snapshot, typedText);
+    const interpretation = await this.vision.interpret(snapshot, typedText, topic.title);
     if (interpretation.needsConfirmation) {
       // Pause the turn and ask the user to confirm/correct (§5.3).
       return {
@@ -86,6 +103,23 @@ export class Orchestrator {
         snapshotId: snapshot.snapshotId,
         suggestedClarification: interpretation.suggestedClarification,
       };
+    }
+
+    // Voice channel (§3.5): transcribe the audio clip when present. typedText is
+    // the board-channel fallback, so it is NOT fed to ASR (that would duplicate
+    // the same text into both channels). No audio (or no ASR) -> no speech.
+    let speech: SpeechTranscript | null = null;
+    if (this.asr && audio) {
+      const clip: AudioClip = {
+        segmentId: newId("seg"),
+        sessionId: session.sessionId,
+        turnIndex,
+        audio,
+        format: "webm",
+        capturedAt: utcNowIso(),
+      };
+      speech = await this.asr.transcribe(clip, null, topic.title);
+      sessions.saveTranscript(speech);
     }
 
     const state =
@@ -98,7 +132,7 @@ export class Orchestrator {
       topicTitle: topic.title,
       topicDescription: topic.description,
       interpretation,
-      speech: null, // TODO(M2): pass the ASR transcript
+      speech,
       state,
       turnIndex,
     });
@@ -110,6 +144,7 @@ export class Orchestrator {
       sessionId: session.sessionId,
       snapshotId: snapshot.snapshotId,
       interpretation,
+      speechTranscript: speech ?? undefined,
       typedInput: typedText ?? null,
       learnerResponseId: response.responseId,
       createdAt: utcNowIso(),
@@ -118,7 +153,7 @@ export class Orchestrator {
     session.turnCount = turnIndex + 1;
     sessions.saveSession(session);
 
-    return { kind: "learner", interpretation, response };
+    return { kind: "learner", interpretation, speech: speech ?? undefined, response };
   }
 }
 
@@ -137,6 +172,7 @@ export function buildOrchestrator({
   return new Orchestrator({
     learner: new LearnerAgent({ forceMock: !useConfig }),
     vision: new VisionAgent({ confidenceThreshold: config.VISION_CONFIDENCE_THRESHOLD }),
+    asr: new AsrAgent({ confidenceThreshold: config.ASR_CONFIDENCE_THRESHOLD }),
   });
 }
 
