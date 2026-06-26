@@ -45,6 +45,7 @@ function newSession(): Session {
     status: "TEACHING",
     createdAt: utcNowIso(),
     turnCount: 0,
+    evaluationIds: [],
   };
   return sessions.saveSession(session);
 }

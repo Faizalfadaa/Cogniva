@@ -6,6 +6,7 @@ import {
   END,
   EVALUATE,
   InvalidTransition,
+  RESUME,
   START,
   acceptsTeachingInput,
   canTransition,
@@ -22,13 +23,23 @@ describe("session state machine", () => {
     expect(s).toBe("EVALUATED");
   });
 
-  it("has no backward path", () => {
-    // ENDED cannot go back to TEACHING (§4.2).
+  it("resumes a finished session back to TEACHING", () => {
+    // Agreed extension: EVALUATED/ENDED -> TEACHING via resume.
+    expect(nextStatus("EVALUATED", RESUME)).toBe("TEACHING");
+    expect(nextStatus("ENDED", RESUME)).toBe("TEACHING");
+    // A full cycle: teach -> end -> evaluate -> resume -> teach again.
+    const cycled = nextStatus(nextStatus("EVALUATED", RESUME), END);
+    expect(cycled).toBe("ENDED");
+  });
+
+  it("still rejects non-resume backward moves", () => {
+    // resume is the ONLY way back; START/EVALUATE from ENDED stay invalid.
     expect(canTransition("ENDED", START)).toBe(false);
     expect(() => nextStatus("ENDED", START)).toThrow(InvalidTransition);
   });
 
-  it("treats EVALUATED as terminal", () => {
+  it("EVALUATED only transitions via resume (no longer terminal)", () => {
+    expect(canTransition("EVALUATED", RESUME)).toBe(true);
     for (const event of [START, END, EVALUATE]) {
       expect(canTransition("EVALUATED", event)).toBe(false);
     }

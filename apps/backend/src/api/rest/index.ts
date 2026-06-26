@@ -2,8 +2,9 @@
  * REST endpoints for the session lifecycle & data retrieval (Architecture Document §7.1).
  *
  * Registered under the /api prefix. The session state machine (§4) is enforced
- * here. Triggering evaluation is idempotent (§4.2): calling it twice for the
- * same session returns the same result rather than re-running the Evaluator.
+ * here. Triggering evaluation is idempotent for the current round (§4.2). A
+ * finished session is resumable (POST /resume): it returns to TEACHING and each
+ * ended round keeps its own EvaluationResult as history (agreed extension).
  */
 
 import type { FastifyInstance, FastifyReply } from "fastify";
@@ -11,11 +12,13 @@ import { z } from "zod";
 
 import { getEvaluator, seedLearnerState, type TranscriptTurn } from "../../agents/index.js";
 import { utcNowIso } from "../../contracts/common.js";
+import type { EvaluationResult } from "../../contracts/evaluation.js";
 import type { Session } from "../../contracts/session.js";
 import {
   END,
   EVALUATE,
   InvalidTransition,
+  RESUME,
   START,
   nextStatus,
   type SessionEvent,
@@ -26,6 +29,10 @@ import { topics } from "../../modules/topic/repository.js";
 const createSessionSchema = z.object({ topicId: z.string() });
 
 export async function restRoutes(app: FastifyInstance): Promise<void> {
+  // In-flight evaluations per session, to de-duplicate concurrent /evaluate
+  // calls for the same round (e.g. React StrictMode mounts the debrief twice).
+  const evaluating = new Map<string, Promise<EvaluationResult>>();
+
   // --- Topics --------------------------------------------------------------
 
   app.get("/topics", async () => topics.list());
@@ -50,6 +57,7 @@ export async function restRoutes(app: FastifyInstance): Promise<void> {
       status: "SETUP",
       createdAt: utcNowIso(),
       turnCount: 0,
+      evaluationIds: [],
     };
     reply.code(201);
     return sessions.saveSession(session);
@@ -94,12 +102,22 @@ export async function restRoutes(app: FastifyInstance): Promise<void> {
     const session = requireSession(req.params, reply);
     if (!session) return reply;
 
-    // Idempotent (§4.2): a second call returns the same result without re-running.
-    const existing = sessions.getEvaluationBySession(session.sessionId);
-    if (existing) return existing;
+    // Idempotent within a round (§4.2): if this round is already EVALUATED,
+    // return its result without re-running. After a resume + re-end the status
+    // is ENDED again, so a fresh evaluation runs and is appended to history.
+    if (session.status === "EVALUATED") {
+      const latest = sessions.getLatestEvaluation(session.sessionId);
+      if (latest) return latest;
+    }
 
-    // Evaluation is only valid once the session has ENDED (§4.2). EVALUATED is
-    // handled above (existing result); SETUP/TEACHING are too early.
+    // De-duplicate concurrent evaluates for the same round: the first call runs
+    // the Evaluator and advances the state; overlapping calls await that same
+    // in-flight result instead of starting a second run and racing on the
+    // ENDED -> EVALUATED transition (which used to 409 for the loser).
+    const inFlight = evaluating.get(session.sessionId);
+    if (inFlight) return inFlight;
+
+    // A new evaluation is only valid once the current round has ENDED (§4.2).
     if (session.status !== "ENDED") {
       return reply
         .code(409)
@@ -121,12 +139,10 @@ export async function restRoutes(app: FastifyInstance): Promise<void> {
       };
     });
 
-    // The Evaluator never throws (it falls back to a deterministic assessment),
-    // but guard anyway: on failure leave the session ENDED so it can be retried
-    // without corrupting session data (§10).
-    let result;
-    try {
-      result = await getEvaluator().evaluate(
+    // Run the Evaluator and persist the round atomically (no awaits between the
+    // save and the state transition), then expose the promise for dedup.
+    const run = (async (): Promise<EvaluationResult> => {
+      const result = await getEvaluator().evaluate(
         {
           sessionId: session.sessionId,
           turns: transcript,
@@ -136,24 +152,54 @@ export async function restRoutes(app: FastifyInstance): Promise<void> {
         },
         newId("ev"),
       );
+      sessions.saveEvaluation(result);
+      session.evaluationId = result.evaluationId;
+      session.evaluationIds = sessions
+        .listEvaluations(session.sessionId)
+        .map((e) => e.evaluationId);
+      session.status = nextStatus(session.status, EVALUATE); // ENDED -> EVALUATED
+      sessions.saveSession(session);
+      return result;
+    })();
+    evaluating.set(session.sessionId, run);
+
+    // The Evaluator never throws (it falls back to a deterministic assessment),
+    // but guard anyway: on failure leave the session ENDED so it can be retried
+    // without corrupting session data (§10).
+    try {
+      return await run;
     } catch (err) {
       req.log.error(err);
       return reply.code(500).send({ detail: "Evaluation failed; please retry" });
+    } finally {
+      evaluating.delete(session.sessionId);
     }
+  });
 
-    sessions.saveEvaluation(result);
-    session.evaluationId = result.evaluationId;
-    if (!advance(session, EVALUATE, reply)) return reply; // ENDED -> EVALUATED
-    sessions.saveSession(session);
-    return result;
+  // Resume a finished session to keep teaching (EVALUATED/ENDED -> TEACHING).
+  // The transcript, turn count, and Learner mental model are preserved, so the
+  // conversation continues; prior evaluations remain as history.
+  app.post("/sessions/:sessionId/resume", async (req, reply) => {
+    const session = requireSession(req.params, reply);
+    if (!session) return reply;
+    if (!advance(session, RESUME, reply)) return reply;
+    session.endedAt = undefined;
+    return sessions.saveSession(session);
   });
 
   app.get("/sessions/:sessionId/evaluation", async (req, reply) => {
     const session = requireSession(req.params, reply);
     if (!session) return reply;
-    const result = sessions.getEvaluationBySession(session.sessionId);
+    const result = sessions.getLatestEvaluation(session.sessionId);
     if (!result) return reply.code(404).send({ detail: "Evaluation not available yet" });
     return result;
+  });
+
+  // Full evaluation history (oldest first) — one entry per ended round.
+  app.get("/sessions/:sessionId/evaluations", async (req, reply) => {
+    const session = requireSession(req.params, reply);
+    if (!session) return reply;
+    return sessions.listEvaluations(session.sessionId);
   });
 }
 

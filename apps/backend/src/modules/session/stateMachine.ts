@@ -1,16 +1,22 @@
 /**
- * Session state machine (Architecture Document §4).
+ * Session state machine (Architecture Document §4, with an agreed extension).
  *
  * The orchestrator is the only party allowed to move the status, and every
  * transition is triggered by a clear event.
  *
  *   SETUP --(start)--> TEACHING --(end)--> ENDED --(evaluate)--> EVALUATED
+ *                          ^                                          |
+ *                          +------------------(resume)---------------+
  *
- * Rules (§4.2):
- * - Transitions are forward-only; there is no path back.
- * - teaching_input is only valid in the TEACHING state.
- * - Triggering evaluation is only valid in the ENDED state, and is idempotent.
- * - EVALUATED is terminal.
+ * Rules:
+ * - teaching_input is only valid in the TEACHING state (§4.2).
+ * - Triggering evaluation is only valid in the ENDED state, and is idempotent
+ *   for the current round (§4.2).
+ * - EXTENSION (supersedes the forward-only rule in §4.2, agreed change): a
+ *   finished session is resumable — `resume` moves ENDED or EVALUATED back to
+ *   TEACHING so the user can continue the conversation. Each ended round still
+ *   produces its own EvaluationResult, and the prior results are kept as
+ *   history rather than overwritten. EVALUATED is therefore no longer terminal.
  */
 
 import type { SessionStatus } from "../../contracts/enums.js";
@@ -19,14 +25,22 @@ import type { SessionStatus } from "../../contracts/enums.js";
 export const START = "start";
 export const END = "end";
 export const EVALUATE = "evaluate";
+export const RESUME = "resume";
 
-export type SessionEvent = typeof START | typeof END | typeof EVALUATE;
+export type SessionEvent =
+  | typeof START
+  | typeof END
+  | typeof EVALUATE
+  | typeof RESUME;
 
 // Allowed transitions: `${status}:${event}` -> next status
 const TRANSITIONS: Record<string, SessionStatus> = {
   [`SETUP:${START}`]: "TEACHING",
   [`TEACHING:${END}`]: "ENDED",
   [`ENDED:${EVALUATE}`]: "EVALUATED",
+  // Resume a finished session to keep teaching (agreed extension).
+  [`EVALUATED:${RESUME}`]: "TEACHING",
+  [`ENDED:${RESUME}`]: "TEACHING",
 };
 
 /** A status transition that is not allowed by the state machine. */

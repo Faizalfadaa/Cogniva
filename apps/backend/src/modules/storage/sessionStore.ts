@@ -25,7 +25,8 @@ export function newId(prefix: string): string {
 /** In-memory store for sessions and everything a turn produces (§8 placeholder). */
 export class SessionStore {
   private sessions = new Map<string, Session>();
-  private evaluations = new Map<string, EvaluationResult>();
+  private evaluationsById = new Map<string, EvaluationResult>();
+  private evaluationIdsBySession = new Map<string, string[]>();
   private snapshots = new Map<string, BoardSnapshot>();
   private transcripts = new Map<string, SpeechTranscript>();
   private responses = new Map<string, LearnerResponse>();
@@ -43,15 +44,32 @@ export class SessionStore {
     return this.sessions.get(sessionId);
   }
 
-  // --- Evaluation -------------------------------------------------------
+  // --- Evaluation (history: one per ended round, oldest first) ----------
 
   saveEvaluation(result: EvaluationResult): EvaluationResult {
-    this.evaluations.set(result.sessionId, result);
+    this.evaluationsById.set(result.evaluationId, result);
+    const ids = this.evaluationIdsBySession.get(result.sessionId) ?? [];
+    ids.push(result.evaluationId);
+    this.evaluationIdsBySession.set(result.sessionId, ids);
     return result;
   }
 
-  getEvaluationBySession(sessionId: string): EvaluationResult | undefined {
-    return this.evaluations.get(sessionId);
+  getEvaluationById(evaluationId: string): EvaluationResult | undefined {
+    return this.evaluationsById.get(evaluationId);
+  }
+
+  /** Full evaluation history for a session, oldest first. */
+  listEvaluations(sessionId: string): EvaluationResult[] {
+    const ids = this.evaluationIdsBySession.get(sessionId) ?? [];
+    return ids
+      .map((id) => this.evaluationsById.get(id))
+      .filter((e): e is EvaluationResult => Boolean(e));
+  }
+
+  /** The most recent evaluation for a session (latest round), if any. */
+  getLatestEvaluation(sessionId: string): EvaluationResult | undefined {
+    const ids = this.evaluationIdsBySession.get(sessionId);
+    return ids?.length ? this.evaluationsById.get(ids[ids.length - 1]) : undefined;
   }
 
   // --- Board snapshots --------------------------------------------------
