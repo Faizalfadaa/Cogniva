@@ -203,3 +203,260 @@
   color: var(--text-primary);
   line-height: 1.5;
 }
+
+/* ─── Learner dock (avatar persistent + chat collapsible) ───
+   Ditempel di tengah edge kanan (top:50%), BUKAN di salah satu pojok -
+   tldraw cuma occupy 4 pojok (style panel top-right, zoom bottom-left,
+   page menu top-left, help bottom-right), jadi tengah-kanan selalu aman
+   baik saat collapsed (avatar kecil) maupun expanded (panel chat). */
+
+.dockCollapsed {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  z-index: 900;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  background: var(--cream);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  transition: transform var(--dur-fast);
+}
+
+.dockCollapsed:hover {
+  transform: translateY(-50%) scale(1.05);
+}
+
+.dockAvatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--parchment);
+}
+
+.dockBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: #e0453c;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dockExpanded {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  z-index: 900;
+  width: 320px;
+  max-height: min(480px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  overflow: hidden;
+}
+
+.dockHeader {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dockHeaderAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--parchment);
+}
+
+.dockHeaderName {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.dockClose {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 16px;
+  color: var(--text-muted);
+  transition: background var(--dur-fast);
+}
+
+.dockClose:hover {
+  background: var(--parchment);
+}
+
+.dockMessages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dockEmpty {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 12px;
+}
+
+.dockBubble {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.dockBubbleLearner {
+  align-self: flex-start;
+  background: var(--parchment);
+  color: var(--text-primary);
+  border-bottom-left-radius: 4px;
+}
+
+.dockBubbleUser {
+  align-self: flex-end;
+  background: var(--lime);
+  color: var(--lime-text);
+  border-bottom-right-radius: 4px;
+}
+
+.dockInputRow {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.dockInput {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+}
+
+.dockSend {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--lime);
+  color: var(--lime-text);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.dockSend:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ─── Learner intro (video → scripted opening lines, sekali per workspace) ───
+   Posisi sama persis dengan dock (right-center) - intro "muncul dari" titik
+   yang sama tempat dock bakal hidup permanen setelah ini selesai. */
+
+.introOverlay {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  z-index: 900;
+  width: 320px;
+}
+
+.introSkip {
+  position: absolute;
+  top: -32px;
+  right: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--cream);
+  border: 1px solid var(--border);
+}
+
+.introSkip:hover {
+  border-color: var(--text-primary);
+}
+
+.introVideoWrap {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  background: #000;
+}
+
+.introVideo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.introMuteBtn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  font-size: 13px;
+  color: #fff;
+}
+
+.introMessageWrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.introAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--parchment);
+}
+
+.introBubble {
+  flex: 1;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}

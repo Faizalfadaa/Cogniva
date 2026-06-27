@@ -5,8 +5,13 @@ import type { WorkspaceDTO } from '../../dto/WorkspaceDTO'
 import { Whiteboard, type WhiteboardHandle } from '../../features/teaching-session/components/Whiteboard'
 import { WorkspaceHeader } from '../../features/teaching-session/components/WorkspaceHeader'
 import { LearnerResponseBubble } from '../../features/teaching-session/components/LearnerResponseBubble'
+import { LearnerIntro } from '../../features/teaching-session/components/LearnerIntro'
+import { LearnerDock } from '../../features/teaching-session/components/LearnerDock'
 import { useTeachingSession } from '../../features/teaching-session/state/useTeachingSession'
 import { useWorkspaceTitleAutosave } from '../../features/teaching-session/hooks/useWorkspaceTitleAutosave'
+import { useIntroSeen } from '../../features/teaching-session/hooks/useIntroSeen'
+import { useWorkspaceChat } from '../../features/teaching-session/hooks/useWorkspaceChat'
+import { useUserStore } from '../../state/UserStore'
 import { deriveLearner } from '../../lib/Learner'
 import styles from '../../styles/TeachingSession.module.css'
 
@@ -42,6 +47,9 @@ export default function WorkspacePage() {
   const session = useTeachingSession(id ?? '', bridge, whiteboardRef)
   const learner = useMemo(() => deriveLearner(id ?? ''), [id])
   const titleField = useWorkspaceTitleAutosave(id ?? '', workspace?.title, bridge)
+  const intro = useIntroSeen(id ?? '')
+  const chat = useWorkspaceChat(id ?? '', bridge)
+  const { userName } = useUserStore()
 
   if (!id || loading) {
     // TODO: loading state proper di fase Polish
@@ -76,6 +84,21 @@ export default function WorkspacePage() {
           pending={session.pending}
           checkpointId={session.latestCheckpoint?.id}
         />
+
+        {!intro.seen && (
+          <LearnerIntro learner={learner} userName={userName ?? ''} onDone={intro.markSeen} />
+        )}
+
+        {intro.seen && (
+          <LearnerDock
+            learner={learner}
+            messages={chat.messages}
+            isOpen={chat.isOpen}
+            unreadCount={chat.unreadCount}
+            onToggle={chat.toggle}
+            onSend={chat.sendMessage}
+          />
+        )}
       </div>
     </div>
   )
