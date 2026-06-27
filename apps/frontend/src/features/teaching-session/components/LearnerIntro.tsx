@@ -34,7 +34,7 @@ export function LearnerIntro({ learner, userName, onDone }: LearnerIntroProps) {
   }, [phase, messageIndex])
 
   function handleVideoEnded() {
-     setTimeout(() => setPhase('messages'), 40000)
+     setTimeout(() => setPhase('messages'), 500)
   }
 
   function handleSkip() {
