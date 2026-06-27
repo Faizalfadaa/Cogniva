@@ -30,7 +30,7 @@ export function ContinueLearning({ topics, onNewSession }: ContinueLearningProps
 
         <div className={styles.continueFooter}>
           <p className={styles.continueFooterText}>
-            Siap mengajar lagi? Buat sesi baru dan lanjutkan perjalananmu.
+            Siap mengajar topik-topik baru? Buat sesi baru atau lanjutkan sesi ini.
           </p>
           <button className={styles.continueBtn} onClick={onNewSession}>
             Mulai sesi baru ↗

@@ -13,6 +13,8 @@ interface WorkspaceHeaderProps {
   pending: boolean
   onTeach: () => void
   onContinueEditing: () => void
+  onFinishSession: () => void
+  finishingSession?: boolean
 }
 
 function saveStatusLabel(status: TitleSaveStatus): string {
@@ -38,6 +40,8 @@ export function WorkspaceHeader({
   pending,
   onTeach,
   onContinueEditing,
+  onFinishSession,
+  finishingSession = false,
 }: WorkspaceHeaderProps) {
   const navigate = useNavigate()
 
@@ -68,6 +72,14 @@ export function WorkspaceHeader({
         {isRecording && !micPermissionDenied && (
           <span className={styles.micDot} title="Merekam audio" />
         )}
+        <button
+          className={styles.finishBtn}
+          onClick={onFinishSession}
+          disabled={finishingSession || pending}
+          aria-label="Selesai mengajar"
+        >
+          {finishingSession ? 'Menyelesaikan...' : 'Finish Session'}
+        </button>
         <TeachButton mode={mode} pending={pending} onTeach={onTeach} onContinueEditing={onContinueEditing} />
       </div>
     </header>

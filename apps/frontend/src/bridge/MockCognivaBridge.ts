@@ -65,32 +65,53 @@ function randomReaction(): string {
 
 function generateMockReport(workspaceId: string): EvaluationReportDTO {
   const checkpoints = store.checkpoints.get(workspaceId) ?? [];
+  const ws = store.workspaces.get(workspaceId);
+  const topic = ws?.title || 'topik ini';
   const count = checkpoints.length;
 
   const learned =
     count > 0
-      ? ['Konsep dasar yang dijelaskan', 'Alur pemikiran utama', 'Contoh yang diberikan']
-      : [];
+      ? [
+          'Konsep utama yang kamu jelaskan di awal sesi',
+          'Alur pemikiran step-by-step yang kamu gambar di whiteboard',
+          'Contoh konkret yang kamu berikan — itu yang paling bikin aku "oh!"',
+        ]
+      : ['Pengenalan awal topik'];
 
   const stillConfused =
-    count < 3
-      ? ['Edge case belum dibahas', 'Koneksi antar konsep masih kabur']
-      : ['Edge case tertentu', 'Detail implementasi lanjutan'];
+    count < 2
+      ? [
+          'Koneksi antara konsep pertama dan kedua masih agak kabur',
+          'Edge case — belum sempat dibahas',
+        ]
+      : [
+          'Detail implementasi di kasus khusus',
+          'Kenapa pendekatan ini lebih baik dari alternatifnya',
+          'Aku masih ragu soal batasan / limitasi-nya',
+        ];
+
+  const date = now().slice(0, 10);
 
   return {
-    letter: `Haii, ${now().slice(0, 10)}...\n\nMakasih banget udah ngajar aku hari ini. Aku beneran berusaha ngerti semua yang kamu jelasin, dan... lumayan banyak yang nyantol! Terutama bagian awal — kamu jelasinnya runtut banget dan aku suka.\n\nTapi jujur, ada beberapa bagian yang aku masih bingung. Bukan salah kamu sih, kayaknya otak aku aja yang butuh waktu lebih. Mau ngajar aku lagi kapan-kapan?\n\nSampai ketemu lagi ya~\n— Learner-mu`,
+    letter: `Haii!\n\nMakasih banget udah ngajarin aku soal ${topic} tadi. Serius, aku beneran berusaha ngerti semua yang kamu jelasin — dan lumayan banyak yang nyantol!\n\nYang paling aku suka, kamu nggak langsung loncat ke hal yang rumit. Kamu mulai dari yang dasar dulu, pelan-pelan, sampai aku bisa bayangin gambaran besarnya. Diagram di whiteboard-nya juga ngebantu banget — kadang lihat tulisan/gambar langsung lebih masuk daripada dengerin penjelasan doang.\n\nJujur sih, ada beberapa bagian yang aku masih perlu waktu buat nyerap. Bukan salah kamu — kayaknya otak aku aja yang butuh diulang beberapa kali hehe. Tapi overall, sesi ini kerasa progress banget.\n\nKapan-kapan ngajar aku lagi ya? Aku mau tau kelanjutannya!\n\nSampai ketemu lagi~\n— Learner-mu 🌱\n\n(${date})`,
     notebook: {
       learned,
       stillConfused,
       reflection:
-        count >= 2
-          ? 'Penjelasan runtut dan ada contoh konkret. Diagram membantu banget. Edge case bisa jadi bahan sesi berikutnya.'
-          : 'Sesi ini singkat, tapi fondasi awalnya udah keliatan. Lanjut lebih dalam di sesi berikutnya!',
+        count >= 3
+          ? 'Penjelasan kamu runtut dan ada contoh konkret di tiap bagian — itu yang bikin aku gampang ngikutin. Kalau next time bisa bahas edge case-nya juga, pasti makin lengkap!'
+          : count >= 1
+          ? 'Fondasi awalnya udah kena. Rasanya kalau sesi-nya lebih panjang lagi aku bisa nangkep lebih banyak. Diagram di whiteboard sangat membantu!'
+          : 'Sesi ini singkat, tapi aku nangkep arahnya ke mana. Lanjut lebih dalam di sesi berikutnya ya!',
     },
     continueLearning:
       count > 0
-        ? ['Topik lanjutan A', 'Topik lanjutan B', 'Variasi / edge case dari topik ini']
-        : ['Mulai dari konsep dasar', 'Coba praktik dengan contoh sederhana'],
+        ? [
+            `${topic} — kasus lanjutan & edge case`,
+            'Perbandingan dengan pendekatan alternatif',
+            'Implementasi nyata / contoh di dunia nyata',
+          ]
+        : ['Teori VSEPR', 'Diagram Orbital Molekul'],
   };
 }
 

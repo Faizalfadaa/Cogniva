@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import type { WorkspaceDTO } from '../../dto/WorkspaceDTO'
 import { Whiteboard, type WhiteboardHandle } from '../../features/teaching-session/components/Whiteboard'
@@ -48,6 +48,20 @@ export default function WorkspacePage() {
   const titleField = useWorkspaceTitleAutosave(id ?? '', workspace?.title, bridge)
   const intro = useIntroSeen(id ?? '')
   const { userName } = useUserStore()
+  const navigate = useNavigate()
+  const [finishingSession, setFinishingSession] = useState(false)
+
+  const handleFinishSession = useCallback(async () => {
+    if (!id) return
+    setFinishingSession(true)
+    try {
+      await bridge.finishSession(id)
+      navigate(`/evaluation/${id}`)
+    } catch (err) {
+      console.error('[Workspace] finishSession failed', err)
+      setFinishingSession(false)
+    }
+  }, [bridge, id, navigate])
 
   // Resolve first messages with userName substitution — stable across renders
   const seedMessages = useMemo(
@@ -78,6 +92,8 @@ export default function WorkspacePage() {
         pending={session.pending}
         onTeach={session.teach}
         onContinueEditing={session.continueEditing}
+        onFinishSession={handleFinishSession}
+        finishingSession={finishingSession}
       />
 
       <div className={styles.workspaceBody}>

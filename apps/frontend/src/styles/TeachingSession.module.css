@@ -111,6 +111,23 @@
 }
 .outlineBtn:hover { border-color: var(--text-primary); }
 
+.finishBtn {
+  background: transparent;
+  border: 1.5px solid var(--border-strong);
+  color: var(--text-secondary);
+  border-radius: var(--radius-pill);
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), color var(--dur-fast);
+}
+.finishBtn:hover:not(:disabled) {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+.finishBtn:disabled { opacity: 0.5; cursor: default; }
+
 .micDot {
   width: 10px;
   height: 10px;
