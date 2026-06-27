@@ -12,10 +12,50 @@ export interface ChatToast {
 }
 
 interface UseWorkspaceChatOptions {
-  /** First messages from the learner character, already resolved with userName.
-   *  These are seeded once as the initial chat history so the chat is never empty. */
   seedMessages?: Array<{ id: string; content: string }>
 }
+
+// ── localStorage helpers ────────────────────────────────────────────────────
+
+function readCountKey(workspaceId: string) {
+  return `cogniva:chat-read:${workspaceId}`
+}
+
+function sessionMsgsKey(workspaceId: string) {
+  return `cogniva:chat-msgs:${workspaceId}`
+}
+
+function loadReadCount(workspaceId: string): number {
+  try {
+    const v = localStorage.getItem(readCountKey(workspaceId))
+    return v !== null ? parseInt(v, 10) : 0
+  } catch {
+    return 0
+  }
+}
+
+function saveReadCount(workspaceId: string, count: number) {
+  try {
+    localStorage.setItem(readCountKey(workspaceId), String(count))
+  } catch {}
+}
+
+function loadSessionMsgs(workspaceId: string): ChatMessageDTO[] {
+  try {
+    const raw = sessionStorage.getItem(sessionMsgsKey(workspaceId))
+    return raw ? (JSON.parse(raw) as ChatMessageDTO[]) : []
+  } catch {
+    return []
+  }
+}
+
+function saveSessionMsgs(workspaceId: string, msgs: ChatMessageDTO[]) {
+  try {
+    sessionStorage.setItem(sessionMsgsKey(workspaceId), JSON.stringify(msgs))
+  } catch {}
+}
+
+// ── Hook ───────────────────────────────────────────────────────────────────
 
 export function useWorkspaceChat(
   workspaceId: string,
@@ -24,31 +64,40 @@ export function useWorkspaceChat(
   learnerAvatarUrl: string,
   options: UseWorkspaceChatOptions = {}
 ) {
-  // Seed first messages as learner messages so chat is never empty on open.
+  // If we have persisted messages from a previous visit, use those as the merge
+  // base instead of re-generating seeds with a fresh Date.now() — otherwise the
+  // new seed timestamps would be newer than real backend messages and sort them
+  // into the wrong position.
+  const persistedOnMount = useRef<ChatMessageDTO[]>(loadSessionMsgs(workspaceId))
+
   const seedRef = useRef<ChatMessageDTO[]>(
-    (options.seedMessages ?? []).map((m, i) => ({
-      id: m.id,
-      sender: 'learner' as const,
-      content: m.content,
-      // Staggered timestamps so they render in order (oldest first)
-      createdAt: new Date(Date.now() - (options.seedMessages!.length - i) * 3000).toISOString(),
-    }))
+    persistedOnMount.current.length > 0
+      ? persistedOnMount.current  // use persisted as stable base; timestamps already fixed
+      : (options.seedMessages ?? []).map((m, i) => ({
+          id: m.id,
+          sender: 'learner' as const,
+          content: m.content,
+          // Anchor to a fixed past time so subsequent real messages always sort after
+          createdAt: new Date(Date.now() - (options.seedMessages!.length - i) * 3000).toISOString(),
+        }))
   )
 
-  const [messages, setMessages] = useState<ChatMessageDTO[]>(seedRef.current)
+  const [messages, setMessages] = useState<ChatMessageDTO[]>(
+    persistedOnMount.current.length > 0 ? persistedOnMount.current : seedRef.current
+  )
+
   const [isOpen, setIsOpen] = useState(false)
-  // Toasts: up to 3 most-recent unread learner messages shown as floating bubbles
   const [toasts, setToasts] = useState<ChatToast[]>([])
 
   const isOpenRef = useRef(isOpen)
   isOpenRef.current = isOpen
 
-  // How many learner messages the user has "read" (panel was open at that point)
-  const readLearnerCountRef = useRef(0)
-  // How many learner messages were already known from last poll (to detect new ones)
-  const prevLearnerCountRef = useRef(seedRef.current.length)
+  // Persist read count across navigations
+  const readLearnerCountRef = useRef<number>(loadReadCount(workspaceId))
 
-  // Merge backend messages on top of seeds — avoid duplicating seed ids
+  // -1 = first poll not yet done; used to suppress stale-message toasts on mount
+  const prevLearnerCountRef = useRef<number>(-1)
+
   function mergeMessages(seeds: ChatMessageDTO[], fetched: ChatMessageDTO[]): ChatMessageDTO[] {
     const seedIds = new Set(seeds.map((s) => s.id))
     const fresh = fetched.filter((m) => !seedIds.has(m.id))
@@ -68,18 +117,22 @@ export function useWorkspaceChat(
 
         const merged = mergeMessages(seedRef.current, fetched)
         setMessages(merged)
+        saveSessionMsgs(workspaceId, merged)
 
         const learnerMsgs = merged.filter((m) => m.sender === 'learner')
         const learnerCount = learnerMsgs.length
 
         if (isOpenRef.current) {
           readLearnerCountRef.current = learnerCount
+          saveReadCount(workspaceId, learnerCount)
           prevLearnerCountRef.current = learnerCount
           setToasts([])
+        } else if (prevLearnerCountRef.current === -1) {
+          // First poll: treat everything already present as "known" — no toasts
+          prevLearnerCountRef.current = learnerCount
         } else {
           const newCount = learnerCount - prevLearnerCountRef.current
           if (newCount > 0) {
-            // Show up to last 3 new learner messages as toasts
             const newMsgs = learnerMsgs.slice(-Math.min(newCount, 3))
             setToasts(
               newMsgs.map((m) => ({
@@ -115,24 +168,28 @@ export function useWorkspaceChat(
       if (!trimmed) return
       const sent = await bridge.sendChatMessage(workspaceId, trimmed)
       setMessages((prev) => {
-        // Avoid duplicate if poll already picked it up
         if (prev.some((m) => m.id === sent.id)) return prev
-        return [...prev, sent]
+        const next = [...prev, sent]
+        saveSessionMsgs(workspaceId, next)
+        return next
       })
     },
     [bridge, workspaceId]
   )
 
+  function markAllRead(msgs: ChatMessageDTO[]) {
+    const learnerCount = msgs.filter((m) => m.sender === 'learner').length
+    readLearnerCountRef.current = learnerCount
+    saveReadCount(workspaceId, learnerCount)
+    prevLearnerCountRef.current = learnerCount
+  }
+
   const open = useCallback(() => {
     setIsOpen(true)
     setToasts([])
-    setMessages((prev) => {
-      const learnerCount = prev.filter((m) => m.sender === 'learner').length
-      readLearnerCountRef.current = learnerCount
-      prevLearnerCountRef.current = learnerCount
-      return prev
-    })
-  }, [])
+    setMessages((prev) => { markAllRead(prev); return prev })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId])
 
   const close = useCallback(() => setIsOpen(false), [])
 
@@ -141,16 +198,12 @@ export function useWorkspaceChat(
       const next = !prev
       if (next) {
         setToasts([])
-        setMessages((msgs) => {
-          const learnerCount = msgs.filter((m) => m.sender === 'learner').length
-          readLearnerCountRef.current = learnerCount
-          prevLearnerCountRef.current = learnerCount
-          return msgs
-        })
+        setMessages((msgs) => { markAllRead(msgs); return msgs })
       }
       return next
     })
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId])
 
   const unreadCount = Math.max(
     0,
