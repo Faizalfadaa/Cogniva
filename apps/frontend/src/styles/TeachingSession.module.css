@@ -136,62 +136,94 @@
 /* ═══════════════════════════════════════════════════════════
    Learner response bubble  (top-right of canvas)
 ═══════════════════════════════════════════════════════════ */
-.responseBubble {
+/* ── Shared notification stack (intro toasts + teach response + chat toasts) ──
+   Anchored top-left, just below the tldraw style panel (~68px from canvas top). */
+.notifStack {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 1000;
+  top: 76px;
+  left: 8px;
+  z-index: 950;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  pointer-events: none;
+  max-width: 300px;
+}
+
+.notifToast {
+  pointer-events: all;
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  max-width: 320px;
+  width: 280px;
   background: var(--cream);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 12px 36px 12px 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 10px 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.13);
+  animation: notifSlideIn 200ms var(--ease-out) both;
 }
 
-.responseClose {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--text-muted);
-  transition: background var(--dur-fast), color var(--dur-fast);
+@keyframes notifSlideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
-.responseClose:hover { background: var(--parchment); color: var(--text-primary); }
 
-.responseAvatar {
-  width: 36px;
-  height: 36px;
+.notifAvatar {
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
   background: var(--parchment);
 }
 
-.responseContent { min-width: 0; }
+.notifBody {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 
-.responseName {
-  font-size: 12px;
+.notifName {
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-secondary);
-  margin-bottom: 2px;
 }
 
-.responseText {
+.notifText {
   font-size: 13px;
   color: var(--text-primary);
-  line-height: 1.5;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
+
+.notifClose {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-muted);
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.notifClose:hover { background: var(--parchment); color: var(--text-primary); }
+
+/* Legacy aliases — kept so old .responseName/.responseText in sidebar still work */
+.responseName { font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 2px; }
+.responseText { font-size: 13px; color: var(--text-primary); line-height: 1.5; }
 
 /* ═══════════════════════════════════════════════════════════
    Chat sidebar
@@ -425,36 +457,38 @@
 .chatSidebarSend:disabled { opacity: 0.5; cursor: default; }
 
 /* ═══════════════════════════════════════════════════════════
-   Chat toast notifications (last 3, 5s lifespan each)
+   Chat toast notifications — use shared .notifStack / .notifToast above
 ═══════════════════════════════════════════════════════════ */
+/* ChatToasts renders a .notifStack wrapper; aliases below keep ChatToasts.tsx compiling */
 .chatToastsContainer {
   position: absolute;
-  bottom: 24px;
-  right: 84px; /* clear of the avatar button */
+  top: 76px;
+  left: 8px;
   z-index: 950;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: flex-end;
+  align-items: flex-start;
   pointer-events: none;
+  max-width: 300px;
 }
 
 .chatToast {
   pointer-events: all;
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  max-width: 300px;
+  width: 280px;
   background: var(--cream);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 10px 14px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.13);
   cursor: pointer;
-  /* Start invisible; fade in via JS class toggle */
   opacity: 0;
-  transform: translateX(12px);
-  transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out);
+  transform: translateX(-10px);
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
 }
 
 .chatToastVisible {
@@ -468,8 +502,8 @@
 }
 
 .chatToastAvatar {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
@@ -478,6 +512,7 @@
 
 .chatToastBody {
   min-width: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -493,7 +528,6 @@
   font-size: 13px;
   color: var(--text-primary);
   line-height: 1.4;
-  /* Clamp to 2 lines max */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -613,64 +647,6 @@
   transform: translateY(0);
 }
 
-/* ── Messages phase (unchanged) ── */
-.introMessageWrap {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  max-width: 320px;
-  width: 90%;
-}
-
-.introAvatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-  background: var(--parchment);
-}
-
-.introBubble {
-  flex: 1;
-  background: var(--cream);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 10px 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-}
-
-/* ── Intro messages phase: side toasts (no overlay) ── */
-.introToastsContainer {
-  position: absolute;
-  bottom: 24px;
-  right: 84px;
-  z-index: 950;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-end;
-  pointer-events: none;
-}
-
-.introToast {
-  pointer-events: all;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  max-width: 300px;
-  background: var(--cream);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 10px 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.13);
-  animation: toastSlideIn 220ms var(--ease-out) both;
-}
-
-@keyframes toastSlideIn {
-  from { opacity: 0; transform: translateX(12px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
 
 /* ═══════════════════════════════════════════════════════════
    Legacy dock classes — kept so old imports don't break

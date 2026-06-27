@@ -12,21 +12,16 @@ type Phase = 'connecting' | 'messages'
 
 const CONNECTING_DURATION_MS = 3000
 const MESSAGE_DURATION_MS = 1200
-// Each message auto-dismisses after this long
 const MESSAGE_VISIBLE_MS = 5000
 
 export function LearnerIntro({ learner, userName, onDone }: LearnerIntroProps) {
   const [phase, setPhase] = useState<Phase>('connecting')
-  // connectStep: 0 = nothing, 1 = line1 visible, 2 = both visible + image unblurred
   const [connectStep, setConnectStep] = useState(0)
-  // Which messages are currently visible (by index)
   const [visibleMessages, setVisibleMessages] = useState<number[]>([])
-  // Current message being shown (drives the queue)
   const [messageIndex, setMessageIndex] = useState(0)
 
   const messages = resolveFirstMessages(learner, userName || 'kamu')
 
-  // Connecting phase: stagger text lines, then switch to messages
   useEffect(() => {
     if (phase !== 'connecting') return
     const t1 = setTimeout(() => setConnectStep(1), 300)
@@ -35,23 +30,18 @@ export function LearnerIntro({ learner, userName, onDone }: LearnerIntroProps) {
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
   }, [phase])
 
-  // Messages phase: show each message one at a time, dismiss after MESSAGE_VISIBLE_MS
   useEffect(() => {
     if (phase !== 'messages') return
     if (messageIndex >= messages.length) return
 
-    // Show this message
-    setVisibleMessages((prev) => [...prev.slice(-2), messageIndex]) // keep last 3
+    setVisibleMessages((prev) => [...prev.slice(-2), messageIndex])
 
-    // Schedule dismiss of this message
     const dismissTimer = setTimeout(() => {
       setVisibleMessages((prev) => prev.filter((i) => i !== messageIndex))
     }, MESSAGE_VISIBLE_MS)
 
-    // Schedule next message (or done)
     const nextTimer = setTimeout(() => {
       if (messageIndex >= messages.length - 1) {
-        // Last message — call onDone after it dismisses
         setTimeout(onDone, MESSAGE_VISIBLE_MS)
       } else {
         setMessageIndex((i) => i + 1)
@@ -64,7 +54,6 @@ export function LearnerIntro({ learner, userName, onDone }: LearnerIntroProps) {
 
   return (
     <>
-      {/* Full-canvas overlay — only during connecting phase */}
       {phase === 'connecting' && (
         <div className={styles.introOverlay}>
           <button className={styles.introSkip} onClick={onDone}>
@@ -88,18 +77,14 @@ export function LearnerIntro({ learner, userName, onDone }: LearnerIntroProps) {
         </div>
       )}
 
-      {/* Side toasts — only during messages phase, no overlay */}
       {phase === 'messages' && visibleMessages.length > 0 && (
-        <div className={styles.introToastsContainer}>
-          <button className={styles.introSkip} onClick={onDone} style={{ position: 'static', marginBottom: 8, alignSelf: 'flex-end' }}>
-            Skip
-          </button>
+        <div className={styles.notifStack}>
           {visibleMessages.map((idx) => (
-            <div key={idx} className={styles.introToast}>
-              <img src={learner.avatarUrl} alt={learner.name} className={styles.chatToastAvatar} />
-              <div className={styles.chatToastBody}>
-                <span className={styles.chatToastName}>{learner.name}</span>
-                <p className={styles.chatToastText}>{messages[idx]}</p>
+            <div key={idx} className={styles.notifToast}>
+              <img src={learner.avatarUrl} alt={learner.name} className={styles.notifAvatar} />
+              <div className={styles.notifBody}>
+                <span className={styles.notifName}>{learner.name}</span>
+                <p className={styles.notifText}>{messages[idx]}</p>
               </div>
             </div>
           ))}

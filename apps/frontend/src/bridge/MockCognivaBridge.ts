@@ -203,11 +203,15 @@ export class MockCognivaBridge implements CognivaBridge {
     store.checkpoints.set(workspaceId, list);
 
     setTimeout(() => {
+      // Use the same reaction string for both the chat message and the checkpoint
+      // response — they represent the same learner reply.
+      const reaction = randomReaction();
+
       const msgs = store.messages.get(workspaceId) ?? [];
       msgs.push({
         id: uuid(),
         sender: 'learner',
-        content: randomReaction(),
+        content: reaction,
         createdAt: now(),
       });
       store.messages.set(workspaceId, msgs);
@@ -215,7 +219,7 @@ export class MockCognivaBridge implements CognivaBridge {
       const checkpoints = store.checkpoints.get(workspaceId) ?? [];
       const idx = checkpoints.findIndex((c) => c.id === checkpoint.id);
       if (idx !== -1) {
-        checkpoints[idx] = { ...checkpoints[idx], learnerResponse: randomReaction() };
+        checkpoints[idx] = { ...checkpoints[idx], learnerResponse: reaction };
         store.checkpoints.set(workspaceId, checkpoints);
       }
     }, 2000);
