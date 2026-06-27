@@ -6,13 +6,14 @@ import { Whiteboard, type WhiteboardHandle } from '../../features/teaching-sessi
 import { WorkspaceHeader } from '../../features/teaching-session/components/WorkspaceHeader'
 import { LearnerResponseBubble } from '../../features/teaching-session/components/LearnerResponseBubble'
 import { LearnerIntro } from '../../features/teaching-session/components/LearnerIntro'
-import { LearnerDock } from '../../features/teaching-session/components/LearnerDock'
+import { ChatSidebar } from '../../features/teaching-session/components/ChatSidebar'
+import { ChatToasts } from '../../features/teaching-session/components/ChatToasts'
 import { useTeachingSession } from '../../features/teaching-session/state/useTeachingSession'
 import { useWorkspaceTitleAutosave } from '../../features/teaching-session/hooks/useWorkspaceTitleAutosave'
 import { useIntroSeen } from '../../features/teaching-session/hooks/useIntroSeen'
 import { useWorkspaceChat } from '../../features/teaching-session/hooks/useWorkspaceChat'
 import { useUserStore } from '../../state/UserStore'
-import { deriveLearner } from '../../lib/Learner'
+import { deriveLearner, resolveFirstMessages } from '../../lib/Learner'
 import styles from '../../styles/TeachingSession.module.css'
 
 export default function WorkspacePage() {
@@ -31,9 +32,7 @@ export default function WorkspacePage() {
       setWorkspace(ws)
       setLoading(false)
     })
-    return () => {
-      active = false
-    }
+    return () => { active = false }
   }, [bridge, id])
 
   const handleAutosave = useCallback(
@@ -48,13 +47,24 @@ export default function WorkspacePage() {
   const learner = useMemo(() => deriveLearner(id ?? ''), [id])
   const titleField = useWorkspaceTitleAutosave(id ?? '', workspace?.title, bridge)
   const intro = useIntroSeen(id ?? '')
-  const chat = useWorkspaceChat(id ?? '', bridge)
   const { userName } = useUserStore()
 
-  if (!id || loading) {
-    // TODO: loading state proper di fase Polish
-    return null
-  }
+  // Resolve first messages with userName substitution — stable across renders
+  const seedMessages = useMemo(
+    () =>
+      resolveFirstMessages(learner, userName || 'kamu').map((content, i) => ({
+        id: `seed-${id}-${i}`,
+        content,
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [learner, id] // userName intentionally excluded — only seed once on mount
+  )
+
+  const chat = useWorkspaceChat(id ?? '', bridge, learner.name, learner.avatarUrl, {
+    seedMessages,
+  })
+
+  if (!id || loading) return null
 
   return (
     <div className={styles.page}>
@@ -70,27 +80,40 @@ export default function WorkspacePage() {
         onContinueEditing={session.continueEditing}
       />
 
-      <div className={styles.canvasArea}>
-        <Whiteboard
-          ref={whiteboardRef}
-          initialSnapshot={workspace?.currentWhiteboardSnapshot}
-          onAutosave={handleAutosave}
-          readOnly={session.mode === 'locked'}
-        />
+      <div className={styles.workspaceBody}>
+        {/* Canvas takes remaining space; sidebar is a flex sibling */}
+        <div className={styles.canvasArea}>
+          <Whiteboard
+            ref={whiteboardRef}
+            initialSnapshot={workspace?.currentWhiteboardSnapshot}
+            onAutosave={handleAutosave}
+            readOnly={session.mode === 'locked'}
+          />
 
-        <LearnerResponseBubble
-          learner={learner}
-          text={session.latestCheckpoint?.learnerResponse}
-          pending={session.pending}
-          checkpointId={session.latestCheckpoint?.id}
-        />
+          <LearnerResponseBubble
+            learner={learner}
+            text={session.latestCheckpoint?.learnerResponse}
+            pending={session.pending}
+            checkpointId={session.latestCheckpoint?.id}
+          />
 
-        {!intro.seen && (
-          <LearnerIntro learner={learner} userName={userName ?? ''} onDone={intro.markSeen} />
-        )}
+          {!intro.seen && (
+            <LearnerIntro learner={learner} userName={userName ?? ''} onDone={intro.markSeen} />
+          )}
 
+          {/* Toast notifications — float over canvas, only when sidebar is closed */}
+          {intro.seen && !chat.isOpen && (
+            <ChatToasts
+              toasts={chat.toasts}
+              onDismiss={chat.dismissToast}
+              onOpenChat={chat.open}
+            />
+          )}
+        </div>
+
+        {/* Chat sidebar — flex sibling so it pushes the canvas, not overlaps it */}
         {intro.seen && (
-          <LearnerDock
+          <ChatSidebar
             learner={learner}
             messages={chat.messages}
             isOpen={chat.isOpen}

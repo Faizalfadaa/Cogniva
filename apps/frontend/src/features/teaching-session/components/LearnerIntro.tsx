@@ -11,7 +11,7 @@ interface LearnerIntroProps {
 
 type Phase = 'video' | 'messages'
 
-const MESSAGE_INTERVAL_MS = 2200
+const MESSAGE_INTERVAL_MS = 1200
 
 export function LearnerIntro({ learner, userName, onDone }: LearnerIntroProps) {
   const [phase, setPhase] = useState<Phase>('video')
@@ -34,7 +34,7 @@ export function LearnerIntro({ learner, userName, onDone }: LearnerIntroProps) {
   }, [phase, messageIndex])
 
   function handleVideoEnded() {
-    setPhase('messages')
+     setTimeout(() => setPhase('messages'), 40000)
   }
 
   function handleSkip() {

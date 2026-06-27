@@ -7,6 +7,13 @@ import styles from '../../styles/HomePage.module.css'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+type ViewFilter = 'All' | 'Active' | 'Completed'
+
+/** Draft + Teaching = Active. Evaluating + Completed = Completed. */
+function getViewFilter(state: WorkspaceState): Exclude<ViewFilter, 'All'> {
+  return state === 'Draft' || state === 'Teaching' ? 'Active' : 'Completed'
+}
+
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diff / 60000)
@@ -18,37 +25,29 @@ function timeAgo(iso: string): string {
   return `${days} hari lalu`
 }
 
-function stateBadgeLabel(state: WorkspaceState): string {
-  const map: Record<WorkspaceState, string> = {
-    Draft: 'Draft',
-    Teaching: 'Teaching',
-    Evaluating: 'Evaluating',
-    Completed: 'Completed',
-  }
-  return map[state]
-}
-
-// ─── Sub-components ──────────────────────────────────────────────────────────
+// ─── Badge ───────────────────────────────────────────────────────────────────
+// Still shows the real underlying state (Draft/Teaching/Evaluating/Completed)
+// on the card itself — users benefit from that granularity inside a section,
+// but don't need to filter by it.
 
 function StateBadge({ state }: { state: WorkspaceState }) {
   return (
     <span className={`${styles.badge} ${styles[`badge_${state.toLowerCase()}`]}`}>
-      {stateBadgeLabel(state)}
+      {state}
     </span>
   )
 }
 
-function WorkspaceCard({
-  ws,
-  onClick,
-}: {
-  ws: WorkspaceDTO
-  onClick: () => void
-}) {
-  const hasTitle = Boolean(ws.title)
+// ─── Cards ───────────────────────────────────────────────────────────────────
 
+function WorkspaceCard({ ws, onClick }: { ws: WorkspaceDTO; onClick: () => void }) {
+  const hasTitle = Boolean(ws.title)
   return (
-    <button className={styles.wsCard} onClick={onClick} aria-label={`Buka workspace ${ws.title ?? 'tanpa judul'}`}>
+    <button
+      className={styles.wsCard}
+      onClick={onClick}
+      aria-label={`Buka workspace ${ws.title ?? 'tanpa judul'}`}
+    >
       <div className={styles.wsCardThumb}>
         {ws.thumbnailUrl ? (
           <img className={styles.wsCardThumbImg} src={ws.thumbnailUrl} alt="" />
@@ -98,7 +97,8 @@ function NewWorkspaceCard({ onClick, loading }: { onClick: () => void; loading: 
   )
 }
 
-function EmptyState({ onNew, loading }: { onNew: () => void; loading: boolean }) {
+function EmptyState({ filter, onNew, loading }: { filter: ViewFilter; onNew: () => void; loading: boolean }) {
+  const isCompleted = filter === 'Completed'
   return (
     <div className={styles.emptyState}>
       <div className={styles.emptyIcon}>
@@ -109,13 +109,24 @@ function EmptyState({ onNew, loading }: { onNew: () => void; loading: boolean })
           <path d="M33.5 12h5M36 9.5v5" stroke="var(--lime-text)" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       </div>
-      <h3 className={styles.emptyTitle}>Belum ada workspace</h3>
-      <p className={styles.emptyBody}>
-        Mulai sesi pertamamu. Pilih topik, buka whiteboard, dan ajari AI muridmu.
-      </p>
-      <button className={styles.emptyBtn} onClick={onNew} disabled={loading}>
-        {loading ? 'Membuat...' : 'Buat workspace pertama'}
-      </button>
+      {isCompleted ? (
+        <>
+          <h3 className={styles.emptyTitle}>Belum ada sesi selesai</h3>
+          <p className={styles.emptyBody}>
+            Selesaikan sesi mengajarmu dan evaluasi akan muncul di sini.
+          </p>
+        </>
+      ) : (
+        <>
+          <h3 className={styles.emptyTitle}>Belum ada workspace</h3>
+          <p className={styles.emptyBody}>
+            Mulai sesi pertamamu. Pilih topik, buka whiteboard, dan ajari AI muridmu.
+          </p>
+          <button className={styles.emptyBtn} onClick={onNew} disabled={loading}>
+            {loading ? 'Membuat...' : 'Buat workspace pertama'}
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -126,9 +137,7 @@ function NameModal({ onConfirm }: { onConfirm: (name: string) => void }) {
   const [name, setName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
+  useEffect(() => { inputRef.current?.focus() }, [])
 
   function handleSubmit() {
     const trimmed = name.trim()
@@ -169,11 +178,9 @@ function NameModal({ onConfirm }: { onConfirm: (name: string) => void }) {
 
 // ─── Filter tabs ─────────────────────────────────────────────────────────────
 
-const FILTER_OPTIONS: Array<{ label: string; value: WorkspaceState | 'All' }> = [
-  { label: 'Semua', value: 'All' },
-  { label: 'Teaching', value: 'Teaching' },
-  { label: 'Draft', value: 'Draft' },
-  { label: 'Evaluating', value: 'Evaluating' },
+const FILTER_OPTIONS: Array<{ label: string; value: ViewFilter }> = [
+  { label: 'Semua',     value: 'All' },
+  { label: 'Active',    value: 'Active' },
   { label: 'Completed', value: 'Completed' },
 ]
 
@@ -187,7 +194,7 @@ export default function HomePage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceDTO[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  const [filter, setFilter] = useState<WorkspaceState | 'All'>('All')
+  const [filter, setFilter] = useState<ViewFilter>('All')
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
@@ -210,39 +217,30 @@ export default function HomePage() {
   }
 
   function handleOpenWorkspace(ws: WorkspaceDTO) {
-    if (ws.state === 'Completed') {
-      navigate(`/evaluation/${ws.id}`)
-    } else {
-      navigate(`/workspace/${ws.id}`)
-    }
-  }
-
-  function handleNameConfirm(name: string) {
-    setUserName(name)
+    const isCompleted = getViewFilter(ws.state) === 'Completed'
+    navigate(isCompleted ? `/evaluation/${ws.id}` : `/workspace/${ws.id}`)
   }
 
   const filtered = workspaces.filter(ws => {
-    const matchState = filter === 'All' || ws.state === filter
+    const matchFilter = filter === 'All' || getViewFilter(ws.state) === filter
     const matchSearch =
       !searchQuery ||
       (ws.title ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (ws.description ?? '').toLowerCase().includes(searchQuery.toLowerCase())
-    return matchState && matchSearch
+    return matchFilter && matchSearch
   })
 
-  const stateCounts: Record<WorkspaceState, number> = {
-    Draft: 0,
-    Teaching: 0,
-    Evaluating: 0,
-    Completed: 0,
+  const activeCount    = workspaces.filter(ws => getViewFilter(ws.state) === 'Active').length
+  const completedCount = workspaces.filter(ws => getViewFilter(ws.state) === 'Completed').length
+  const counts: Record<ViewFilter, number> = {
+    All:       workspaces.length,
+    Active:    activeCount,
+    Completed: completedCount,
   }
-  workspaces.forEach(ws => { stateCounts[ws.state]++ })
 
   const hasAny = workspaces.length > 0
 
-  if (needsNameSetup) {
-    return <NameModal onConfirm={handleNameConfirm} />
-  }
+  if (needsNameSetup) return <NameModal onConfirm={setUserName} />
 
   return (
     <div className={styles.layout}>
@@ -250,7 +248,7 @@ export default function HomePage() {
       <aside className={styles.sidebar}>
         <div className={styles.sidebarTop}>
           <div className={styles.logo}>
-            <span className={styles.logoMark}>✦</span>
+            <span className={styles.logoMark}><img src="/cogniva_logo.png" alt="Cogniva Logo" className={styles.logoImg} /></span>
             <span className={styles.logoText}>Cogniva</span>
           </div>
 
@@ -274,11 +272,8 @@ export default function HomePage() {
               aria-current={filter === opt.value ? 'page' : undefined}
             >
               <span>{opt.label}</span>
-              {opt.value !== 'All' && stateCounts[opt.value] > 0 && (
-                <span className={styles.navCount}>{stateCounts[opt.value]}</span>
-              )}
-              {opt.value === 'All' && workspaces.length > 0 && (
-                <span className={styles.navCount}>{workspaces.length}</span>
+              {counts[opt.value] > 0 && (
+                <span className={styles.navCount}>{counts[opt.value]}</span>
               )}
             </button>
           ))}
@@ -302,9 +297,7 @@ export default function HomePage() {
               {filter === 'All' ? 'Semua workspace' : filter}
             </h1>
             {hasAny && (
-              <p className={styles.mainSub}>
-                {filtered.length} workspace{filtered.length !== 1 ? '' : ''}
-              </p>
+              <p className={styles.mainSub}>{filtered.length} workspace</p>
             )}
           </div>
 
@@ -326,24 +319,6 @@ export default function HomePage() {
           )}
         </header>
 
-        {/* Stats strip */}
-        {hasAny && (
-          <div className={styles.statsStrip}>
-            {Object.entries(stateCounts)
-              .filter(([, count]) => count > 0)
-              .map(([state, count]) => (
-                <button
-                  key={state}
-                  className={`${styles.statPill} ${filter === state ? styles.statPillActive : ''}`}
-                  onClick={() => setFilter(filter === state ? 'All' : state as WorkspaceState)}
-                >
-                  <span className={`${styles.statDot} ${styles[`dot_${state.toLowerCase()}`]}`} />
-                  <span>{count} {state}</span>
-                </button>
-              ))}
-          </div>
-        )}
-
         {/* Content */}
         <div className={styles.content}>
           {loading ? (
@@ -353,11 +328,14 @@ export default function HomePage() {
               ))}
             </div>
           ) : !hasAny ? (
-            <EmptyState onNew={handleCreateWorkspace} loading={creating} />
+            <EmptyState filter={filter} onNew={handleCreateWorkspace} loading={creating} />
           ) : filtered.length === 0 ? (
             <div className={styles.noResults}>
               <p>Tidak ada workspace yang cocok.</p>
-              <button className={styles.clearFilter} onClick={() => { setFilter('All'); setSearchQuery('') }}>
+              <button
+                className={styles.clearFilter}
+                onClick={() => { setFilter('All'); setSearchQuery('') }}
+              >
                 Hapus filter
               </button>
             </div>
@@ -370,7 +348,10 @@ export default function HomePage() {
                   onClick={() => handleOpenWorkspace(ws)}
                 />
               ))}
-              <NewWorkspaceCard onClick={handleCreateWorkspace} loading={creating} />
+              {/* Only show new workspace card in All / Active views */}
+              {(filter === 'All' || filter === 'Active') && (
+                <NewWorkspaceCard onClick={handleCreateWorkspace} loading={creating} />
+              )}
             </div>
           )}
         </div>

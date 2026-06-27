@@ -9,23 +9,22 @@ export interface LearnerCharacter extends Omit<LearnerDTO, 'firstMessage'> {
 
 const LEARNERS: LearnerCharacter[] = [
   {
-    id: 'ellen',
-    name: 'Ellen Joe',
-    avatarUrl: '/assets/avatars/ellen.png',
-    introVideoUrl: '/intro/ellen.mp4',
+    id: 'yuzuki',
+    name: 'Yuzuki Akatsuki',
+    avatarUrl: '/assets/avatars/yuzuki.png',
+    introVideoUrl: '/intro/yuzuki.mp4',
     firstMessages: [
       'E-Etto...',
       '...{userName}-sensei?',
       'Finally... I get to meet you.',
-      '...Hehe.',
-      "Mulai hari ini... please don't look at anyone else more than you look at me, okay?",
+      'Lets learn something new today, sensei...'
     ],
   },
   {
-    id: 'nanally',
-    name: 'Nanally Coluccis',
-    avatarUrl: '/assets/avatars/nanally.png',
-    introVideoUrl: '/intro/nanally.mp4',
+    id: 'reina',
+    name: 'Reina Kisaragi',
+    avatarUrl: '/assets/avatars/reina.png',
+    introVideoUrl: '/intro/reina.mp4',
     firstMessages: [
       'Eh?',
       'A-Are you really...',
@@ -37,10 +36,10 @@ const LEARNERS: LearnerCharacter[] = [
     ],
   },
   {
-    id: 'rhen',
-    name: 'Rhen',
-    avatarUrl: '/assets/avatars/rhen.png',
-    introVideoUrl: '/intro/rhen.mp4',
+    id: 'akira',
+    name: 'Akira Kagetsu',
+    avatarUrl: '/assets/avatars/akira.png',
+    introVideoUrl: '/intro/akira.mp4',
     firstMessages: [
       "...You're late.",
       '...Hm?',

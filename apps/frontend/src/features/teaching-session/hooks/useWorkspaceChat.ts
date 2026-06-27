@@ -4,38 +4,96 @@ import type { ChatMessageDTO } from '../../../dto/ChatMessageDTO'
 
 const POLL_INTERVAL_MS = 2000
 
-export function useWorkspaceChat(workspaceId: string, bridge: CognivaBridge) {
-  const [messages, setMessages] = useState<ChatMessageDTO[]>([])
+export interface ChatToast {
+  id: string
+  content: string
+  senderName: string
+  avatarUrl: string
+}
+
+interface UseWorkspaceChatOptions {
+  /** First messages from the learner character, already resolved with userName.
+   *  These are seeded once as the initial chat history so the chat is never empty. */
+  seedMessages?: Array<{ id: string; content: string }>
+}
+
+export function useWorkspaceChat(
+  workspaceId: string,
+  bridge: CognivaBridge,
+  learnerName: string,
+  learnerAvatarUrl: string,
+  options: UseWorkspaceChatOptions = {}
+) {
+  // Seed first messages as learner messages so chat is never empty on open.
+  const seedRef = useRef<ChatMessageDTO[]>(
+    (options.seedMessages ?? []).map((m, i) => ({
+      id: m.id,
+      sender: 'learner' as const,
+      content: m.content,
+      // Staggered timestamps so they render in order (oldest first)
+      createdAt: new Date(Date.now() - (options.seedMessages!.length - i) * 3000).toISOString(),
+    }))
+  )
+
+  const [messages, setMessages] = useState<ChatMessageDTO[]>(seedRef.current)
   const [isOpen, setIsOpen] = useState(false)
-  const [unreadCount, setUnreadCount] = useState(0)
+  // Toasts: up to 3 most-recent unread learner messages shown as floating bubbles
+  const [toasts, setToasts] = useState<ChatToast[]>([])
 
   const isOpenRef = useRef(isOpen)
   isOpenRef.current = isOpen
-  // Berapa pesan learner yang udah "dibaca" (panel pernah kebuka sampai sejauh ini).
-  const readLearnerCountRef = useRef(0)
 
-  // Bridge cuma expose polling (lihat komentar di CognivaBridge.ts), jadi caller
-  // yang tanggung jawab nge-poll berkala - di sini, selama halaman workspace mount,
-  // gak peduli panel-nya kebuka atau ketutup (biar badge tetep ke-update saat ketutup).
+  // How many learner messages the user has "read" (panel was open at that point)
+  const readLearnerCountRef = useRef(0)
+  // How many learner messages were already known from last poll (to detect new ones)
+  const prevLearnerCountRef = useRef(seedRef.current.length)
+
+  // Merge backend messages on top of seeds — avoid duplicating seed ids
+  function mergeMessages(seeds: ChatMessageDTO[], fetched: ChatMessageDTO[]): ChatMessageDTO[] {
+    const seedIds = new Set(seeds.map((s) => s.id))
+    const fresh = fetched.filter((m) => !seedIds.has(m.id))
+    return [...seeds, ...fresh].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    )
+  }
+
   useEffect(() => {
     if (!workspaceId) return
     let active = true
 
     async function poll() {
       try {
-        const list = await bridge.getChatMessages(workspaceId)
+        const fetched = await bridge.getChatMessages(workspaceId)
         if (!active) return
-        setMessages(list)
 
-        const learnerCount = list.filter((m) => m.sender === 'learner').length
+        const merged = mergeMessages(seedRef.current, fetched)
+        setMessages(merged)
+
+        const learnerMsgs = merged.filter((m) => m.sender === 'learner')
+        const learnerCount = learnerMsgs.length
+
         if (isOpenRef.current) {
           readLearnerCountRef.current = learnerCount
-          setUnreadCount(0)
+          prevLearnerCountRef.current = learnerCount
+          setToasts([])
         } else {
-          setUnreadCount(Math.max(0, learnerCount - readLearnerCountRef.current))
+          const newCount = learnerCount - prevLearnerCountRef.current
+          if (newCount > 0) {
+            // Show up to last 3 new learner messages as toasts
+            const newMsgs = learnerMsgs.slice(-Math.min(newCount, 3))
+            setToasts(
+              newMsgs.map((m) => ({
+                id: m.id,
+                content: m.content,
+                senderName: learnerName,
+                avatarUrl: learnerAvatarUrl,
+              }))
+            )
+          }
+          prevLearnerCountRef.current = learnerCount
         }
       } catch {
-        // diem aja - retry otomatis di siklus poll berikutnya
+        // Retry on next cycle
       }
     }
 
@@ -45,24 +103,35 @@ export function useWorkspaceChat(workspaceId: string, bridge: CognivaBridge) {
       active = false
       clearInterval(interval)
     }
-  }, [workspaceId, bridge])
+  }, [workspaceId, bridge, learnerName, learnerAvatarUrl])
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
 
   const sendMessage = useCallback(
     async (content: string) => {
       const trimmed = content.trim()
       if (!trimmed) return
       const sent = await bridge.sendChatMessage(workspaceId, trimmed)
-      // Optimistic append - poll berikutnya akan full-replace dengan list yang
-      // sama (sent udah ke-persist di store sebelum promise ini resolve),
-      // jadi gak ada duplikat.
-      setMessages((prev) => [...prev, sent])
+      setMessages((prev) => {
+        // Avoid duplicate if poll already picked it up
+        if (prev.some((m) => m.id === sent.id)) return prev
+        return [...prev, sent]
+      })
     },
     [bridge, workspaceId]
   )
 
   const open = useCallback(() => {
     setIsOpen(true)
-    setUnreadCount(0)
+    setToasts([])
+    setMessages((prev) => {
+      const learnerCount = prev.filter((m) => m.sender === 'learner').length
+      readLearnerCountRef.current = learnerCount
+      prevLearnerCountRef.current = learnerCount
+      return prev
+    })
   }, [])
 
   const close = useCallback(() => setIsOpen(false), [])
@@ -70,10 +139,23 @@ export function useWorkspaceChat(workspaceId: string, bridge: CognivaBridge) {
   const toggle = useCallback(() => {
     setIsOpen((prev) => {
       const next = !prev
-      if (next) setUnreadCount(0)
+      if (next) {
+        setToasts([])
+        setMessages((msgs) => {
+          const learnerCount = msgs.filter((m) => m.sender === 'learner').length
+          readLearnerCountRef.current = learnerCount
+          prevLearnerCountRef.current = learnerCount
+          return msgs
+        })
+      }
       return next
     })
   }, [])
 
-  return { messages, isOpen, unreadCount, sendMessage, open, close, toggle }
+  const unreadCount = Math.max(
+    0,
+    messages.filter((m) => m.sender === 'learner').length - readLearnerCountRef.current
+  )
+
+  return { messages, isOpen, unreadCount, toasts, dismissToast, sendMessage, open, close, toggle }
 }

@@ -1,3 +1,6 @@
+/* ═══════════════════════════════════════════════════════════
+   Page shell
+═══════════════════════════════════════════════════════════ */
 .page {
   position: fixed;
   inset: 0;
@@ -5,6 +8,19 @@
   flex-direction: column;
 }
 
+/* workspaceBody sits below the header and splits into
+   canvas (flex:1) + chat sidebar (fixed width or zero) */
+.workspaceBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Header
+═══════════════════════════════════════════════════════════ */
 .header {
   flex: 0 0 auto;
   display: flex;
@@ -43,10 +59,7 @@
   color: var(--text-secondary);
   transition: background var(--dur-fast);
 }
-
-.backBtn:hover {
-  background: var(--parchment);
-}
+.backBtn:hover { background: var(--parchment); }
 
 .titleInput {
   font-family: var(--font-display);
@@ -62,31 +75,15 @@
   border-radius: var(--radius-sm);
   transition: background var(--dur-fast);
 }
-
-.titleInput::placeholder {
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.titleInput:hover {
-  background: var(--parchment);
-}
-
-.titleInput:focus {
-  background: var(--parchment);
-}
+.titleInput::placeholder { color: var(--text-muted); font-weight: 600; }
+.titleInput:hover,
+.titleInput:focus { background: var(--parchment); }
 
 .saveStatus {
   font-size: 12px;
   color: var(--text-muted);
   flex-shrink: 0;
   white-space: nowrap;
-}
-
-.canvasArea {
-  position: relative;
-  flex: 1;
-  min-height: 0;
 }
 
 .teachBtn {
@@ -99,15 +96,8 @@
   font-weight: 600;
   transition: background var(--dur-fast);
 }
-
-.teachBtn:hover:not(:disabled) {
-  background: var(--lime-hover);
-}
-
-.teachBtn:disabled {
-  opacity: 0.7;
-  cursor: default;
-}
+.teachBtn:hover:not(:disabled) { background: var(--lime-hover); }
+.teachBtn:disabled { opacity: 0.7; cursor: default; }
 
 .outlineBtn {
   background: var(--cream);
@@ -119,10 +109,7 @@
   font-weight: 600;
   transition: border-color var(--dur-fast);
 }
-
-.outlineBtn:hover {
-  border-color: var(--text-primary);
-}
+.outlineBtn:hover { border-color: var(--text-primary); }
 
 .micDot {
   width: 10px;
@@ -131,16 +118,24 @@
   background: #e0453c;
   animation: micPulse 1.4s infinite;
 }
-
 @keyframes micPulse {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.85); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
 }
 
-/* ─── Learner response bubble ─── */
-/* position:absolute relatif ke .canvasArea (bukan fixed ke viewport) - aman dari
-   collision karena StylePanel dipaksa null saat readOnly (lihat Whiteboard.tsx),
-   dan top-right gak pernah overlap sama zoom/nav panel tldraw yang ada di bottom-left. */
+/* ═══════════════════════════════════════════════════════════
+   Canvas area
+═══════════════════════════════════════════════════════════ */
+.canvasArea {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Learner response bubble  (top-right of canvas)
+═══════════════════════════════════════════════════════════ */
 .responseBubble {
   position: absolute;
   top: 16px;
@@ -172,11 +167,7 @@
   color: var(--text-muted);
   transition: background var(--dur-fast), color var(--dur-fast);
 }
-
-.responseClose:hover {
-  background: var(--parchment);
-  color: var(--text-primary);
-}
+.responseClose:hover { background: var(--parchment); color: var(--text-primary); }
 
 .responseAvatar {
   width: 36px;
@@ -187,9 +178,7 @@
   background: var(--parchment);
 }
 
-.responseContent {
-  min-width: 0;
-}
+.responseContent { min-width: 0; }
 
 .responseName {
   font-size: 12px;
@@ -204,32 +193,35 @@
   line-height: 1.5;
 }
 
-/* ─── Learner dock (avatar persistent + chat collapsible) ───
-   Ditempel di tengah edge kanan (top:50%), BUKAN di salah satu pojok -
-   tldraw cuma occupy 4 pojok (style panel top-right, zoom bottom-left,
-   page menu top-left, help bottom-right), jadi tengah-kanan selalu aman
-   baik saat collapsed (avatar kecil) maupun expanded (panel chat). */
+/* ═══════════════════════════════════════════════════════════
+   Chat sidebar
+═══════════════════════════════════════════════════════════ */
 
-.dockCollapsed {
+/* When closed — only the avatar trigger button shows, no sidebar space is taken */
+.sidebarTrigger {
   position: absolute;
-  top: 50%;
   right: 16px;
+  top: 50%;
   transform: translateY(-50%);
   z-index: 900;
-  width: 56px;
-  height: 56px;
+}
+
+.sidebarAvatarBtn {
+  position: relative;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   border: 2px solid var(--border-strong);
   background: var(--cream);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-  transition: transform var(--dur-fast);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  transition: transform var(--dur-fast), box-shadow var(--dur-fast);
+}
+.sidebarAvatarBtn:hover {
+  transform: scale(1.06);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
 }
 
-.dockCollapsed:hover {
-  transform: translateY(-50%) scale(1.05);
-}
-
-.dockAvatar {
+.sidebarAvatarImg {
   width: 100%;
   height: 100%;
   border-radius: 50%;
@@ -237,7 +229,7 @@
   background: var(--parchment);
 }
 
-.dockBadge {
+.sidebarBadge {
   position: absolute;
   top: -4px;
   right: -4px;
@@ -254,78 +246,125 @@
   justify-content: center;
 }
 
-.dockExpanded {
-  position: absolute;
-  top: 50%;
-  right: 16px;
-  transform: translateY(-50%);
-  z-index: 900;
-  width: 320px;
-  max-height: min(480px, calc(100% - 32px));
+/* When open — sidebar is a flex child of .workspaceBody */
+.chatSidebar {
+  position: relative;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   background: var(--cream);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
-  overflow: hidden;
+  border-left: 1px solid var(--border);
+  min-width: 280px;
+  /* Smooth open animation */
+  animation: sidebarSlideIn var(--dur-base) var(--ease-out);
 }
 
-.dockHeader {
+@keyframes sidebarSlideIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Drag handle — left edge of sidebar */
+.chatSidebarHandle {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 10;
+  /* Subtle visual affordance */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chatSidebarHandle::after {
+  content: '';
+  width: 3px;
+  height: 32px;
+  border-radius: 2px;
+  background: var(--border-strong);
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
+.chatSidebarHandle:hover::after { opacity: 1; }
+
+/* Header */
+.chatSidebarHeader {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 10px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--border);
 }
 
-.dockHeaderAvatar {
+.chatSidebarAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--parchment);
+}
+
+.chatSidebarHeaderInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.chatSidebarName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chatSidebarStatus {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.chatSidebarClose {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  object-fit: cover;
-  background: var(--parchment);
-}
-
-.dockHeaderName {
-  flex: 1;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.dockClose {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  font-size: 16px;
+  font-size: 18px;
+  line-height: 1;
   color: var(--text-muted);
-  transition: background var(--dur-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--dur-fast), color var(--dur-fast);
 }
+.chatSidebarClose:hover { background: var(--parchment); color: var(--text-primary); }
 
-.dockClose:hover {
-  background: var(--parchment);
-}
-
-.dockMessages {
+/* Message list */
+.chatSidebarMessages {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px;
+  padding: 14px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.dockEmpty {
+.chatSidebarEmpty {
   font-size: 12px;
   color: var(--text-muted);
   text-align: center;
   margin-top: 12px;
 }
 
-.dockBubble {
+/* Shared bubble styles (used by both sidebar and toasts) */
+.chatBubble {
   max-width: 85%;
   padding: 8px 12px;
   border-radius: var(--radius-md);
@@ -333,29 +372,30 @@
   line-height: 1.45;
 }
 
-.dockBubbleLearner {
+.chatBubbleLearner {
   align-self: flex-start;
   background: var(--parchment);
   color: var(--text-primary);
   border-bottom-left-radius: 4px;
 }
 
-.dockBubbleUser {
+.chatBubbleUser {
   align-self: flex-end;
   background: var(--lime);
   color: var(--lime-text);
   border-bottom-right-radius: 4px;
 }
 
-.dockInputRow {
+/* Input row */
+.chatSidebarInputRow {
   flex: 0 0 auto;
   display: flex;
   gap: 6px;
-  padding: 10px;
+  padding: 10px 12px;
   border-top: 1px solid var(--border);
 }
 
-.dockInput {
+.chatSidebarInput {
   flex: 1;
   min-width: 0;
   font-size: 13px;
@@ -363,31 +403,110 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-pill);
   background: var(--card-bg);
+  outline: none;
+  transition: border-color var(--dur-fast);
 }
+.chatSidebarInput:focus { border-color: var(--lime); }
 
-.dockSend {
+.chatSidebarSend {
   width: 32px;
   height: 32px;
   border-radius: 50%;
   background: var(--lime);
   color: var(--lime-text);
   font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  transition: background var(--dur-fast);
+}
+.chatSidebarSend:hover:not(:disabled) { background: var(--lime-hover); }
+.chatSidebarSend:disabled { opacity: 0.5; cursor: default; }
+
+/* ═══════════════════════════════════════════════════════════
+   Chat toast notifications (last 3, 5s lifespan each)
+═══════════════════════════════════════════════════════════ */
+.chatToastsContainer {
+  position: absolute;
+  bottom: 24px;
+  right: 84px; /* clear of the avatar button */
+  z-index: 950;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  pointer-events: none;
 }
 
-.dockSend:disabled {
-  opacity: 0.5;
-  cursor: default;
+.chatToast {
+  pointer-events: all;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 300px;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.13);
+  cursor: pointer;
+  /* Start invisible; fade in via JS class toggle */
+  opacity: 0;
+  transform: translateX(12px);
+  transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out);
 }
 
-/* ─── Learner intro (video → scripted opening lines, sekali per workspace) ───
-   Posisi sama persis dengan dock (right-center) - intro "muncul dari" titik
-   yang sama tempat dock bakal hidup permanen setelah ini selesai. */
+.chatToastVisible {
+  opacity: 1;
+  transform: translateX(0);
+}
 
+.chatToast:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.chatToastAvatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--parchment);
+}
+
+.chatToastBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chatToastName {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.chatToastText {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+  /* Clamp to 2 lines max */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Learner intro (video → scripted bubbles, once per workspace)
+═══════════════════════════════════════════════════════════ */
 .introOverlay {
   position: absolute;
   top: 50%;
-  right: 16px;
+  right: 84px; /* offset left of avatar button position */
   transform: translateY(-50%);
   z-index: 900;
   width: 320px;
@@ -405,10 +524,7 @@
   background: var(--cream);
   border: 1px solid var(--border);
 }
-
-.introSkip:hover {
-  border-color: var(--text-primary);
-}
+.introSkip:hover { border-color: var(--text-primary); }
 
 .introVideoWrap {
   position: relative;
@@ -460,3 +576,10 @@
   padding: 10px 14px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Legacy dock classes — kept so old imports don't break
+   (can be removed once LearnerDock is fully retired)
+═══════════════════════════════════════════════════════════ */
+.dockCollapsed { display: none; }
+.dockExpanded  { display: none; }
