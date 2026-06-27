@@ -3,8 +3,9 @@ import type { LearnerDTO } from '../dto/LearnerDTO';
 // 3 karakter learner, hardcoded "for fun".
 // firstMessages adalah array bubble yang ditampilkan satu per satu,
 // dengan placeholder {userName} diganti runtime sebelum ditampilkan.
-export interface LearnerCharacter extends Omit<LearnerDTO, 'firstMessage'> {
+export interface LearnerCharacter extends Omit<LearnerDTO, 'firstMessage' | 'introVideoUrl'> {
   firstMessages: string[];
+  introImageUrl: string;
 }
 
 const LEARNERS: LearnerCharacter[] = [
@@ -12,7 +13,7 @@ const LEARNERS: LearnerCharacter[] = [
     id: 'yuzuki',
     name: 'Yuzuki Akatsuki',
     avatarUrl: '/assets/avatars/yuzuki.png',
-    introVideoUrl: '/intro/yuzuki.mp4',
+    introImageUrl: '/intro/yuzuki_full.png',
     firstMessages: [
       'E-Etto...',
       '...{userName}-sensei?',
@@ -24,7 +25,7 @@ const LEARNERS: LearnerCharacter[] = [
     id: 'reina',
     name: 'Reina Kisaragi',
     avatarUrl: '/assets/avatars/reina.png',
-    introVideoUrl: '/intro/reina.mp4',
+    introImageUrl: '/intro/reina_full.png',
     firstMessages: [
       'Eh?',
       'A-Are you really...',
@@ -39,7 +40,7 @@ const LEARNERS: LearnerCharacter[] = [
     id: 'akira',
     name: 'Akira Kagetsu',
     avatarUrl: '/assets/avatars/akira.png',
-    introVideoUrl: '/intro/akira.mp4',
+    introImageUrl: '/intro/akira_full.png',
     firstMessages: [
       "...You're late.",
       '...Hm?',
