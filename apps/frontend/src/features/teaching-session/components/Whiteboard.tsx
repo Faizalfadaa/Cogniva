@@ -1,12 +1,19 @@
-import { useCallback, useRef } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import { Tldraw, getSnapshot, loadSnapshot, type Editor, type TLComponents } from 'tldraw'
 import 'tldraw/tldraw.css'
 
 interface WhiteboardProps {
   /** Bagian "document" dari snapshot tldraw sebelumnya (dari WorkspaceDTO.currentWhiteboardSnapshot) */
   initialSnapshot?: unknown
-  /** Dipanggil debounced setiap ada perubahan di kanvas */
+  /** Dipanggil debounced setiap ada perubahan di kanvas (autosave draft) */
   onAutosave: (payload: { snapshot: unknown; thumbnail?: Blob }) => void
+  /** true saat checkpoint dikunci (setelah Teach ditekan) - whiteboard jadi read-only */
+  readOnly?: boolean
+}
+
+export interface WhiteboardHandle {
+  /** Ambil snapshot dokumen + gambar SAAT INI - dipanggil TeachButton pas ditekan, bukan debounced */
+  exportSnapshot: () => Promise<{ document: unknown; image?: Blob }>
 }
 
 const AUTOSAVE_DEBOUNCE_MS = 3000
@@ -27,13 +34,24 @@ function ParchmentBackground() {
   )
 }
 
-const components: TLComponents = {
-  Background: ParchmentBackground,
-}
-
-export function Whiteboard({ initialSnapshot, onAutosave }: WhiteboardProps) {
+export const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteboard(
+  { initialSnapshot, onAutosave, readOnly = false },
+  ref
+) {
   const editorRef = useRef<Editor | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // StylePanel & SelectionForeground dipaksa null saat locked - jangan andalkan
+  // readonly bawaan tldraw buat nyembunyiin ini sendiri, karena shape masih bisa
+  // ke-select dalam mode readonly (lihat tldraw/tldraw#5903) dan panel ikut nongol.
+  // Ini juga yang bikin posisi LearnerResponseBubble di top-right aman dari collision.
+  const components = useMemo<TLComponents>(
+    () => ({
+      Background: ParchmentBackground,
+      ...(readOnly ? { StylePanel: null, SelectionForeground: null } : {}),
+    }),
+    [readOnly]
+  )
 
   const runAutosave = useCallback(() => {
     const editor = editorRef.current
@@ -54,9 +72,32 @@ export function Whiteboard({ initialSnapshot, onAutosave }: WhiteboardProps) {
       .catch(() => onAutosave({ snapshot: document }))
   }, [onAutosave])
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      exportSnapshot: async () => {
+        const editor = editorRef.current
+        if (!editor) return { document: undefined }
+
+        const { document } = getSnapshot(editor.store)
+        const shapeIds = [...editor.getCurrentPageShapeIds()]
+        if (shapeIds.length === 0) return { document }
+
+        try {
+          const result = await editor.toImage(shapeIds, { format: 'png', background: true })
+          return { document, image: result?.blob }
+        } catch {
+          return { document }
+        }
+      },
+    }),
+    []
+  )
+
   const handleMount = useCallback(
     (editor: Editor) => {
       editorRef.current = editor
+      editor.updateInstanceState({ isReadonly: readOnly })
 
       if (initialSnapshot) {
         try {
@@ -79,14 +120,21 @@ export function Whiteboard({ initialSnapshot, onAutosave }: WhiteboardProps) {
         unsubscribe()
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [initialSnapshot, runAutosave]
   )
 
+  // readOnly bisa berubah setelah editor mount (toggle lock/unlock berulang kali
+  // dalam satu sesi) - sinkronkan tiap kali nilainya berubah.
+  useEffect(() => {
+    editorRef.current?.updateInstanceState({ isReadonly: readOnly })
+  }, [readOnly])
+
   return (
-    // TODO: full-viewport buat sekarang. Akan disesuaikan saat TeachButton,
-    // title/description/PDF, dan LearnerPanel masuk di increment berikutnya.
-    <div style={{ position: 'fixed', inset: 0 }}>
+    // Ngisi parent-nya (.canvasArea di WorkspacePage, flex:1 + position:relative).
+    // Bukan lagi full-viewport - itu sebabnya kanvas sekarang gak pernah ketiban header.
+    <div style={{ position: 'absolute', inset: 0 }}>
       <Tldraw onMount={handleMount} components={components} />
     </div>
   )
-}
+})

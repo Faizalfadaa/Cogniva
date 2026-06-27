@@ -1,14 +1,21 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import type { WorkspaceDTO } from '../../dto/WorkspaceDTO'
-import { Whiteboard } from '../../features/teaching-session/components/Whiteboard/Whiteboard'
+import { Whiteboard, type WhiteboardHandle } from '../../features/teaching-session/components/Whiteboard'
+import { WorkspaceHeader } from '../../features/teaching-session/components/WorkspaceHeader'
+import { LearnerResponseBubble } from '../../features/teaching-session/components/LearnerResponseBubble'
+import { useTeachingSession } from '../../features/teaching-session/state/useTeachingSession'
+import { useWorkspaceTitleAutosave } from '../../features/teaching-session/hooks/useWorkspaceTitleAutosave'
+import { deriveLearner } from '../../lib/Learner'
+import styles from '../../styles/TeachingSession.module.css'
 
 export default function WorkspacePage() {
   const { id } = useParams<{ id: string }>()
   const bridge = useBridge()
   const [workspace, setWorkspace] = useState<WorkspaceDTO | null>(null)
   const [loading, setLoading] = useState(true)
+  const whiteboardRef = useRef<WhiteboardHandle>(null)
 
   useEffect(() => {
     if (!id) return
@@ -32,10 +39,44 @@ export default function WorkspacePage() {
     [bridge, id]
   )
 
+  const session = useTeachingSession(id ?? '', bridge, whiteboardRef)
+  const learner = useMemo(() => deriveLearner(id ?? ''), [id])
+  const titleField = useWorkspaceTitleAutosave(id ?? '', workspace?.title, bridge)
+
   if (!id || loading) {
     // TODO: loading state proper di fase Polish
     return null
   }
 
-  return <Whiteboard initialSnapshot={workspace?.currentWhiteboardSnapshot} onAutosave={handleAutosave} />
+  return (
+    <div className={styles.page}>
+      <WorkspaceHeader
+        title={titleField.title}
+        onTitleChange={titleField.onChange}
+        saveStatus={titleField.status}
+        isRecording={session.isRecording}
+        micPermissionDenied={session.micPermissionDenied}
+        mode={session.mode}
+        pending={session.pending}
+        onTeach={session.teach}
+        onContinueEditing={session.continueEditing}
+      />
+
+      <div className={styles.canvasArea}>
+        <Whiteboard
+          ref={whiteboardRef}
+          initialSnapshot={workspace?.currentWhiteboardSnapshot}
+          onAutosave={handleAutosave}
+          readOnly={session.mode === 'locked'}
+        />
+
+        <LearnerResponseBubble
+          learner={learner}
+          text={session.latestCheckpoint?.learnerResponse}
+          pending={session.pending}
+          checkpointId={session.latestCheckpoint?.id}
+        />
+      </div>
+    </div>
+  )
 }
