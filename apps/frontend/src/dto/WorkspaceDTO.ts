@@ -12,6 +12,8 @@ export interface WorkspaceDTO {
    * yang merupakan histori tiap kali tombol Teach ditekan.
    */
   currentWhiteboardSnapshot?: unknown;
+  /** Thumbnail raster kecil dari whiteboard, dipakai sebagai preview di card Home */
+  thumbnailUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

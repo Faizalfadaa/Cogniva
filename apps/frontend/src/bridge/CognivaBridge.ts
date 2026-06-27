@@ -17,7 +17,11 @@ export interface CognivaBridge {
   uploadWorkspacePdf(workspaceId: string, file: File): Promise<WorkspaceDTO>;
   // Autosave draft whiteboard selama state Editing - dipanggil berkala (debounced),
   // terpisah dari submitCheckpoint yang hanya jalan saat tombol Teach ditekan.
-  saveWhiteboardDraft(workspaceId: string, snapshot: unknown): Promise<void>;
+  // thumbnail (opsional) dipakai sebagai preview kecil di card Home.
+  saveWhiteboardDraft(
+    workspaceId: string,
+    payload: { snapshot: unknown; thumbnail?: Blob }
+  ): Promise<WorkspaceDTO>;
 
   // Teaching session
   submitCheckpoint(

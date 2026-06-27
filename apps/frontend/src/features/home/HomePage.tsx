@@ -45,13 +45,19 @@ function WorkspaceCard({
   ws: WorkspaceDTO
   onClick: () => void
 }) {
-  const initial = ws.title ? ws.title.charAt(0).toUpperCase() : '✦'
   const hasTitle = Boolean(ws.title)
 
   return (
     <button className={styles.wsCard} onClick={onClick} aria-label={`Buka workspace ${ws.title ?? 'tanpa judul'}`}>
-      <div className={styles.wsCardIcon}>
-        <span>{initial}</span>
+      <div className={styles.wsCardThumb}>
+        {ws.thumbnailUrl ? (
+          <img className={styles.wsCardThumbImg} src={ws.thumbnailUrl} alt="" />
+        ) : (
+          <div className={styles.wsCardThumbPlaceholder} aria-hidden="true" />
+        )}
+        <span className={styles.wsCardThumbBadge}>
+          <StateBadge state={ws.state} />
+        </span>
       </div>
       <div className={styles.wsCardBody}>
         <p className={`${styles.wsCardTitle} ${!hasTitle ? styles.wsCardTitleEmpty : ''}`}>
@@ -63,12 +69,6 @@ function WorkspaceCard({
             <span className={styles.wsCardDesc}> · {ws.description}</span>
           )}
         </p>
-      </div>
-      <div className={styles.wsCardRight}>
-        <StateBadge state={ws.state} />
-        <svg className={styles.wsCardArrow} width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
       </div>
     </button>
   )

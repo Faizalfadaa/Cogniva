@@ -156,17 +156,22 @@ export class MockCognivaBridge implements CognivaBridge {
     return { ...updated };
   }
 
-  async saveWhiteboardDraft(workspaceId: string, snapshot: unknown): Promise<void> {
+  async saveWhiteboardDraft(
+    workspaceId: string,
+    payload: { snapshot: unknown; thumbnail?: Blob }
+  ): Promise<WorkspaceDTO> {
     await delay(100);
     const ws = store.workspaces.get(workspaceId);
-    if (!ws) return;
+    if (!ws) throw new Error(`[Mock] Workspace not found: ${workspaceId}`);
     const updated: WorkspaceDTO = {
       ...ws,
-      currentWhiteboardSnapshot: snapshot,
+      currentWhiteboardSnapshot: payload.snapshot,
+      thumbnailUrl: payload.thumbnail ? URL.createObjectURL(payload.thumbnail) : ws.thumbnailUrl,
       state: ws.state === 'Draft' ? 'Teaching' : ws.state,
       updatedAt: now(),
     };
     store.workspaces.set(workspaceId, updated);
+    return { ...updated };
   }
 
   // ── Teaching session ──────────────────────────────────────────────────────
