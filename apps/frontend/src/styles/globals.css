@@ -1,0 +1,85 @@
+/* ─── Cogniva Design Tokens ─── */
+:root {
+  /* Brand */
+  --lime: #d8ff29;
+  --lime-hover: #c9f020;
+  --lime-tint: #edffd0;
+  --lime-text: #1a2200;
+
+  /* Surfaces */
+  --forest-dark: #1e2d08;
+  --forest-mid: #2d3a1a;
+  --page-bg: #faf7f0;
+  --card-bg: #ffffff;
+  --cream: #fff8e7;
+  --parchment: #f5f0e4;
+
+  /* Text */
+  --text-primary: #1c1a14;
+  --text-secondary: #5a5545;
+  --text-muted: #9a9282;
+  --text-on-dark: #e8e5d8;
+  --text-on-dark-muted: #8a9278;
+
+  /* Borders */
+  --border: rgba(30, 25, 10, 0.1);
+  --border-strong: rgba(30, 25, 10, 0.18);
+  --border-lime: rgba(216, 255, 41, 0.4);
+
+  /* State badge colors */
+  --badge-draft-bg: #f0efea;
+  --badge-draft-text: #6b6456;
+  --badge-teaching-bg: #edffd0;
+  --badge-teaching-text: #2d5c00;
+  --badge-evaluating-bg: #fff3cc;
+  --badge-evaluating-text: #7a5500;
+  --badge-completed-bg: #e0f4e8;
+  --badge-completed-text: #1a5e2e;
+
+  /* Typography */
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 100px;
+
+  /* Transitions */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+  --dur-slow: 350ms;
+}
+
+/* ─── Reset ─── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--page-bg);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+input, textarea { font-family: inherit; }
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }

@@ -1,0 +1,673 @@
+/* ═══════════════════════════════════════════════════════════
+   Page shell
+═══════════════════════════════════════════════════════════ */
+.page {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* workspaceBody sits below the header and splits into
+   canvas (flex:1) + chat sidebar (fixed width or zero) */
+.workspaceBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Header
+═══════════════════════════════════════════════════════════ */
+.header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 60px;
+  padding: 0 16px;
+  background: var(--cream);
+  border-bottom: 1px solid var(--border);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  color: var(--text-secondary);
+  transition: background var(--dur-fast);
+}
+.backBtn:hover { background: var(--parchment); }
+
+.titleInput {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  min-width: 80px;
+  max-width: 360px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-fast);
+}
+.titleInput::placeholder { color: var(--text-muted); font-weight: 600; }
+.titleInput:hover,
+.titleInput:focus { background: var(--parchment); }
+
+.saveStatus {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.teachBtn {
+  background: var(--lime);
+  color: var(--lime-text);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background var(--dur-fast);
+}
+.teachBtn:hover:not(:disabled) { background: var(--lime-hover); }
+.teachBtn:disabled { opacity: 0.7; cursor: default; }
+
+.outlineBtn {
+  background: var(--cream);
+  border: 1.5px solid var(--border-strong);
+  color: var(--text-primary);
+  border-radius: var(--radius-pill);
+  padding: 8px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: border-color var(--dur-fast);
+}
+.outlineBtn:hover { border-color: var(--text-primary); }
+
+.finishBtn {
+  background: transparent;
+  border: 1.5px solid var(--border-strong);
+  color: var(--text-secondary);
+  border-radius: var(--radius-pill);
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), color var(--dur-fast);
+}
+.finishBtn:hover:not(:disabled) {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+.finishBtn:disabled { opacity: 0.5; cursor: default; }
+
+.micDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e0453c;
+  animation: micPulse 1.4s infinite;
+}
+@keyframes micPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Canvas area
+═══════════════════════════════════════════════════════════ */
+.canvasArea {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Learner response bubble  (top-right of canvas)
+═══════════════════════════════════════════════════════════ */
+/* ── Shared notification stack (intro toasts + teach response + chat toasts) ──
+   Anchored top-left, just below the tldraw style panel (~68px from canvas top). */
+.notifStack {
+  position: absolute;
+  top: 76px;
+  left: 8px;
+  z-index: 950;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  pointer-events: none;
+  max-width: 300px;
+}
+
+.notifToast {
+  pointer-events: all;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 280px;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.13);
+  animation: notifSlideIn 200ms var(--ease-out) both;
+}
+
+@keyframes notifSlideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.notifAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--parchment);
+}
+
+.notifBody {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notifName {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.notifText {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.notifClose {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-muted);
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.notifClose:hover { background: var(--parchment); color: var(--text-primary); }
+
+/* Legacy aliases — kept so old .responseName/.responseText in sidebar still work */
+.responseName { font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 2px; }
+.responseText { font-size: 13px; color: var(--text-primary); line-height: 1.5; }
+
+/* ═══════════════════════════════════════════════════════════
+   Chat sidebar
+═══════════════════════════════════════════════════════════ */
+
+/* When closed — only the avatar trigger button shows, no sidebar space is taken */
+.sidebarTrigger {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 900;
+}
+
+.sidebarAvatarBtn {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  background: var(--cream);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  transition: transform var(--dur-fast), box-shadow var(--dur-fast);
+}
+.sidebarAvatarBtn:hover {
+  transform: scale(1.06);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+.sidebarAvatarImg {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--parchment);
+}
+
+.sidebarBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: #e0453c;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* When open — sidebar is a flex child of .workspaceBody */
+.chatSidebar {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--cream);
+  border-left: 1px solid var(--border);
+  min-width: 280px;
+  /* Smooth open animation */
+  animation: sidebarSlideIn var(--dur-base) var(--ease-out);
+}
+
+@keyframes sidebarSlideIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Drag handle — left edge of sidebar */
+.chatSidebarHandle {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 10;
+  /* Subtle visual affordance */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chatSidebarHandle::after {
+  content: '';
+  width: 3px;
+  height: 32px;
+  border-radius: 2px;
+  background: var(--border-strong);
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
+.chatSidebarHandle:hover::after { opacity: 1; }
+
+/* Header */
+.chatSidebarHeader {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chatSidebarAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--parchment);
+}
+
+.chatSidebarHeaderInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.chatSidebarName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chatSidebarStatus {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.chatSidebarClose {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.chatSidebarClose:hover { background: var(--parchment); color: var(--text-primary); }
+
+/* Message list */
+.chatSidebarMessages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chatSidebarEmpty {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 12px;
+}
+
+/* Shared bubble styles (used by both sidebar and toasts) */
+.chatBubble {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.chatBubbleLearner {
+  align-self: flex-start;
+  background: var(--parchment);
+  color: var(--text-primary);
+  border-bottom-left-radius: 4px;
+}
+
+.chatBubbleUser {
+  align-self: flex-end;
+  background: var(--lime);
+  color: var(--lime-text);
+  border-bottom-right-radius: 4px;
+}
+
+/* Input row */
+.chatSidebarInputRow {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.chatSidebarInput {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  outline: none;
+  transition: border-color var(--dur-fast);
+}
+.chatSidebarInput:focus { border-color: var(--lime); }
+
+.chatSidebarSend {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--lime);
+  color: var(--lime-text);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--dur-fast);
+}
+.chatSidebarSend:hover:not(:disabled) { background: var(--lime-hover); }
+.chatSidebarSend:disabled { opacity: 0.5; cursor: default; }
+
+/* ═══════════════════════════════════════════════════════════
+   Chat toast notifications — use shared .notifStack / .notifToast above
+═══════════════════════════════════════════════════════════ */
+/* ChatToasts renders a .notifStack wrapper; aliases below keep ChatToasts.tsx compiling */
+.chatToastsContainer {
+  position: absolute;
+  top: 76px;
+  left: 8px;
+  z-index: 950;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  pointer-events: none;
+  max-width: 300px;
+}
+
+.chatToast {
+  pointer-events: all;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 280px;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.13);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+
+.chatToastVisible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.chatToast:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.chatToastAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--parchment);
+}
+
+.chatToastBody {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chatToastName {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.chatToastText {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Learner intro — call card (connecting) → scripted bubbles
+═══════════════════════════════════════════════════════════ */
+
+/* Full-canvas dim overlay */
+.introOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 18, 10, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.introSkip {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-on-dark-muted);
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: border-color var(--dur-fast), color var(--dur-fast);
+}
+.introSkip:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: var(--text-on-dark);
+}
+
+/* ── Connecting card ── */
+.introCard {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  background: var(--forest-dark);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  max-width: 640px;
+  width: 90%;
+}
+
+.introCardImage {
+  width: 240px;
+  height: 340px;
+  object-fit: cover;
+  object-position: top;
+  flex-shrink: 0;
+  display: block;
+  transition: filter 0.7s var(--ease-out);
+}
+
+.introCardImageBlurred {
+  filter: blur(8px) brightness(0.7);
+}
+
+.introCardImageClear {
+  filter: blur(0px) brightness(1);
+}
+
+.introCardText {
+  flex: 1;
+  padding: 32px 32px 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.introLine1Hidden,
+.introLine1Visible {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lime);
+  transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out);
+}
+.introLine1Hidden {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.introLine1Visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.introLine2Hidden,
+.introLine2Visible {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--text-on-dark);
+  transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+}
+.introLine2Hidden {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.introLine2Visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   Legacy dock classes — kept so old imports don't break
+   (can be removed once LearnerDock is fully retired)
+═══════════════════════════════════════════════════════════ */
+.dockCollapsed { display: none; }
+.dockExpanded  { display: none; }
