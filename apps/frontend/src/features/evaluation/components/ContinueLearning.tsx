@@ -3,9 +3,11 @@ import styles from '../../../styles/Evaluation.module.css'
 interface ContinueLearningProps {
   topics: string[]
   onNewSession: () => void
+  onResumeSession: () => void
+  resuming?: boolean
 }
 
-export function ContinueLearning({ topics, onNewSession }: ContinueLearningProps) {
+export function ContinueLearning({ topics, onNewSession, onResumeSession, resuming = false }: ContinueLearningProps) {
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>
@@ -32,9 +34,18 @@ export function ContinueLearning({ topics, onNewSession }: ContinueLearningProps
           <p className={styles.continueFooterText}>
             Siap mengajar topik-topik baru? Buat sesi baru atau lanjutkan sesi ini.
           </p>
-          <button className={styles.continueBtn} onClick={onNewSession}>
-            Mulai sesi baru ↗
-          </button>
+          <div className={styles.continueActions}>
+            <button
+              className={styles.continueSecondaryBtn}
+              onClick={onResumeSession}
+              disabled={resuming}
+            >
+              {resuming ? 'Membuka...' : 'Lanjutkan Sesi ↩'}
+            </button>
+            <button className={styles.continueBtn} onClick={onNewSession} disabled={resuming}>
+              Mulai sesi baru ↗
+            </button>
+          </div>
         </div>
       </div>
     </section>

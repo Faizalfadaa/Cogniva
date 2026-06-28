@@ -312,4 +312,13 @@ export class MockCognivaBridge implements CognivaBridge {
     if (!report) throw new Error(`[Mock] Report not ready for workspace: ${workspaceId}`);
     return { ...report };
   }
+
+  async resumeSession(workspaceId: string): Promise<WorkspaceDTO> {
+    await delay(200);
+    const ws = store.workspaces.get(workspaceId);
+    if (!ws) throw new Error(`[Mock] Workspace not found: ${workspaceId}`);
+    const updated: WorkspaceDTO = { ...ws, state: 'Teaching', updatedAt: now() };
+    store.workspaces.set(workspaceId, updated);
+    return { ...updated };
+  }
 }

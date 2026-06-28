@@ -20,6 +20,7 @@ export default function EvaluationPage() {
   const [workspace, setWorkspace] = useState<WorkspaceDTO | null>(null)
   const [report, setReport] = useState<EvaluationReportDTO | null>(null)
   const [loading, setLoading] = useState(true)
+  const [resuming, setResuming] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const learner = useMemo(() => deriveLearner(id ?? ''), [id])
@@ -71,6 +72,18 @@ export default function EvaluationPage() {
     navigate(`/workspace/${ws.id}`)
   }
 
+  async function handleResumeSession() {
+    if (!id) return
+    setResuming(true)
+    try {
+      await bridge.resumeSession(id)
+      navigate(`/workspace/${id}`)
+    } catch (err) {
+      console.error('[Evaluation] resumeSession failed', err)
+      setResuming(false)
+    }
+  }
+
   if (loading || !workspace) return null
 
   // ── Processing screen ─────────────────────────────────────────────────────
@@ -107,7 +120,7 @@ export default function EvaluationPage() {
       <div className={styles.reportContent}>
         <LetterFromLearner learner={learner} letter={report!.letter} />
         <Notebook notebook={report!.notebook} learnerName={learner.name} />
-        <ContinueLearning topics={report!.continueLearning} onNewSession={handleNewSession} />
+        <ContinueLearning topics={report!.continueLearning} onNewSession={handleNewSession} onResumeSession={handleResumeSession} resuming={resuming} />
       </div>
     </div>
   )

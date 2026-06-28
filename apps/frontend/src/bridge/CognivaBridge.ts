@@ -45,4 +45,7 @@ export interface CognivaBridge {
   // untuk tahu kapan berubah jadi 'Completed' - tidak ada endpoint status terpisah.
   finishSession(workspaceId: string): Promise<void>;
   getEvaluationReport(workspaceId: string): Promise<EvaluationReportDTO>;
+
+  // Lanjutkan sesi dari Completed kembali ke Teaching
+  resumeSession(workspaceId: string): Promise<WorkspaceDTO>;
 }
