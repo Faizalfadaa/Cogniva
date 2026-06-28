@@ -45,7 +45,7 @@ export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
     addUnique(nextState.openGaps, unclearTerm);
   }
 
-  const responseText = createMockResponse(concept, unclearTerm);
+  const responseText = createMockResponse(concept, unclearTerm, input.turnIndex);
   if (unclearTerm) {
     addUnique(nextState.questionsAsked, responseText);
   }
@@ -107,17 +107,29 @@ function extractUnclearTerm(text: string): string | null {
 
 function createMockResponse(
   concept: string | null,
-  unclearTerm: string | null
+  unclearTerm: string | null,
+  turnIndex: number
 ): string {
   if (unclearTerm) {
-    return `Aku mulai nangkep sedikit, tapi istilah "${unclearTerm}" itu maksudnya apa ya?`;
+    const templates = [
+      `Hmm, istilah "${unclearTerm}" itu maksudnya apa ya? Aku baru denger.`,
+      `Eh "${unclearTerm}" itu apa sih? Kayak nama alat gitu?`,
+      `Wait, "${unclearTerm}" itu yang mana? Aku ketinggalan.`
+    ];
+    return templates[turnIndex % templates.length];
   }
 
   if (concept) {
-    return `Jadi sejauh ini aku pahamnya, ${concept} itu bagian penting dari materi ini ya?`;
+    const templates = [
+      `Ohh jadi ${concept} itu kayak gitu ya! Aku mulai ngerti deh.`,
+      `Hmm menarik sih soal ${concept}. Tapi kok bisa gitu ya?`,
+      `Berarti ${concept} itu intinya kayak yang tadi kan? Bener ga kak?`,
+      `Oh ${concept} toh. Aku mikirnya beda loh tadi, kirain kayak yang di kehidupan sehari-hari.`
+    ];
+    return templates[turnIndex % templates.length];
   }
 
-  return "Aku mulai paham sedikit, tapi bisa jelasin lagi dengan contoh yang lebih sederhana?";
+  return "Aku mulai paham sedikit, tapi bisa jelasin lagi pakai contoh yang lebih gampang?";
 }
 
 function cleanupConcept(value: string): string {
