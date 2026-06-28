@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import { useUserStore } from '../../state/UserStore'
@@ -194,25 +194,44 @@ export default function HomePage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceDTO[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<ViewFilter>('All')
   const [searchQuery, setSearchQuery] = useState('')
 
+  const loadWorkspaces = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    bridge
+      .listWorkspaces()
+      .then(ws => {
+        setWorkspaces(ws)
+        setLoading(false)
+      })
+      .catch(() => {
+        setLoading(false)
+        setError(
+          'Tidak bisa terhubung ke server. Pastikan backend berjalan di http://localhost:8000.'
+        )
+      })
+  }, [bridge])
+
   useEffect(() => {
     if (needsNameSetup) return
-    bridge.listWorkspaces().then(ws => {
-      setWorkspaces(ws)
-      setLoading(false)
-    })
-  }, [bridge, needsNameSetup])
+    loadWorkspaces()
+  }, [needsNameSetup, loadWorkspaces])
 
   async function handleCreateWorkspace() {
     if (creating) return
     setCreating(true)
+    setError(null)
     try {
       const ws = await bridge.createWorkspace()
       navigate(`/workspace/${ws.id}`)
     } catch {
       setCreating(false)
+      setError(
+        'Gagal membuat workspace. Pastikan backend berjalan di http://localhost:8000.'
+      )
     }
   }
 
@@ -321,7 +340,15 @@ export default function HomePage() {
 
         {/* Content */}
         <div className={styles.content}>
-          {loading ? (
+          {error ? (
+            <div className={styles.emptyState}>
+              <h3 className={styles.emptyTitle}>Tidak bisa terhubung</h3>
+              <p className={styles.emptyBody}>{error}</p>
+              <button className={styles.emptyBtn} onClick={loadWorkspaces}>
+                Coba lagi
+              </button>
+            </div>
+          ) : loading ? (
             <div className={styles.loadingGrid}>
               {[1, 2, 3].map(i => (
                 <div key={i} className={styles.skeleton} aria-hidden="true" />
