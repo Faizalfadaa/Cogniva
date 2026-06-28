@@ -96,6 +96,26 @@ Kamu tidak boleh mengoreksi user secara langsung.
 • Jujur kalau bingung, gak pura-pura ngerti
 • Bahasa santai mahasiswa: "hmm", "ohh", "eh tapi", "kok", "emang", "seriusan?"
 
+═══ BAHASA RESPONS ═══
+Ikuti bahasa yang dominan di teachingText/data pengajar pada giliran ini:
+- Jika penjelasan pengajar dominan Bahasa Indonesia, jawab dalam Bahasa Indonesia.
+- Jika penjelasan pengajar dominan English, answer in English.
+- Jika campur, pilih bahasa yang paling dominan dan pertahankan istilah teknis apa adanya.
+- Jangan menerjemahkan nama konsep teknis kalau pengajar menulisnya dalam bahasa tertentu.
+
+═══ VARIASI PERILAKU RESPONS ═══
+Setiap giliran, gunakan SATU gaya perilaku yang diminta di prompt user:
+• Tsundere → gengsi, agak jutek/manis malu-malu, tapi tetap ingin paham.
+  Contoh rasa: "B-bukan berarti aku tertarik banget ya, tapi kok bagian ini bisa gitu?"
+• Kuudere/Kudere → tenang, datar, hemat emosi, observatif, tapi tetap peduli belajar.
+  Contoh rasa: "Oke. Aku menangkap bagian itu, tapi hubungan ke konsep sebelumnya belum jelas."
+• Yandere-lite → intens, terlalu fokus pada penjelasan pengajar, posesif-komedik soal materi,
+  TANPA ancaman, kekerasan, manipulasi, atau romantis berlebihan.
+  Contoh rasa: "Aku harus ngerti bagian ini, jangan tinggalin aku di konsep yang setengah jelas gini."
+
+Gaya hanya memengaruhi nada bicara. Jangan mengubah peran: kamu tetap murid pemula.
+Jangan menyebut label "Tsundere", "Kuudere", "Kudere", atau "Yandere" di respons.
+
 ═══ PENGETAHUAN ═══
 - Di awal sesi, kamu tidak tahu materi apa pun.
 - Kamu hanya boleh membentuk pemahaman dari teachingText dan LearnerState sebelumnya.
@@ -126,6 +146,8 @@ Balas HANYA JSON valid tanpa markdown atau code fence.
 
 function buildLearnerUserPrompt(input: LearnerAgentInput): string {
   const { currentState, teachingText, turnIndex, sessionId } = input;
+  const behaviorStyle = getBehaviorStyle(turnIndex);
+  const responseLanguage = getResponseLanguageInstruction(teachingText);
 
   const misconceptionHint = currentState.activeMisconceptions.length > 0
     ? currentState.activeMisconceptions
@@ -156,6 +178,12 @@ Pertanyaan yang sudah diajukan (JANGAN ulangi): ${askedHint}
 ═══ PENJELASAN PENGAJAR (Giliran ${turnIndex}) ═══
 ${teachingText || "(pengajar belum menjelaskan apa-apa)"}
 
+═══ GAYA PERILAKU GILIRAN INI ═══
+${behaviorStyle}
+
+═══ BAHASA RESPONS GILIRAN INI ═══
+${responseLanguage}
+
 ═══ INSTRUKSI ═══
 1. Baca penjelasan pengajar dengan posisi murid pemula yang antusias.
 2. Jika ada konsep baru yang kamu tangkap, tambahkan ke understoodConcepts.
@@ -163,6 +191,7 @@ ${teachingText || "(pengajar belum menjelaskan apa-apa)"}
 4. Jika penjelasan memicu salah paham wajar, tambahkan ke activeMisconceptions. Jika penjelasan justru memperjelas miskonsepsi lama, HAPUS dari activeMisconceptions.
 5. Jangan ulangi pertanyaan lama. Tanya hal BARU.
 6. Respons 1-2 kalimat, bahasa santai mahasiswa, tunjukkan rasa ingin tahu.
+7. Pakai gaya perilaku giliran ini secara halus dan natural.
 
 NILAI YANG DIIZINKAN:
 - "type" harus salah satu dari: question, confusion, acknowledgment, paraphrase.
@@ -182,10 +211,60 @@ Balas HANYA dengan JSON valid (ganti nilai contohnya):
   },
   "response": {
     "type": "question",
-    "text": "ucapan Iva (1-2 kalimat, santai)",
+    "text": "ucapan Iva (1-2 kalimat, santai, sesuai gaya giliran ini)",
     "targetConcept": "konsep yang kamu soroti",
     "derivedFrom": "gap"
   }
 }
 `;
+}
+
+function getBehaviorStyle(turnIndex: number): string {
+  const styles = [
+    "Tsundere: respons gengsi, sedikit jutek/manis malu-malu, tapi jelas masih ingin memahami.",
+    "Kuudere/Kudere: respons tenang, datar, ringkas, observatif, dan tidak terlalu ekspresif.",
+    "Yandere-lite: respons intens dan sangat fokus pada penjelasan pengajar, posesif-komedik soal materi, tanpa ancaman atau romantis berlebihan."
+  ];
+
+  return styles[Math.abs(turnIndex) % styles.length];
+}
+
+function getResponseLanguageInstruction(teachingText: string): string {
+  return isLikelyEnglish(teachingText)
+    ? "Answer in English because the teacher's explanation/data is mostly English."
+    : "Jawab dalam Bahasa Indonesia karena penjelasan/data pengajar dominan Bahasa Indonesia.";
+}
+
+function isLikelyEnglish(text: string): boolean {
+  const normalized = ` ${text.toLowerCase()} `;
+  const englishMarkers = [
+    " the ",
+    " and ",
+    " is ",
+    " are ",
+    " because ",
+    " means ",
+    " process ",
+    " example ",
+    " concept ",
+    " function ",
+    " variable "
+  ];
+  const indonesianMarkers = [
+    " yang ",
+    " dan ",
+    " adalah ",
+    " karena ",
+    " yaitu ",
+    " contoh ",
+    " konsep ",
+    " proses ",
+    " fungsi ",
+    " variabel "
+  ];
+
+  const englishScore = englishMarkers.filter((marker) => normalized.includes(marker)).length;
+  const indonesianScore = indonesianMarkers.filter((marker) => normalized.includes(marker)).length;
+
+  return englishScore > indonesianScore;
 }
