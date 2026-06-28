@@ -1,0 +1,361 @@
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useBridge } from '../../bridge/BridgeProvider'
+import { useUserStore } from '../../state/UserStore'
+import type { WorkspaceDTO, WorkspaceState } from '../../dto/WorkspaceDTO'
+import styles from '../../styles/HomePage.module.css'
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+type ViewFilter = 'All' | 'Active' | 'Completed'
+
+/** Draft + Teaching = Active. Evaluating + Completed = Completed. */
+function getViewFilter(state: WorkspaceState): Exclude<ViewFilter, 'All'> {
+  return state === 'Draft' || state === 'Teaching' ? 'Active' : 'Completed'
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'baru saja'
+  if (mins < 60) return `${mins} menit lalu`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} jam lalu`
+  const days = Math.floor(hours / 24)
+  return `${days} hari lalu`
+}
+
+// ─── Badge ───────────────────────────────────────────────────────────────────
+// Still shows the real underlying state (Draft/Teaching/Evaluating/Completed)
+// on the card itself — users benefit from that granularity inside a section,
+// but don't need to filter by it.
+
+function StateBadge({ state }: { state: WorkspaceState }) {
+  return (
+    <span className={`${styles.badge} ${styles[`badge_${state.toLowerCase()}`]}`}>
+      {state}
+    </span>
+  )
+}
+
+// ─── Cards ───────────────────────────────────────────────────────────────────
+
+function WorkspaceCard({ ws, onClick }: { ws: WorkspaceDTO; onClick: () => void }) {
+  const hasTitle = Boolean(ws.title)
+  return (
+    <button
+      className={styles.wsCard}
+      onClick={onClick}
+      aria-label={`Buka workspace ${ws.title ?? 'tanpa judul'}`}
+    >
+      <div className={styles.wsCardThumb}>
+        {ws.thumbnailUrl ? (
+          <img className={styles.wsCardThumbImg} src={ws.thumbnailUrl} alt="" />
+        ) : (
+          <div className={styles.wsCardThumbPlaceholder} aria-hidden="true" />
+        )}
+        <span className={styles.wsCardThumbBadge}>
+          <StateBadge state={ws.state} />
+        </span>
+      </div>
+      <div className={styles.wsCardBody}>
+        <p className={`${styles.wsCardTitle} ${!hasTitle ? styles.wsCardTitleEmpty : ''}`}>
+          {ws.title ?? 'Workspace tanpa judul'}
+        </p>
+        <p className={styles.wsCardMeta}>
+          {timeAgo(ws.updatedAt)}
+          {ws.description && (
+            <span className={styles.wsCardDesc}> · {ws.description}</span>
+          )}
+        </p>
+      </div>
+    </button>
+  )
+}
+
+function NewWorkspaceCard({ onClick, loading }: { onClick: () => void; loading: boolean }) {
+  return (
+    <button
+      className={styles.newCard}
+      onClick={onClick}
+      disabled={loading}
+      aria-label="Buat workspace baru"
+    >
+      <div className={styles.newCardInner}>
+        <div className={styles.newCardPlus}>
+          {loading ? (
+            <svg className={styles.spinner} width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="32" strokeDashoffset="12" />
+            </svg>
+          ) : (
+            <span>+</span>
+          )}
+        </div>
+        <p className={styles.newCardLabel}>{loading ? 'Membuat workspace...' : 'Workspace baru'}</p>
+      </div>
+    </button>
+  )
+}
+
+function EmptyState({ filter, onNew, loading }: { filter: ViewFilter; onNew: () => void; loading: boolean }) {
+  const isCompleted = filter === 'Completed'
+  return (
+    <div className={styles.emptyState}>
+      <div className={styles.emptyIcon}>
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <rect x="8" y="12" width="32" height="26" rx="4" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M16 20h16M16 26h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <circle cx="36" cy="12" r="6" fill="var(--lime)" />
+          <path d="M33.5 12h5M36 9.5v5" stroke="var(--lime-text)" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      </div>
+      {isCompleted ? (
+        <>
+          <h3 className={styles.emptyTitle}>Belum ada sesi selesai</h3>
+          <p className={styles.emptyBody}>
+            Selesaikan sesi mengajarmu dan evaluasi akan muncul di sini.
+          </p>
+        </>
+      ) : (
+        <>
+          <h3 className={styles.emptyTitle}>Belum ada workspace</h3>
+          <p className={styles.emptyBody}>
+            Mulai sesi pertamamu. Pilih topik, buka whiteboard, dan ajari AI muridmu.
+          </p>
+          <button className={styles.emptyBtn} onClick={onNew} disabled={loading}>
+            {loading ? 'Membuat...' : 'Buat workspace pertama'}
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─── Name Setup Modal ────────────────────────────────────────────────────────
+
+function NameModal({ onConfirm }: { onConfirm: (name: string) => void }) {
+  const [name, setName] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { inputRef.current?.focus() }, [])
+
+  function handleSubmit() {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    onConfirm(trimmed)
+  }
+
+  return (
+    <div className={styles.modalOverlay}>
+      <div className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div className={styles.modalMark}>✦</div>
+        <h2 id="modal-title" className={styles.modalTitle}>Hei, siapa namamu?</h2>
+        <p className={styles.modalBody}>
+          Murid AI-mu akan memanggilmu dengan nama ini sepanjang sesi.
+        </p>
+        <input
+          ref={inputRef}
+          className={styles.modalInput}
+          type="text"
+          placeholder="Nama kamu..."
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+          maxLength={40}
+          aria-label="Nama kamu"
+        />
+        <button
+          className={styles.modalBtn}
+          onClick={handleSubmit}
+          disabled={!name.trim()}
+        >
+          Masuk ke Cogniva →
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Filter tabs ─────────────────────────────────────────────────────────────
+
+const FILTER_OPTIONS: Array<{ label: string; value: ViewFilter }> = [
+  { label: 'Semua',     value: 'All' },
+  { label: 'Active',    value: 'Active' },
+  { label: 'Completed', value: 'Completed' },
+]
+
+// ─── Main Page ───────────────────────────────────────────────────────────────
+
+export default function HomePage() {
+  const bridge = useBridge()
+  const navigate = useNavigate()
+  const { userName, needsNameSetup, setUserName } = useUserStore()
+
+  const [workspaces, setWorkspaces] = useState<WorkspaceDTO[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [filter, setFilter] = useState<ViewFilter>('All')
+  const [searchQuery, setSearchQuery] = useState('')
+
+  useEffect(() => {
+    if (needsNameSetup) return
+    bridge.listWorkspaces().then(ws => {
+      setWorkspaces(ws)
+      setLoading(false)
+    })
+  }, [bridge, needsNameSetup])
+
+  async function handleCreateWorkspace() {
+    if (creating) return
+    setCreating(true)
+    try {
+      const ws = await bridge.createWorkspace()
+      navigate(`/workspace/${ws.id}`)
+    } catch {
+      setCreating(false)
+    }
+  }
+
+  function handleOpenWorkspace(ws: WorkspaceDTO) {
+    const isCompleted = getViewFilter(ws.state) === 'Completed'
+    navigate(isCompleted ? `/evaluation/${ws.id}` : `/workspace/${ws.id}`)
+  }
+
+  const filtered = workspaces.filter(ws => {
+    const matchFilter = filter === 'All' || getViewFilter(ws.state) === filter
+    const matchSearch =
+      !searchQuery ||
+      (ws.title ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (ws.description ?? '').toLowerCase().includes(searchQuery.toLowerCase())
+    return matchFilter && matchSearch
+  })
+
+  const activeCount    = workspaces.filter(ws => getViewFilter(ws.state) === 'Active').length
+  const completedCount = workspaces.filter(ws => getViewFilter(ws.state) === 'Completed').length
+  const counts: Record<ViewFilter, number> = {
+    All:       workspaces.length,
+    Active:    activeCount,
+    Completed: completedCount,
+  }
+
+  const hasAny = workspaces.length > 0
+
+  if (needsNameSetup) return <NameModal onConfirm={setUserName} />
+
+  return (
+    <div className={styles.layout}>
+      {/* ── Sidebar ── */}
+      <aside className={styles.sidebar}>
+        <div className={styles.sidebarTop}>
+          <div className={styles.logo}>
+            <span className={styles.logoMark}><img src="/cogniva_logo.png" alt="Cogniva Logo" className={styles.logoImg} /></span>
+            <span className={styles.logoText}>Cogniva</span>
+          </div>
+
+          <button
+            className={styles.newBtn}
+            onClick={handleCreateWorkspace}
+            disabled={creating}
+            aria-label="Buat workspace baru"
+          >
+            <span className={styles.newBtnPlus}>{creating ? '…' : '+'}</span>
+            <span>Workspace baru</span>
+          </button>
+        </div>
+
+        <nav className={styles.sidebarNav} aria-label="Filter workspace">
+          {FILTER_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              className={`${styles.navItem} ${filter === opt.value ? styles.navItemActive : ''}`}
+              onClick={() => setFilter(opt.value)}
+              aria-current={filter === opt.value ? 'page' : undefined}
+            >
+              <span>{opt.label}</span>
+              {counts[opt.value] > 0 && (
+                <span className={styles.navCount}>{counts[opt.value]}</span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        <div className={styles.sidebarBottom}>
+          <div className={styles.userChip}>
+            <div className={styles.userAvatar}>
+              {userName?.charAt(0).toUpperCase() ?? '?'}
+            </div>
+            <span className={styles.userName}>{userName}</span>
+          </div>
+        </div>
+      </aside>
+
+      {/* ── Main ── */}
+      <main className={styles.main}>
+        <header className={styles.mainHeader}>
+          <div className={styles.mainHeaderLeft}>
+            <h1 className={styles.mainTitle}>
+              {filter === 'All' ? 'Semua workspace' : filter}
+            </h1>
+            {hasAny && (
+              <p className={styles.mainSub}>{filtered.length} workspace</p>
+            )}
+          </div>
+
+          {hasAny && (
+            <div className={styles.searchBox}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className={styles.searchIcon}>
+                <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4" />
+                <path d="M10.5 10.5L13 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+              <input
+                className={styles.searchInput}
+                type="search"
+                placeholder="Cari workspace..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                aria-label="Cari workspace"
+              />
+            </div>
+          )}
+        </header>
+
+        {/* Content */}
+        <div className={styles.content}>
+          {loading ? (
+            <div className={styles.loadingGrid}>
+              {[1, 2, 3].map(i => (
+                <div key={i} className={styles.skeleton} aria-hidden="true" />
+              ))}
+            </div>
+          ) : !hasAny ? (
+            <EmptyState filter={filter} onNew={handleCreateWorkspace} loading={creating} />
+          ) : filtered.length === 0 ? (
+            <div className={styles.noResults}>
+              <p>Tidak ada workspace yang cocok.</p>
+              <button
+                className={styles.clearFilter}
+                onClick={() => { setFilter('All'); setSearchQuery('') }}
+              >
+                Hapus filter
+              </button>
+            </div>
+          ) : (
+            <div className={styles.grid}>
+              {filtered.map(ws => (
+                <WorkspaceCard
+                  key={ws.id}
+                  ws={ws}
+                  onClick={() => handleOpenWorkspace(ws)}
+                />
+              ))}
+              {/* Only show new workspace card in All / Active views */}
+              {(filter === 'All' || filter === 'Active') && (
+                <NewWorkspaceCard onClick={handleCreateWorkspace} loading={creating} />
+              )}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  )
+}
