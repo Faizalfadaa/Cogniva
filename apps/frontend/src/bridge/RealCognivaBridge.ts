@@ -155,4 +155,10 @@ export class RealCognivaBridge implements CognivaBridge {
     // mock so the Evaluation screen keeps polling getWorkspace() until Completed.
     return getJson<EvaluationReportDTO>(`/api/workspaces/${workspaceId}/report`);
   }
+
+  // Resume a finished session back into teaching — transcript and the Learner's
+  // memory are preserved server-side; returns the workspace now in 'Teaching'.
+  resumeSession(workspaceId: string): Promise<WorkspaceDTO> {
+    return sendJson<WorkspaceDTO>(`/api/workspaces/${workspaceId}/resume`, 'POST');
+  }
 }

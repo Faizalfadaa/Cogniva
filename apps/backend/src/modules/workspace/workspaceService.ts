@@ -231,6 +231,28 @@ export function getReport(id: string) {
   return workspaces.getReport(id);
 }
 
+/**
+ * Resume a finished workspace back into teaching (§4.2, §5.4). The transcript,
+ * turn count, and the Learner's mental model are all preserved — the student
+ * keeps remembering what was taught — and prior evaluations stay as history; the
+ * next finish appends a fresh one. Only a Completed workspace resumes.
+ */
+export function resumeSession(id: string): Workspace | undefined {
+  const ws = workspaces.get(id);
+  if (!ws) return undefined;
+  if (ws.state !== "Completed") return ws; // nothing to resume
+
+  const session = requireSession(ws);
+  // EVALUATED/ENDED -> TEACHING. Direct move (the service owns workspace state),
+  // keeping turnCount, LearnerState, and evaluationIds intact.
+  session.status = "TEACHING";
+  session.endedAt = undefined;
+  sessions.saveSession(session);
+
+  ws.state = "Teaching";
+  return touch(ws);
+}
+
 // --- Internals -------------------------------------------------------------
 
 /** Run one teaching turn through the orchestrator, never pausing for confirmation. */

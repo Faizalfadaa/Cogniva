@@ -114,6 +114,12 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     if (!report) return reply.code(404).send({ detail: "Report not ready yet" });
     return report;
   });
+
+  // Resume a finished workspace back into teaching (§4.2, §5.4).
+  app.post("/workspaces/:id/resume", async (req, reply) => {
+    const ws = service.resumeSession(idOf(req.params));
+    return ws ?? notFound(reply);
+  });
 }
 
 // --- Helpers ---------------------------------------------------------------
