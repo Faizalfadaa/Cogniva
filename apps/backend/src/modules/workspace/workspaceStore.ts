@@ -29,6 +29,7 @@ export class WorkspaceStore {
   private messages = new Map<string, ChatMessage[]>();
   private reports = new Map<string, EvaluationReport>();
   private pdfs = new Map<string, StoredBlob>();
+  private references = new Map<string, string>();
 
   // --- Workspaces -------------------------------------------------------
 
@@ -114,6 +115,17 @@ export class WorkspaceStore {
 
   getPdf(workspaceId: string): StoredBlob | undefined {
     return this.pdfs.get(workspaceId);
+  }
+
+  // --- Reference material (text extracted from the uploaded PDF) ---------
+  // Read only by the Evaluator as the answer key (§1.4); never by the Learner.
+
+  saveReference(workspaceId: string, text: string): void {
+    this.references.set(workspaceId, text);
+  }
+
+  getReference(workspaceId: string): string | undefined {
+    return this.references.get(workspaceId);
   }
 }
 

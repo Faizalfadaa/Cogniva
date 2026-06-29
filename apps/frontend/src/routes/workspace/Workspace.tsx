@@ -50,6 +50,7 @@ export default function WorkspacePage() {
   const { userName } = useUserStore()
   const navigate = useNavigate()
   const [finishingSession, setFinishingSession] = useState(false)
+  const [uploadingPdf, setUploadingPdf] = useState(false)
 
   const handleFinishSession = useCallback(async () => {
     if (!id) return
@@ -62,6 +63,22 @@ export default function WorkspacePage() {
       setFinishingSession(false)
     }
   }, [bridge, id, navigate])
+
+  const handleUploadPdf = useCallback(
+    async (file: File) => {
+      if (!id) return
+      setUploadingPdf(true)
+      try {
+        const ws = await bridge.uploadWorkspacePdf(id, file)
+        setWorkspace(ws)
+      } catch (err) {
+        console.error('[Workspace] uploadWorkspacePdf failed', err)
+      } finally {
+        setUploadingPdf(false)
+      }
+    },
+    [bridge, id]
+  )
 
   // Resolve first messages with userName substitution — stable across renders
   const seedMessages = useMemo(
@@ -94,6 +111,9 @@ export default function WorkspacePage() {
         onContinueEditing={session.continueEditing}
         onFinishSession={handleFinishSession}
         finishingSession={finishingSession}
+        onUploadPdf={handleUploadPdf}
+        pdfUrl={workspace?.pdfUrl}
+        uploadingPdf={uploadingPdf}
       />
 
       <div className={styles.workspaceBody}>

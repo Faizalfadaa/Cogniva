@@ -1,8 +1,8 @@
 /** Orchestrator tests (Architecture Document §3.3, §5.1) — one full teaching turn. */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { VisionAgent } from "../src/agents/index.js";
+import { LearnerAgent, VisionAgent } from "../src/agents/index.js";
 import { utcNowIso } from "../src/contracts/common.js";
 import type { LearnerResponse, LearnerState } from "../src/contracts/learner.js";
 import type { Session } from "../src/contracts/session.js";
@@ -95,6 +95,26 @@ describe("orchestrator", () => {
 
     expect(result.kind).toBe("learner");
     expect(session.turnCount).toBe(1);
+  });
+
+  it("lets the Learner use the reread_board tool mid-turn (agentic loop)", async () => {
+    const session = newSession();
+    const topic = topics.get("topic_photosynthesis")!;
+    const vision = new VisionAgent({ confidenceThreshold: 0.6 });
+    const interpret = vi.spyOn(vision, "interpret");
+    // Real Learner in mock mode investigates an unclear term before asking.
+    const orch = new Orchestrator({ learner: new LearnerAgent({ forceMock: true }), vision });
+
+    const result = await orch.runTeachingTurn(session, topic, {
+      image: "base64data",
+      typedText: null,
+    });
+
+    expect(result.kind).toBe("learner");
+    expect(result.response?.text.trim()).toBeTruthy();
+    // Vision ran twice: the initial board read + one directed re-read the
+    // Learner requested through its injected tool.
+    expect(interpret.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it("requests confirmation when there is neither image nor typed text", async () => {

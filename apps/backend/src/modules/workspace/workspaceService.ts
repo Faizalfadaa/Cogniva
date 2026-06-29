@@ -15,7 +15,13 @@
  *     without a strict answer key (and falls back deterministically offline).
  */
 
-import { LearnerAgent, getEvaluator, seedLearnerState, type TranscriptTurn } from "../../agents/index.js";
+import {
+  LearnerAgent,
+  getEvaluator,
+  seedLearnerState,
+  seedLearnerStateFromEvaluation,
+  type TranscriptTurn,
+} from "../../agents/index.js";
 import * as config from "../../config/index.js";
 import type { VisionInterpretation } from "../../contracts/board.js";
 import { utcNowIso } from "../../contracts/common.js";
@@ -88,12 +94,40 @@ export function saveDraft(
   return touch(ws);
 }
 
-export function setPdf(id: string, data: Buffer, mime: string): Workspace | undefined {
+export async function setPdf(
+  id: string,
+  data: Buffer,
+  mime: string,
+): Promise<Workspace | undefined> {
   const ws = workspaces.get(id);
   if (!ws) return undefined;
   workspaces.savePdf(id, { data, mime });
   ws.pdfUrl = `/api/workspaces/${id}/pdf`;
+
+  // Extract the text and keep it as this session's reference material — the
+  // answer key the Evaluator grades against (§3.7). It flows ONLY to the
+  // Evaluator (via synthTopic), never to the Learner (§1.4). Extraction failures
+  // (e.g. a scanned/image-only PDF) are non-fatal: the session has no reference.
+  const text = await extractPdfText(data);
+  if (text) workspaces.saveReference(id, text);
+
   return touch(ws);
+}
+
+/** Pull plain text out of a PDF buffer. Loaded lazily so the heavy PDF engine is
+ * only imported when a document is actually uploaded. */
+async function extractPdfText(data: Buffer): Promise<string> {
+  try {
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const pdf = await getDocumentProxy(new Uint8Array(data));
+    const { text } = await extractText(pdf, { mergePages: true });
+    const merged = Array.isArray(text) ? text.join("\n") : text;
+    // Cap the length to keep the Evaluator prompt bounded.
+    return merged.replace(/[ \t]+\n/g, "\n").trim().slice(0, 20000);
+  } catch (err) {
+    console.error("[workspace] PDF text extraction failed:", err);
+    return "";
+  }
 }
 
 // --- Teaching checkpoints --------------------------------------------------
@@ -231,6 +265,43 @@ export function getReport(id: string) {
   return workspaces.getReport(id);
 }
 
+/**
+ * Resume a finished workspace back into teaching (§4.2, §5.4). The transcript and
+ * turn count carry over, and prior evaluations stay as history (the next finish
+ * appends a fresh one). The Learner's mental model is re-seeded from the last
+ * round's evaluation so the student now targets the user's real weak spots
+ * (§4.3). Only a Completed workspace resumes.
+ */
+export function resumeSession(id: string): Workspace | undefined {
+  const ws = workspaces.get(id);
+  if (!ws) return undefined;
+  if (ws.state !== "Completed") return ws; // nothing to resume
+
+  const session = requireSession(ws);
+  // EVALUATED/ENDED -> TEACHING. Direct move (the service owns workspace state),
+  // keeping turnCount and evaluationIds intact.
+  session.status = "TEACHING";
+  session.endedAt = undefined;
+
+  // Adaptive seeding (§4.3): re-aim the Learner at the weak spots the last
+  // evaluation found, instead of carrying the old static misconceptions — so the
+  // next round the student probes what the user actually got wrong/missed.
+  const evaluation = sessions.getLatestEvaluation(session.sessionId);
+  if (evaluation) {
+    sessions.saveLearnerState(
+      seedLearnerStateFromEvaluation(
+        session.sessionId,
+        evaluation,
+        sessions.getLearnerState(session.sessionId),
+      ),
+    );
+  }
+
+  sessions.saveSession(session);
+  ws.state = "Teaching";
+  return touch(ws);
+}
+
 // --- Internals -------------------------------------------------------------
 
 /** Run one teaching turn through the orchestrator, never pausing for confirmation. */
@@ -366,7 +437,8 @@ function synthTopic(ws: Workspace): Topic {
     topicId: ws.id,
     title: ws.title?.trim() || "Sesi tanpa judul",
     description: ws.description?.trim() || "",
-    referenceMaterial: "",
+    // Grounding: the uploaded PDF's text becomes the Evaluator's answer key.
+    referenceMaterial: workspaces.getReference(ws.id) ?? "",
     keyConcepts: [],
     commonMisconceptions: [],
     difficulty: "medium",

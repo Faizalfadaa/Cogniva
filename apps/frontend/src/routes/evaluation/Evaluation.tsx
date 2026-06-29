@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import type { WorkspaceDTO } from '../../dto/WorkspaceDTO'
 import type { EvaluationReportDTO } from '../../dto/EvaluationReportDTO'
@@ -85,6 +85,12 @@ export default function EvaluationPage() {
   }
 
   if (loading || !workspace) return null
+
+  // A resumed workspace is back in Teaching — the debrief no longer applies
+  // (e.g. landing here via the browser back button after "Lanjutkan Sesi").
+  if (workspace.state === 'Teaching' || workspace.state === 'Draft') {
+    return <Navigate to={`/workspace/${id}`} replace />
+  }
 
   // ── Processing screen ─────────────────────────────────────────────────────
   if (workspace.state === 'Evaluating' || (workspace.state === 'Completed' && !report)) {

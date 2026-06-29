@@ -54,7 +54,7 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
   app.post("/workspaces/:id/pdf", async (req, reply) => {
     const parsed = uploadPdfSchema.safeParse(req.body);
     if (!parsed.success) return badRequest(reply, "Invalid pdf payload");
-    const ws = service.setPdf(
+    const ws = await service.setPdf(
       idOf(req.params),
       Buffer.from(parsed.data.data, "base64"),
       parsed.data.mime,
@@ -113,6 +113,12 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     const report = service.getReport(idOf(req.params));
     if (!report) return reply.code(404).send({ detail: "Report not ready yet" });
     return report;
+  });
+
+  // Resume a finished workspace back into teaching (§4.2, §5.4).
+  app.post("/workspaces/:id/resume", async (req, reply) => {
+    const ws = service.resumeSession(idOf(req.params));
+    return ws ?? notFound(reply);
   });
 }
 

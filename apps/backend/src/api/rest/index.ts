@@ -10,7 +10,12 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 
-import { getEvaluator, seedLearnerState, type TranscriptTurn } from "../../agents/index.js";
+import {
+  getEvaluator,
+  seedLearnerState,
+  seedLearnerStateFromEvaluation,
+  type TranscriptTurn,
+} from "../../agents/index.js";
 import { utcNowIso } from "../../contracts/common.js";
 import type { EvaluationResult } from "../../contracts/evaluation.js";
 import type { Session } from "../../contracts/session.js";
@@ -184,6 +189,19 @@ export async function restRoutes(app: FastifyInstance): Promise<void> {
     if (!session) return reply;
     if (!advance(session, RESUME, reply)) return reply;
     session.endedAt = undefined;
+
+    // Adaptive seeding (§4.3): re-aim the Learner at the weak spots the last
+    // round's evaluation surfaced, rather than carrying the static seed forward.
+    const latest = sessions.getLatestEvaluation(session.sessionId);
+    if (latest) {
+      sessions.saveLearnerState(
+        seedLearnerStateFromEvaluation(
+          session.sessionId,
+          latest,
+          sessions.getLearnerState(session.sessionId),
+        ),
+      );
+    }
     return sessions.saveSession(session);
   });
 
