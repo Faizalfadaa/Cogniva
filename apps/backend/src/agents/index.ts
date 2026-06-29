@@ -8,7 +8,7 @@
  */
 
 export { LearnerAgent, seedLearnerState } from "./learner/index.js";
-export type { RespondArgs } from "./learner/index.js";
+export type { LearnerTools, RespondArgs } from "./learner/index.js";
 export { VisionAgent } from "./vision/index.js";
 export { AsrAgent } from "./asr/index.js";
 export { EvaluatorAgent, getEvaluator, setEvaluator, runEvaluator } from "./evaluator/index.js";

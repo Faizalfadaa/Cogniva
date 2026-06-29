@@ -17,6 +17,9 @@ import type { VisionInterpretation } from "../../contracts/board.js";
 import type { LearnerResponse, LearnerState, Misc } from "../../contracts/learner.js";
 import type { SpeechTranscript } from "../../contracts/speech.js";
 import { runLearnerTurn } from "./learner.agent.js";
+import type { LearnerTools } from "./learner.types";
+
+export type { LearnerTools } from "./learner.types";
 
 const MAX_SEED_MISCONCEPTIONS = 3;
 
@@ -27,6 +30,8 @@ export interface RespondArgs {
   speech: SpeechTranscript | null;
   state: LearnerState;
   turnIndex: number;
+  /** Tools the orchestrator injects so the student can investigate (§2.3). */
+  tools?: LearnerTools;
 }
 
 /**
@@ -64,6 +69,7 @@ export class LearnerAgent {
     speech,
     state,
     turnIndex,
+    tools,
   }: RespondArgs): Promise<[LearnerResponse, LearnerState]> {
     const teachingText = [interpretation.transcribedText, speech?.transcript]
       .filter((text): text is string => Boolean(text && text.trim()))
@@ -71,7 +77,7 @@ export class LearnerAgent {
 
     const output = await runLearnerTurn(
       { sessionId: state.sessionId, turnIndex, teachingText, currentState: state },
-      { useMock: this.options.forceMock },
+      { useMock: this.options.forceMock, tools },
     );
 
     const response: LearnerResponse = {

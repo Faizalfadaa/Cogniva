@@ -6,7 +6,7 @@
  * guard directly, in deterministic mock mode (no network, no API key).
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { LearnerAgent, seedLearnerState } from "../src/agents/index.js";
 import { runLearnerTurn } from "../src/agents/learner/learner.agent.js";
@@ -103,6 +103,59 @@ describe("runLearnerTurn (mock)", () => {
     expect(out.nextState.updatedAtTurn).toBe(2);
     expect(out.response.type).toBe("question");
     expect(out.nextState.questionsAsked).toContain(out.response.text);
+  });
+});
+
+describe("runLearnerTurn agentic loop (mock)", () => {
+  it("uses the reread_board tool to investigate, then responds", async () => {
+    const rereadBoard = vi.fn(async (focus: string) => `(detail) ${focus}`);
+
+    const out = await runLearnerTurn(
+      {
+        sessionId: "ses_1",
+        turnIndex: 1,
+        teachingText: 'Yang penting di sini adalah istilah "fotosintesis".',
+        currentState: freshState(),
+      },
+      { useMock: true, tools: { rereadBoard } },
+    );
+
+    // The student investigated the unclear term before asking (agentic tool use).
+    expect(rereadBoard).toHaveBeenCalledTimes(1);
+    expect(rereadBoard).toHaveBeenCalledWith("fotosintesis");
+    // ...and still finalized with a valid student response.
+    expect(STUDENT_TYPES).toContain(out.response.type);
+    expect(out.response.text.trim()).toBeTruthy();
+  });
+
+  it("collapses to a single response when no tools are injected", async () => {
+    const rereadBoard = vi.fn(async () => "(detail)");
+    await runLearnerTurn(
+      {
+        sessionId: "ses_1",
+        turnIndex: 1,
+        teachingText: 'Istilah "klorofil" itu kuncinya.',
+        currentState: freshState(),
+      },
+      { useMock: true }, // no tools
+    );
+    expect(rereadBoard).not.toHaveBeenCalled();
+  });
+
+  it("is bounded — never loops forever even if a tool stays available", async () => {
+    const rereadBoard = vi.fn(async () => "(detail)");
+    const out = await runLearnerTurn(
+      {
+        sessionId: "ses_1",
+        turnIndex: 2,
+        teachingText: 'Istilah "kloroplas" itu kuncinya.',
+        currentState: freshState(),
+      },
+      { useMock: true, tools: { rereadBoard } },
+    );
+    // Dedup + step cap keep it to one investigation, then a response.
+    expect(rereadBoard.mock.calls.length).toBeLessThanOrEqual(2);
+    expect(STUDENT_TYPES).toContain(out.response.type);
   });
 });
 

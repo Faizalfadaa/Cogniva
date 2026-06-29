@@ -1,9 +1,12 @@
 import {
+  LearnerAction,
+  LearnerActionKind,
   LearnerAgentInput,
   LearnerAgentOutput,
   LearnerLLMOutput,
   LearnerResponse,
   LearnerResponseDerivedFrom,
+  LearnerResponseStrategy,
   LearnerResponseType,
   LearnerState,
   Misconception
@@ -15,6 +18,39 @@ const allowedResponseTypes: LearnerResponseType[] = [
   "acknowledgment",
   "paraphrase"
 ];
+
+const allowedActionKinds: LearnerActionKind[] = [
+  "respond",
+  "reread_board",
+  "recall_earlier"
+];
+
+const allowedStrategies: LearnerResponseStrategy[] = [
+  "ask_clarification",
+  "request_example",
+  "challenge_claim",
+  "paraphrase",
+  "attempt_problem"
+];
+
+/**
+ * Coerce the model's chosen action into a safe shape. Unknown/missing -> the
+ * terminal "respond" so a malformed action can never stall the agent loop.
+ */
+export function normalizeAction(raw: unknown): LearnerAction {
+  const a = (raw ?? {}) as Partial<LearnerAction>;
+  const kind = allowedActionKinds.includes(a.kind as LearnerActionKind)
+    ? (a.kind as LearnerActionKind)
+    : "respond";
+  return {
+    kind,
+    focus: typeof a.focus === "string" ? a.focus.trim() : undefined,
+    query: typeof a.query === "string" ? a.query.trim() : undefined,
+    strategy: allowedStrategies.includes(a.strategy as LearnerResponseStrategy)
+      ? (a.strategy as LearnerResponseStrategy)
+      : undefined
+  };
+}
 
 const allowedDerivedFrom: LearnerResponseDerivedFrom[] = [
   "gap",

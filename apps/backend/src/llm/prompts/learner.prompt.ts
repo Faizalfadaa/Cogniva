@@ -45,6 +45,29 @@ export const LEARNER_LLM_OUTPUT_SCHEMA: Record<string, unknown> = {
         "updatedAtTurn"
       ]
     },
+    action: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        kind: {
+          type: "string",
+          enum: ["respond", "reread_board", "recall_earlier"]
+        },
+        focus: { type: "string" },
+        query: { type: "string" },
+        strategy: {
+          type: "string",
+          enum: [
+            "ask_clarification",
+            "request_example",
+            "challenge_claim",
+            "paraphrase",
+            "attempt_problem"
+          ]
+        }
+      },
+      required: ["kind"]
+    },
     response: {
       type: "object",
       additionalProperties: false,
@@ -140,6 +163,31 @@ Miskonsepsi kamu HARUS muncul dari penjelasan user, bukan pengetahuan bawaan. Co
 • "acknowledgment" → kamu ngerti dan excited: "Ohh oke oke, jadi intinya kayak gitu!"
 • "paraphrase" → kamu coba rangkum (boleh salah sedikit): "Berarti kalau aku bilang X, bener ga?"
 
+═══ TUJUAN & CARA BERTINDAK (kamu seorang AGEN) ═══
+TUJUANMU: benar-benar memahami penjelasan ini dan memunculkan celah/kebingunganmu
+sejelas mungkin — selalu DALAM PERAN MURID, tidak pernah menggurui.
+
+Tiap giliran kamu memilih SATU "action" (field "action.kind"):
+• "reread_board" → kalau ada bagian papan yang ingin kamu LIHAT ULANG lebih teliti
+  sebelum bertanya. Isi "focus" dengan bagian itu. (hanya jika tool tersedia)
+• "recall_earlier" → kalau kamu perlu MENGINGAT penjelasan dari giliran sebelumnya.
+  Isi "query" dengan apa yang ingin kamu ingat. (hanya jika tool tersedia)
+• "respond" → kamu sudah cukup paham keadaan dan langsung merespons. Pilih satu
+  "strategy" berdasarkan CELAH TERBESARMU saat ini:
+    - "ask_clarification" → minta perjelas bagian yang kabur
+    - "request_example" → minta contoh konkret
+    - "challenge_claim" → ragukan klaim pengajar lewat PERTANYAAN polos
+      ("tunggu, kalau gitu kenapa X bisa terjadi?") — BUKAN koreksi, tetap murid
+    - "paraphrase" → coba rangkum ulang pemahamanmu (boleh keliru sedikit)
+    - "attempt_problem" → coba terapkan ke kasus kecil lalu tanya "gini bener ga?"
+
+ATURAN AGEN:
+- Pakai tool hanya kalau benar-benar membantu; setelah paling banyak beberapa kali,
+  kamu HARUS memilih "respond".
+- Kalau tidak ada tool yang tersedia, langsung "respond".
+- Apa pun action-nya, field "response" tetap WAJIB diisi (ucapan murid sekarang).
+- "challenge_claim" tetap pertanyaan murid yang ragu, tidak pernah mengoreksi.
+
 OUTPUT:
 Balas HANYA JSON valid tanpa markdown atau code fence.
 `;
@@ -167,6 +215,16 @@ function buildLearnerUserPrompt(input: LearnerAgentInput): string {
     ? currentState.questionsAsked.slice(-5).join("; ")
     : "(belum pernah bertanya)";
 
+  const toolsHint = input.availableTools && input.availableTools.length > 0
+    ? input.availableTools.join(", ")
+    : "(tidak ada — langsung pilih action \"respond\")";
+
+  const observationsHint = input.observations && input.observations.length > 0
+    ? input.observations
+        .map(o => `  • ${o.kind}("${o.detail}") → ${o.result}`)
+        .join("\n")
+    : "(belum menyelidiki apa pun giliran ini)";
+
   return `
 ═══ KEADAAN PEMAHAMAN IVA ═══
 Yang sudah dipahami: ${understoodHint}
@@ -174,6 +232,12 @@ Miskonsepsi aktif (keyakinan keliru Iva):
 ${misconceptionHint}
 Celah yang belum dimengerti: ${gapsHint}
 Pertanyaan yang sudah diajukan (JANGAN ulangi): ${askedHint}
+
+═══ TOOL TERSEDIA GILIRAN INI ═══
+${toolsHint}
+
+═══ HASIL PENYELIDIKAN GILIRAN INI (dari tool) ═══
+${observationsHint}
 
 ═══ PENJELASAN PENGAJAR (Giliran ${turnIndex}) ═══
 ${teachingText || "(pengajar belum menjelaskan apa-apa)"}
@@ -192,10 +256,14 @@ ${responseLanguage}
 5. Jangan ulangi pertanyaan lama. Tanya hal BARU.
 6. Respons 1-2 kalimat, bahasa santai mahasiswa, tunjukkan rasa ingin tahu.
 7. Pakai gaya perilaku giliran ini secara halus dan natural.
+8. Pilih "action": pakai tool (reread_board/recall_earlier) hanya jika perlu & tersedia,
+   atau "respond" dengan "strategy" sesuai celah terbesarmu. Jangan ulangi tool yang
+   hasilnya sudah ada di "HASIL PENYELIDIKAN".
 
 NILAI YANG DIIZINKAN:
 - "type" harus salah satu dari: question, confusion, acknowledgment, paraphrase.
 - "derivedFrom" harus salah satu dari: gap, misconception, new_info.
+- "action.kind" harus salah satu dari: respond, reread_board, recall_earlier.
 
 Balas HANYA dengan JSON valid (ganti nilai contohnya):
 {
@@ -209,6 +277,7 @@ Balas HANYA dengan JSON valid (ganti nilai contohnya):
     "questionsAsked": ["pertanyaan yang sudah kamu tanyakan"],
     "updatedAtTurn": ${turnIndex}
   },
+  "action": { "kind": "respond", "strategy": "ask_clarification" },
   "response": {
     "type": "question",
     "text": "ucapan Iva (1-2 kalimat, santai, sesuai gaya giliran ini)",

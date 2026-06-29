@@ -14,7 +14,7 @@
  * pauses and asks the user instead of running the Learner.
  */
 
-import { LearnerAgent, VisionAgent, AsrAgent, seedLearnerState, type RespondArgs } from "../agents/index.js";
+import { LearnerAgent, VisionAgent, AsrAgent, seedLearnerState, type LearnerTools, type RespondArgs } from "../agents/index.js";
 import type { AudioClip } from "../agents/asr/asr.types.js";
 import * as config from "../config/index.js";
 import type { BoardSnapshot, VisionInterpretation } from "../contracts/board.js";
@@ -128,6 +128,29 @@ export class Orchestrator {
         topicTitle: topic.title,
       });
 
+    // Tools the student may use to investigate before asking (§3.6). The
+    // orchestrator owns the cross-agent calls (§2.3): the Learner only declares
+    // intent ("re-read this", "recall that") and these closures execute it.
+    const tools: LearnerTools = {
+      rereadBoard: async (focus) => {
+        try {
+          const focused = await this.vision.interpret(
+            snapshot,
+            null,
+            `${topic.title} — fokus baca ulang: ${focus}`,
+          );
+          return (
+            focused.transcribedText?.trim() ||
+            "(tidak ada detail tambahan yang terbaca di bagian itu)"
+          );
+        } catch {
+          return "(gagal membaca ulang papan)";
+        }
+      },
+      recallEarlier: (query) =>
+        Promise.resolve(recallFromTranscript(session.sessionId, query)),
+    };
+
     const [response, newState] = await this.learner.respond({
       topicTitle: topic.title,
       topicDescription: topic.description,
@@ -135,6 +158,7 @@ export class Orchestrator {
       speech,
       state,
       turnIndex,
+      tools,
     });
 
     sessions.saveResponse(response);
@@ -155,6 +179,29 @@ export class Orchestrator {
 
     return { kind: "learner", interpretation, speech: speech ?? undefined, response };
   }
+}
+
+/**
+ * The student's "recall_earlier" tool: look back over the turns already taught
+ * this session for the one most relevant to its query. Reads only the user's own
+ * prior explanations (never the answer key, §1.4).
+ */
+function recallFromTranscript(sessionId: string, query: string): string {
+  const turns = sessions.listTurns(sessionId);
+  if (turns.length === 0) return "(belum ada penjelasan sebelumnya untuk diingat)";
+
+  const summarize = (t: (typeof turns)[number]): string =>
+    [t.interpretation.transcribedText, t.speechTranscript?.transcript]
+      .filter(Boolean)
+      .join(" ");
+
+  const keyword = query.toLowerCase().split(/\s+/).find((w) => w.length >= 4) ?? "";
+  const hit = keyword
+    ? turns.find((t) => summarize(t).toLowerCase().includes(keyword))
+    : undefined;
+  const chosen = hit ?? turns[turns.length - 1];
+
+  return `Giliran ${chosen.turnIndex}: ${summarize(chosen).slice(0, 280) || "(tidak ada teks)"}`;
 }
 
 // --- Module-level singleton (built from config, overridable in tests) ------

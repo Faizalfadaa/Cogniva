@@ -25,6 +25,7 @@ export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
 
     return {
       nextState,
+      action: { kind: "respond", strategy: "ask_clarification" },
       response: {
         type: "question",
         text: question,
@@ -50,8 +51,31 @@ export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
     addUnique(nextState.questionsAsked, responseText);
   }
 
+  // Agentic demo (offline): on the first step, if a directed board re-read is
+  // available and there's an unclear term, investigate it before asking — so the
+  // tool loop is exercised even without an LLM. After observing (or with no tool
+  // available) the student responds normally.
+  const canReread = (input.availableTools ?? []).includes("reread_board");
+  const alreadyInvestigated = (input.observations ?? []).length > 0;
+  if (unclearTerm && canReread && !alreadyInvestigated) {
+    return {
+      nextState,
+      action: { kind: "reread_board", focus: unclearTerm },
+      response: {
+        type: "question",
+        text: responseText,
+        targetConcept: unclearTerm,
+        derivedFrom: "gap"
+      }
+    };
+  }
+
   return {
     nextState,
+    action: {
+      kind: "respond",
+      strategy: unclearTerm ? "ask_clarification" : "paraphrase"
+    },
     response: {
       type: unclearTerm ? "question" : "paraphrase",
       text: responseText,
