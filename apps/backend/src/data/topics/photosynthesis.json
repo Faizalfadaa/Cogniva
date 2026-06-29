@@ -1,0 +1,22 @@
+{
+  "topicId": "topic_photosynthesis",
+  "title": "Photosynthesis",
+  "description": "How plants turn light, water, and CO2 into sugar and oxygen.",
+  "referenceMaterial": "# Photosynthesis\n\nPhotosynthesis is the process by which plants, algae, and some bacteria convert light energy into chemical energy stored in glucose.\n\n## Summary equation\n\n6 CO2 + 6 H2O + light -> C6H12O6 + 6 O2\n\nThat is: six molecules of carbon dioxide and six molecules of water, powered by light energy, produce one molecule of glucose and six molecules of oxygen.\n\n## Two main stages\n\n1. **Light reactions** — occur in the thylakoid membranes of the chloroplast. Chlorophyll absorbs light; water is split (photolysis), releasing O2; energy is stored as ATP and NADPH. The oxygen we breathe comes from splitting WATER, not from CO2.\n2. **Dark reactions (Calvin cycle)** — occur in the stroma of the chloroplast and do NOT require light directly; they use the ATP and NADPH from the light reactions to fix CO2 into glucose.\n\n## The role of chlorophyll\n\nChlorophyll is the green pigment that absorbs red and blue light and reflects green — which is why leaves look green. Chlorophyll only captures light energy; it is not a raw material that becomes sugar.\n\n## Factors affecting the rate\n\nLight intensity, CO2 concentration, and temperature. Beyond a certain point the rate saturates even if more light is added.",
+  "keyConcepts": [
+    "Photosynthesis converts light energy into chemical energy (glucose)",
+    "Inputs: CO2 + water + light; outputs: glucose + oxygen",
+    "The oxygen released comes from splitting water, not from CO2",
+    "The light reactions produce ATP & NADPH in the thylakoids",
+    "The Calvin cycle fixes CO2 into glucose in the stroma",
+    "Chlorophyll absorbs light but is not a raw material for sugar"
+  ],
+  "commonMisconceptions": [
+    "The oxygen released comes from CO2 rather than from water",
+    "The dark reactions only happen at night or always in the absence of light",
+    "Plants only photosynthesize and never respire",
+    "Chlorophyll is the substance that is turned into sugar",
+    "Photosynthesis and respiration are exactly reverse processes that cancel each other out"
+  ],
+  "difficulty": "easy"
+}
