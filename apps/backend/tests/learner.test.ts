@@ -8,7 +8,8 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { LearnerAgent, seedLearnerState } from "../src/agents/index.js";
+import { LearnerAgent, seedLearnerState, seedLearnerStateFromEvaluation } from "../src/agents/index.js";
+import type { EvaluationResult } from "../src/contracts/evaluation.js";
 import { runLearnerTurn } from "../src/agents/learner/learner.agent.js";
 import {
   createFallbackOutput,
@@ -63,6 +64,57 @@ describe("seedLearnerState", () => {
       topicTitle: "T",
     });
     expect(state.activeMisconceptions).toHaveLength(3);
+  });
+});
+
+describe("seedLearnerStateFromEvaluation (adaptive resume)", () => {
+  function evalResult(findings: EvaluationResult["findings"], improvements: string[] = []): EvaluationResult {
+    return {
+      evaluationId: "ev_1",
+      sessionId: "ses_1",
+      score: 60,
+      findings,
+      summary: "ringkasan",
+      strengths: [],
+      improvements,
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    };
+  }
+
+  it("re-aims the Learner at the user's weak spots from the last evaluation", () => {
+    const seeded = seedLearnerStateFromEvaluation(
+      "ses_1",
+      evalResult(
+        [
+          { category: "CORRECT", concept: "Definisi dasar", detail: "tersampaikan", evidenceTurnIndex: 0 },
+          { category: "WRONG", concept: "Arah reaksi", detail: "membalik sebab dan akibat", evidenceTurnIndex: 1 },
+          { category: "MISSED", concept: "Peran cahaya", detail: "belum dibahas", evidenceTurnIndex: null },
+        ],
+        ["Bahas peran enzim"],
+      ),
+    );
+
+    // CORRECT -> understood (won't be re-probed)
+    expect(seeded.understoodConcepts).toContain("Definisi dasar");
+    // WRONG -> active misconception to correct by re-teaching
+    expect(seeded.activeMisconceptions).toEqual([
+      { concept: "Arah reaksi", belief: "membalik sebab dan akibat" },
+    ]);
+    // MISSED/CONFUSING + improvements -> open gaps to ask about
+    expect(seeded.openGaps).toEqual(expect.arrayContaining(["Peran cahaya", "Bahas peran enzim"]));
+  });
+
+  it("keeps the carried-over memory when the evaluation has no findings", () => {
+    const previous = {
+      sessionId: "ses_1",
+      understoodConcepts: ["X"],
+      activeMisconceptions: [{ concept: "Y", belief: "z" }],
+      openGaps: ["g"],
+      questionsAsked: ["q"],
+      updatedAtTurn: 3,
+    };
+    const seeded = seedLearnerStateFromEvaluation("ses_1", evalResult([]), previous);
+    expect(seeded).toEqual(previous);
   });
 });
 

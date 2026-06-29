@@ -7,7 +7,7 @@
  * real call through the centralized Gemini wrapper and falls back gracefully.
  */
 
-export { LearnerAgent, seedLearnerState } from "./learner/index.js";
+export { LearnerAgent, seedLearnerState, seedLearnerStateFromEvaluation } from "./learner/index.js";
 export type { LearnerTools, RespondArgs } from "./learner/index.js";
 export { VisionAgent } from "./vision/index.js";
 export { AsrAgent } from "./asr/index.js";

@@ -15,7 +15,13 @@
  *     without a strict answer key (and falls back deterministically offline).
  */
 
-import { LearnerAgent, getEvaluator, seedLearnerState, type TranscriptTurn } from "../../agents/index.js";
+import {
+  LearnerAgent,
+  getEvaluator,
+  seedLearnerState,
+  seedLearnerStateFromEvaluation,
+  type TranscriptTurn,
+} from "../../agents/index.js";
 import * as config from "../../config/index.js";
 import type { VisionInterpretation } from "../../contracts/board.js";
 import { utcNowIso } from "../../contracts/common.js";
@@ -232,10 +238,11 @@ export function getReport(id: string) {
 }
 
 /**
- * Resume a finished workspace back into teaching (§4.2, §5.4). The transcript,
- * turn count, and the Learner's mental model are all preserved — the student
- * keeps remembering what was taught — and prior evaluations stay as history; the
- * next finish appends a fresh one. Only a Completed workspace resumes.
+ * Resume a finished workspace back into teaching (§4.2, §5.4). The transcript and
+ * turn count carry over, and prior evaluations stay as history (the next finish
+ * appends a fresh one). The Learner's mental model is re-seeded from the last
+ * round's evaluation so the student now targets the user's real weak spots
+ * (§4.3). Only a Completed workspace resumes.
  */
 export function resumeSession(id: string): Workspace | undefined {
   const ws = workspaces.get(id);
@@ -244,11 +251,25 @@ export function resumeSession(id: string): Workspace | undefined {
 
   const session = requireSession(ws);
   // EVALUATED/ENDED -> TEACHING. Direct move (the service owns workspace state),
-  // keeping turnCount, LearnerState, and evaluationIds intact.
+  // keeping turnCount and evaluationIds intact.
   session.status = "TEACHING";
   session.endedAt = undefined;
-  sessions.saveSession(session);
 
+  // Adaptive seeding (§4.3): re-aim the Learner at the weak spots the last
+  // evaluation found, instead of carrying the old static misconceptions — so the
+  // next round the student probes what the user actually got wrong/missed.
+  const evaluation = sessions.getLatestEvaluation(session.sessionId);
+  if (evaluation) {
+    sessions.saveLearnerState(
+      seedLearnerStateFromEvaluation(
+        session.sessionId,
+        evaluation,
+        sessions.getLearnerState(session.sessionId),
+      ),
+    );
+  }
+
+  sessions.saveSession(session);
   ws.state = "Teaching";
   return touch(ws);
 }
