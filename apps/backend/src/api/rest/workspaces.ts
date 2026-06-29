@@ -54,7 +54,7 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
   app.post("/workspaces/:id/pdf", async (req, reply) => {
     const parsed = uploadPdfSchema.safeParse(req.body);
     if (!parsed.success) return badRequest(reply, "Invalid pdf payload");
-    const ws = service.setPdf(
+    const ws = await service.setPdf(
       idOf(req.params),
       Buffer.from(parsed.data.data, "base64"),
       parsed.data.mime,

@@ -94,12 +94,40 @@ export function saveDraft(
   return touch(ws);
 }
 
-export function setPdf(id: string, data: Buffer, mime: string): Workspace | undefined {
+export async function setPdf(
+  id: string,
+  data: Buffer,
+  mime: string,
+): Promise<Workspace | undefined> {
   const ws = workspaces.get(id);
   if (!ws) return undefined;
   workspaces.savePdf(id, { data, mime });
   ws.pdfUrl = `/api/workspaces/${id}/pdf`;
+
+  // Extract the text and keep it as this session's reference material — the
+  // answer key the Evaluator grades against (§3.7). It flows ONLY to the
+  // Evaluator (via synthTopic), never to the Learner (§1.4). Extraction failures
+  // (e.g. a scanned/image-only PDF) are non-fatal: the session has no reference.
+  const text = await extractPdfText(data);
+  if (text) workspaces.saveReference(id, text);
+
   return touch(ws);
+}
+
+/** Pull plain text out of a PDF buffer. Loaded lazily so the heavy PDF engine is
+ * only imported when a document is actually uploaded. */
+async function extractPdfText(data: Buffer): Promise<string> {
+  try {
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const pdf = await getDocumentProxy(new Uint8Array(data));
+    const { text } = await extractText(pdf, { mergePages: true });
+    const merged = Array.isArray(text) ? text.join("\n") : text;
+    // Cap the length to keep the Evaluator prompt bounded.
+    return merged.replace(/[ \t]+\n/g, "\n").trim().slice(0, 20000);
+  } catch (err) {
+    console.error("[workspace] PDF text extraction failed:", err);
+    return "";
+  }
 }
 
 // --- Teaching checkpoints --------------------------------------------------
@@ -409,7 +437,8 @@ function synthTopic(ws: Workspace): Topic {
     topicId: ws.id,
     title: ws.title?.trim() || "Sesi tanpa judul",
     description: ws.description?.trim() || "",
-    referenceMaterial: "",
+    // Grounding: the uploaded PDF's text becomes the Evaluator's answer key.
+    referenceMaterial: workspaces.getReference(ws.id) ?? "",
     keyConcepts: [],
     commonMisconceptions: [],
     difficulty: "medium",
