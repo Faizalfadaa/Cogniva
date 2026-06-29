@@ -32,7 +32,13 @@ const teacherLikePhrases = [
   "definisi resminya",
   "mari kita bahas",
   "dapat disimpulkan bahwa",
-  "konsep ini sebenarnya"
+  "konsep ini sebenarnya",
+  "perlu diketahui bahwa",
+  "secara ilmiah",
+  "menurut referensi",
+  "faktanya adalah",
+  "izinkan saya jelaskan",
+  "saya akan menjelaskan"
 ];
 
 export function normalizeLearnerOutput(
