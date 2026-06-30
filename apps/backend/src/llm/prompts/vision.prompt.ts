@@ -65,6 +65,11 @@ ATURAN PENTING:
 4. Gunakan topik sebagai konteks untuk membantu membaca tulisan yang
    mirip-mirip, tapi jangan memaksakan bila gambar tidak mendukungnya.
 5. Balas HANYA dengan JSON valid sesuai schema yang diberikan.
+6. Tulis 'content' dan 'location' tiap elemen SINGKAT (beberapa kata, bukan
+   kalimat penuh) -- misal "6CO2+6H2O->C6H12O6+6O2" bukan "persamaan kimia
+   yang menunjukkan reaksi karbon dioksida dan air menjadi glukosa dan
+   oksigen". Papan yang padat (banyak elemen) tetap harus pas dalam satu
+   balasan; keringkasan per elemen menjaga itu tanpa mengurangi makna.
 `;
 
 export function buildVisionMessages(input: VisionAgentInput): AIMessage[] {

@@ -49,6 +49,19 @@ export const VISION_MODEL: string =
   process.env.COGNIVA_VISION_MODEL ?? "gemini-2.5-flash";
 
 /**
+ * Vision's own output-token budget, separate from the shared LLM_MAX_TOKENS
+ * (2048) used by Learner/ASR/Evaluator. A dense whiteboard can have 20+
+ * elements, each needing kind+content+confidence+location in the JSON
+ * response -- 2048 was observed truncating mid-string on a busy board
+ * (photosynthesis diagram with two staged sub-diagrams + factors list).
+ * Override with COGNIVA_VISION_MAX_TOKENS if even denser boards still
+ * truncate.
+ */
+export const VISION_MAX_TOKENS: number = num(
+  process.env.COGNIVA_VISION_MAX_TOKENS,
+  4096,
+);
+/**
  * Below this confidence the orchestrator asks the user to confirm/correct the
  * board reading instead of guessing (real Vision lands in M2).
  */
