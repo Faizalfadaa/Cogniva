@@ -53,7 +53,7 @@ export function useTeachingSession(
     const { document, image } = await handle.exportSnapshot()
 
     if (!image) {
-      // Kanvas masih kosong - gak ada yang berarti buat dikirim ke Vision, batalkan.
+      // Canvas is still empty - nothing meaningful to send to Vision, so cancel.
       setPending(false)
       setMode('editing')
       audio.start()

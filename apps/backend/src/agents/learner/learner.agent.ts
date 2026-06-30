@@ -103,12 +103,12 @@ async function runTool(
   }
   try {
     if (action.kind === "reread_board" && tools.rereadBoard) {
-      const result = await tools.rereadBoard(detail || "bagian yang belum jelas");
+      const result = await tools.rereadBoard(detail || "the unclear part");
       console.error(`[Learner] tool reread_board("${detail}")`);
       return { kind: action.kind, detail, result };
     }
     if (action.kind === "recall_earlier" && tools.recallEarlier) {
-      const result = await tools.recallEarlier(detail || "penjelasan sebelumnya");
+      const result = await tools.recallEarlier(detail || "the earlier explanation");
       console.error(`[Learner] tool recall_earlier("${detail}")`);
       return { kind: action.kind, detail, result };
     }

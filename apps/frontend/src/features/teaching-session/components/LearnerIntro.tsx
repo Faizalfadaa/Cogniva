@@ -20,7 +20,7 @@ export function LearnerIntro({ learner, userName, onDone }: LearnerIntroProps) {
   const [visibleMessages, setVisibleMessages] = useState<number[]>([])
   const [messageIndex, setMessageIndex] = useState(0)
 
-  const messages = resolveFirstMessages(learner, userName || 'kamu')
+  const messages = resolveFirstMessages(learner, userName || 'you')
 
   useEffect(() => {
     if (phase !== 'connecting') return

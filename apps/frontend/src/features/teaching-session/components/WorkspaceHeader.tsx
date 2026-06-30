@@ -51,7 +51,7 @@ function saveStatusLabel(status: TitleSaveStatus): string {
     case 'saved':
       return 'Saved'
     case 'error':
-      return 'Gagal menyimpan'
+      return 'Failed to save'
     default:
       return ''
   }
@@ -78,19 +78,19 @@ export function WorkspaceHeader({
   return (
     <header className={styles.header}>
       <div className={styles.headerLeft}>
-        <button className={styles.backBtn} onClick={() => navigate('/')} aria-label="Kembali ke Home">
+        <button className={styles.backBtn} onClick={() => navigate('/')} aria-label="Back to Home">
           ←
         </button>
 
-        {/* Placeholder "Untitled Document" - value tetap title asli (bisa kosong),
-            bukan ditulis ke value supaya gak ke-save sebagai judul literal kalau
-            user cuma klik tanpa ngetik apa-apa. */}
+        {/* "Untitled Document" is only a placeholder - the value stays the real
+            (possibly empty) title, not written into value, so it isn't saved as a
+            literal title if the user just clicks without typing anything. */}
         <input
           className={styles.titleInput}
           value={title}
           placeholder="Untitled Document"
           onChange={(e) => onTitleChange(e.target.value)}
-          aria-label="Judul workspace"
+          aria-label="Workspace title"
         />
 
         <span className={styles.saveStatus} aria-live="polite">
@@ -106,13 +106,13 @@ export function WorkspaceHeader({
               target="_blank"
               rel="noreferrer"
               style={{ ...pdfBtnStyle, textDecoration: 'none' }}
-              title="Lihat materi rujukan"
+              title="View reference material"
             >
-              📄 Materi terlampir
+              📄 Reference attached
             </a>
           )}
-          <label style={{ ...pdfBtnStyle, opacity: uploadingPdf ? 0.6 : 1 }} title="Upload materi rujukan (PDF) untuk menilai penjelasanmu">
-            {uploadingPdf ? 'Mengunggah…' : pdfUrl ? 'Ganti' : '📎 Materi rujukan (PDF)'}
+          <label style={{ ...pdfBtnStyle, opacity: uploadingPdf ? 0.6 : 1 }} title="Upload reference material (PDF) to ground your evaluation">
+            {uploadingPdf ? 'Uploading…' : pdfUrl ? 'Replace' : '📎 Reference (PDF)'}
             <input
               type="file"
               accept="application/pdf,.pdf"
@@ -130,15 +130,15 @@ export function WorkspaceHeader({
 
       <div className={styles.headerRight}>
         {isRecording && !micPermissionDenied && (
-          <span className={styles.micDot} title="Merekam audio" />
+          <span className={styles.micDot} title="Recording audio" />
         )}
         <button
           className={styles.finishBtn}
           onClick={onFinishSession}
           disabled={finishingSession || pending}
-          aria-label="Selesai mengajar"
+          aria-label="Finish teaching"
         >
-          {finishingSession ? 'Menyelesaikan...' : 'Finish Session'}
+          {finishingSession ? 'Finishing...' : 'Finish Session'}
         </button>
         <TeachButton mode={mode} pending={pending} onTeach={onTeach} onContinueEditing={onContinueEditing} />
       </div>

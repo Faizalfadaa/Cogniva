@@ -172,7 +172,7 @@ export function submitCheckpoint(
       });
     } catch (err) {
       console.error("[workspace] teaching turn failed:", err);
-      reply = "Hmm, aku agak bingung sama yang ini... bisa dijelasin ulang pelan-pelan?";
+      reply = "Hmm, I'm a little confused about this one... could you walk me through it again slowly?";
     }
     workspaces.updateCheckpoint(id, checkpoint.id, { learnerResponse: reply });
     workspaces.addMessage(id, learnerMessage(reply));
@@ -210,7 +210,7 @@ export function sendChatMessage(id: string, content: string): ChatMessage | unde
       reply = await runChatReply(ws, content);
     } catch (err) {
       console.error("[workspace] chat reply failed:", err);
-      reply = "Eh, maaf, aku nge-blank sebentar... boleh diulang?";
+      reply = "Oh, sorry, I blanked for a second there... could you say that again?";
     }
     workspaces.addMessage(id, learnerMessage(reply));
     touch(ws);
@@ -322,7 +322,7 @@ async function runTeachingTurn(
   // Low-confidence board reading would normally pause and ask the user, but the
   // workspace UI has no confirmation step — re-run trusting Vision's best guess.
   if (result.kind === "confirmation") {
-    const guess = result.interpretation?.transcribedText?.trim() || "Penjelasan di papan tulis";
+    const guess = result.interpretation?.transcribedText?.trim() || "The explanation on the whiteboard";
     result = await orchestrator.runTeachingTurn(session, topic, {
       image: null,
       audio: input.audio,
@@ -330,7 +330,7 @@ async function runTeachingTurn(
     });
   }
 
-  return result.response?.text ?? "Oke... lanjut deh, aku ikutin.";
+  return result.response?.text ?? "Okay... go on, I'm following.";
 }
 
 /** Drive the Learner persona for a free-text chat message (no teaching turn saved). */
@@ -435,7 +435,7 @@ function startTeaching(ws: Workspace): void {
 function synthTopic(ws: Workspace): Topic {
   return {
     topicId: ws.id,
-    title: ws.title?.trim() || "Sesi tanpa judul",
+    title: ws.title?.trim() || "Untitled session",
     description: ws.description?.trim() || "",
     // Grounding: the uploaded PDF's text becomes the Evaluator's answer key.
     referenceMaterial: workspaces.getReference(ws.id) ?? "",

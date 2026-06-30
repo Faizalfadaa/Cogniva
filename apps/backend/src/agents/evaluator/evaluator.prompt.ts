@@ -4,8 +4,8 @@
  * The Evaluator grades the QUALITY OF THE USER'S EXPLANATION (not the AI) against
  * the topic's reference material, turn by turn (§3.7). Categories are the
  * canonical English enum; the natural-language fields (summary, detail,
- * strengths, improvements) are written in Indonesian since that is the user's
- * language and the debrief screen renders them directly.
+ * strengths, improvements) are written in English and rendered directly on the
+ * debrief screen.
  */
 
 import type { EvaluatorInput } from "./types.js";
@@ -46,34 +46,35 @@ export const EVALUATOR_LLM_OUTPUT_SCHEMA: Record<string, unknown> = {
 };
 
 const evaluatorSystemPrompt = `
-Kamu adalah Evaluator dalam aplikasi Cogniva.
+You are the Evaluator in the Cogniva app.
 
-KONTEKS:
-Cogniva memakai prinsip "belajar dengan mengajar". User baru saja MENGAJARKAN
-sebuah topik kepada AI murid pemula. Tugasmu menilai KUALITAS PENJELASAN USER —
-bukan menilai si AI murid — dengan membandingkannya terhadap materi rujukan resmi.
+CONTEXT:
+Cogniva uses the "learning by teaching" principle. The user has just TAUGHT a
+topic to a beginner AI student. Your job is to assess the QUALITY OF THE USER'S
+EXPLANATION -- not to assess the AI student -- by comparing it against the
+official reference material.
 
-YANG DINILAI:
-- Seberapa benar dan lengkap penjelasan user dibanding materi rujukan.
-- Konsep kunci mana yang sudah tersampaikan, mana yang keliru, mana yang terlewat,
-  dan bagian mana yang membingungkan.
+WHAT TO ASSESS:
+- How correct and complete the user's explanation is versus the reference material.
+- Which key concepts were conveyed, which were wrong, which were missed, and which
+  parts were confusing.
 
-KATEGORI TEMUAN (pakai PERSIS salah satu nilai berikut, dalam huruf kapital):
-- CORRECT  : user menjelaskan sebuah konsep dengan benar.
-- WRONG    : user menyatakan sesuatu yang keliru atau salah konsep.
-- MISSED   : konsep kunci penting yang sama sekali tidak disinggung.
-- CONFUSING: penjelasan user ambigu, rancu, atau membingungkan.
+FINDING CATEGORIES (use EXACTLY one of these values, in uppercase):
+- CORRECT  : the user explained a concept correctly.
+- WRONG    : the user stated something incorrect or a misconception.
+- MISSED   : an important key concept that was never mentioned at all.
+- CONFUSING: the user's explanation was ambiguous, muddled, or confusing.
 
-ATURAN:
-- Nilai hanya berdasarkan transkrip dan materi rujukan yang diberikan.
-- Kutip evidenceTurnIndex dari transkrip untuk setiap temuan. Untuk MISSED yang
-  tidak punya giliran terkait, pakai evidenceTurnIndex 0.
-- "score" adalah bilangan bulat 0..100 yang mencerminkan kualitas keseluruhan.
-- Tulis "summary", "strengths", "improvements", dan "detail" dalam Bahasa
-  Indonesia yang jelas dan membangun.
+RULES:
+- Assess only based on the given transcript and reference material.
+- Cite evidenceTurnIndex from the transcript for each finding. For a MISSED item
+  with no related turn, use evidenceTurnIndex 0.
+- "score" is an integer 0..100 reflecting the overall quality.
+- Write "summary", "strengths", "improvements", and "detail" in clear,
+  constructive English.
 
 OUTPUT:
-- Balas HANYA JSON valid sesuai skema. Tanpa markdown, tanpa code fence.
+- Reply with ONLY valid JSON matching the schema. No markdown, no code fences.
 `.trim();
 
 export function buildEvaluatorMessages(input: EvaluatorInput): AIMessage[] {
@@ -86,33 +87,34 @@ export function buildEvaluatorMessages(input: EvaluatorInput): AIMessage[] {
 function buildEvaluatorUserPrompt(input: EvaluatorInput): string {
   const transcript = input.turns.length
     ? input.turns.map(renderTurn).join("\n\n")
-    : "(Tidak ada giliran mengajar yang terekam.)";
+    : "(No teaching turns were recorded.)";
 
   return `
-# Materi Rujukan (acuan kebenaran)
-${input.referenceMaterial || "(kosong)"}
+# Reference Material (source of truth)
+${input.referenceMaterial || "(empty)"}
 
-# Konsep Kunci yang Idealnya Tersampaikan
-${input.keyConcepts.length ? input.keyConcepts.map((c) => `- ${c}`).join("\n") : "(tidak ada)"}
+# Key Concepts That Should Ideally Be Conveyed
+${input.keyConcepts.length ? input.keyConcepts.map((c) => `- ${c}`).join("\n") : "(none)"}
 
-# Miskonsepsi Umum (waspadai jika muncul di penjelasan user)
-${input.commonMisconceptions.length ? input.commonMisconceptions.map((c) => `- ${c}`).join("\n") : "(tidak ada)"}
+# Common Misconceptions (watch for these in the user's explanation)
+${input.commonMisconceptions.length ? input.commonMisconceptions.map((c) => `- ${c}`).join("\n") : "(none)"}
 
-# Transkrip Sesi (giliran demi giliran)
+# Session Transcript (turn by turn)
 ${transcript}
 
-# Tugas
-Nilai kualitas penjelasan user terhadap materi rujukan. Kembalikan JSON sesuai
-skema: score (0..100), summary, strengths[], improvements[], dan findings[]
-dengan kategori CORRECT/WRONG/MISSED/CONFUSING beserta evidenceTurnIndex.
+# Task
+Assess the quality of the user's explanation against the reference material.
+Return JSON matching the schema: score (0..100), summary, strengths[],
+improvements[], and findings[] with category CORRECT/WRONG/MISSED/CONFUSING plus
+evidenceTurnIndex.
 `.trim();
 }
 
 function renderTurn(turn: EvaluatorInput["turns"][number]): string {
-  const lines = [`Giliran ${turn.turnIndex}:`];
-  if (turn.boardText?.trim()) lines.push(`  Papan/teks: ${turn.boardText.trim()}`);
-  if (turn.speech?.trim()) lines.push(`  Ucapan: ${turn.speech.trim()}`);
+  const lines = [`Turn ${turn.turnIndex}:`];
+  if (turn.boardText?.trim()) lines.push(`  Board/text: ${turn.boardText.trim()}`);
+  if (turn.speech?.trim()) lines.push(`  Speech: ${turn.speech.trim()}`);
   if (turn.learnerUtterance?.trim())
-    lines.push(`  Reaksi murid: ${turn.learnerUtterance.trim()}`);
+    lines.push(`  Student reaction: ${turn.learnerUtterance.trim()}`);
   return lines.join("\n");
 }

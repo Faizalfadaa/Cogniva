@@ -141,10 +141,10 @@ export class Orchestrator {
           );
           return (
             focused.transcribedText?.trim() ||
-            "(tidak ada detail tambahan yang terbaca di bagian itu)"
+            "(no additional detail could be read in that part)"
           );
         } catch {
-          return "(gagal membaca ulang papan)";
+          return "(failed to re-read the board)";
         }
       },
       recallEarlier: (query) =>
@@ -188,7 +188,7 @@ export class Orchestrator {
  */
 function recallFromTranscript(sessionId: string, query: string): string {
   const turns = sessions.listTurns(sessionId);
-  if (turns.length === 0) return "(belum ada penjelasan sebelumnya untuk diingat)";
+  if (turns.length === 0) return "(no earlier explanation to recall yet)";
 
   const summarize = (t: (typeof turns)[number]): string =>
     [t.interpretation.transcribedText, t.speechTranscript?.transcript]
@@ -201,7 +201,7 @@ function recallFromTranscript(sessionId: string, query: string): string {
     : undefined;
   const chosen = hit ?? turns[turns.length - 1];
 
-  return `Giliran ${chosen.turnIndex}: ${summarize(chosen).slice(0, 280) || "(tidak ada teks)"}`;
+  return `Turn ${chosen.turnIndex}: ${summarize(chosen).slice(0, 280) || "(no text)"}`;
 }
 
 // --- Module-level singleton (built from config, overridable in tests) ------

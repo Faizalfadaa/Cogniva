@@ -15,9 +15,9 @@ import type {
 } from "./vision.types.js";
 
 /**
- * Jalankan satu pembacaan papan. Dipanggil oleh VisionAgent (agents/vision/index.ts)
- * hanya ketika ada gambar untuk dibaca -- jalur typedText tetap memakai
- * jalan pintas tanpa model di VisionAgent, sesuai stub M1 yang sudah ada.
+ * Run one board reading. Called by VisionAgent (agents/vision/index.ts) only
+ * when there's an image to read -- the typedText path still uses the no-model
+ * shortcut inside VisionAgent, matching the existing M1 stub.
  */
 export async function runVisionTurn(
   input: VisionAgentInput,
@@ -45,12 +45,12 @@ export async function runVisionTurn(
 }
 
 /**
- * Jalur LLM nyata -- lewat pembungkus Gemini terpusat proyek (§7.3).
+ * Real LLM path -- through the project's centralized Gemini wrapper (§7.3).
  *
- * CATATAN INTEGRASI: ini butuh StructuredArgs.image, field yang BELUM ada
- * di llm/providers/gemini.ts saat ini (wrapper itu baru menangani teks,
- * dipakai Learner). Lihat GAPS_VISION.md untuk diff minimal yang diusulkan
- * agar wrapper bisa menerima gambar tanpa mengubah cara Learner memakainya.
+ * INTEGRATION NOTE: this needs StructuredArgs.image, a field that does NOT yet
+ * exist in llm/providers/gemini.ts (that wrapper currently only handles text,
+ * used by the Learner). See GAPS_VISION.md for the minimal proposed diff so the
+ * wrapper can accept an image without changing how the Learner uses it.
  */
 async function callRealAI(input: VisionAgentInput): Promise<Record<string, unknown>> {
   const messages = buildVisionMessages(input);

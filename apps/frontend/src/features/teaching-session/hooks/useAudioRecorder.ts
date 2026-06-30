@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface UseAudioRecorderResult {
   isRecording: boolean
-  /** true kalau user menolak izin mic, atau device gak ada - audio tetap optional, gak menghalangi flow */
+  /** true if the user denies mic permission, or there's no device - audio stays optional and doesn't block the flow */
   permissionDenied: boolean
   start: () => Promise<void>
   stop: () => Promise<Blob | undefined>
@@ -16,7 +16,7 @@ export function useAudioRecorder(): UseAudioRecorderResult {
   const streamRef = useRef<MediaStream | null>(null)
 
   const start = useCallback(async () => {
-    if (recorderRef.current) return // sudah jalan
+    if (recorderRef.current) return // already running
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -33,7 +33,7 @@ export function useAudioRecorder(): UseAudioRecorderResult {
       setIsRecording(true)
       setPermissionDenied(false)
     } catch {
-      // Mic ditolak / gak ada device - audio cuma optional, lanjut tanpa rekam.
+      // Mic denied / no device - audio is only optional, carry on without recording.
       setPermissionDenied(true)
       setIsRecording(false)
     }
@@ -60,7 +60,7 @@ export function useAudioRecorder(): UseAudioRecorderResult {
     })
   }, [])
 
-  // Auto-start sekali saat komponen pertama mount (mode Editing dimulai).
+  // Auto-start once when the component first mounts (Editing mode begins).
   useEffect(() => {
     start()
     return () => {

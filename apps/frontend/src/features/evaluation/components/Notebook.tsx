@@ -17,7 +17,7 @@ export function Notebook({ notebook, learnerName }: NotebookProps) {
       <div className={styles.notebookCard}>
         {/* Notebook ruled-paper header */}
         <div className={styles.notebookHeader}>
-          <p className={styles.notebookOwner}>Catatan milik {learnerName}</p>
+          <p className={styles.notebookOwner}>{learnerName}'s notes</p>
         </div>
 
         <div className={styles.notebookBody}>
@@ -25,7 +25,7 @@ export function Notebook({ notebook, learnerName }: NotebookProps) {
           <div className={styles.notebookBlock}>
             <h3 className={styles.notebookBlockTitle}>Learned</h3>
             {notebook.learned.length === 0 ? (
-              <p className={styles.notebookEmpty}>Belum ada yang tercatat.</p>
+              <p className={styles.notebookEmpty}>Nothing noted yet.</p>
             ) : (
               <ul className={styles.notebookList}>
                 {notebook.learned.map((item, i) => (
@@ -44,7 +44,7 @@ export function Notebook({ notebook, learnerName }: NotebookProps) {
           <div className={styles.notebookBlock}>
             <h3 className={styles.notebookBlockTitle}>Still Confused</h3>
             {notebook.stillConfused.length === 0 ? (
-              <p className={styles.notebookEmpty}>Tidak ada yang membingungkan — luar biasa!</p>
+              <p className={styles.notebookEmpty}>Nothing confusing — amazing!</p>
             ) : (
               <ul className={styles.notebookList}>
                 {notebook.stillConfused.map((item, i) => (

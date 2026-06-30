@@ -86,7 +86,7 @@ export function ChatSidebar({
         <button
           className={styles.sidebarAvatarBtn}
           onClick={onToggle}
-          aria-label={`Buka chat dengan ${learner.name}`}
+          aria-label={`Open chat with ${learner.name}`}
         >
           <img src={learner.avatarUrl} alt={learner.name} className={styles.sidebarAvatarImg} />
           {unreadCount > 0 && (
@@ -124,7 +124,7 @@ export function ChatSidebar({
         <button
           className={styles.chatSidebarClose}
           onClick={onToggle}
-          aria-label="Tutup chat"
+          aria-label="Close chat"
         >
           ×
         </button>
@@ -134,7 +134,7 @@ export function ChatSidebar({
       <div className={styles.chatSidebarMessages} ref={listRef}>
         {messages.length === 0 ? (
           <p className={styles.chatSidebarEmpty}>
-            Belum ada chat. Sapa {learner.name} dulu, yuk.
+            No messages yet. Say hi to {learner.name}!
           </p>
         ) : (
           messages.map((m) => (
@@ -157,14 +157,14 @@ export function ChatSidebar({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-          placeholder={`Tulis pesan ke ${learner.name}...`}
-          aria-label="Tulis pesan"
+          placeholder={`Message ${learner.name}...`}
+          aria-label="Write a message"
         />
         <button
           className={styles.chatSidebarSend}
           onClick={handleSubmit}
           disabled={!draft.trim()}
-          aria-label="Kirim"
+          aria-label="Send"
         >
           ↑
         </button>

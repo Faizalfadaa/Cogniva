@@ -21,12 +21,12 @@ export function LetterFromLearner({ learner, letter }: LetterFromLearnerProps) {
         // Sealed envelope state — user clicks to open
         <div className={styles.letterSealed} onClick={() => setSealed(false)} role="button" tabIndex={0}
           onKeyDown={e => e.key === 'Enter' && setSealed(false)}
-          aria-label="Buka surat dari learner"
+          aria-label="Open the letter from your learner"
         >
           <img src={learner.avatarUrl} alt={learner.name} className={styles.letterSealAvatar} />
           <div className={styles.letterSealText}>
-            <p className={styles.letterSealFrom}>Surat dari {learner.name}</p>
-            <p className={styles.letterSealHint}>Klik untuk membuka</p>
+            <p className={styles.letterSealFrom}>Letter from {learner.name}</p>
+            <p className={styles.letterSealHint}>Click to open</p>
           </div>
           <span className={styles.letterSealIcon}>✉</span>
         </div>
@@ -37,7 +37,7 @@ export function LetterFromLearner({ learner, letter }: LetterFromLearnerProps) {
             <img src={learner.avatarUrl} alt={learner.name} className={styles.letterAvatar} />
             <div>
               <p className={styles.letterFrom}>{learner.name}</p>
-              <p className={styles.letterSub}>kepada sensei-nya</p>
+              <p className={styles.letterSub}>to their teacher</p>
             </div>
           </div>
           <div className={styles.letterBody}>

@@ -59,22 +59,23 @@ const allowedDerivedFrom: LearnerResponseDerivedFrom[] = [
 ];
 
 const teacherLikePhrases = [
-  "kamu salah",
-  "yang benar adalah",
-  "seharusnya",
-  "berdasarkan teori",
-  "jawaban yang tepat",
-  "penjelasan lengkapnya",
-  "definisi resminya",
-  "mari kita bahas",
-  "dapat disimpulkan bahwa",
-  "konsep ini sebenarnya",
-  "perlu diketahui bahwa",
-  "secara ilmiah",
-  "menurut referensi",
-  "faktanya adalah",
-  "izinkan saya jelaskan",
-  "saya akan menjelaskan"
+  "you're wrong",
+  "you are wrong",
+  "the correct answer is",
+  "it should be",
+  "according to theory",
+  "the right answer",
+  "the full explanation",
+  "the official definition",
+  "let's discuss",
+  "it can be concluded that",
+  "this concept is actually",
+  "you should know that",
+  "scientifically speaking",
+  "according to the reference",
+  "the fact is",
+  "let me explain",
+  "i will explain"
 ];
 
 export function normalizeLearnerOutput(
@@ -161,7 +162,7 @@ export function createFallbackOutput(
       turnIndex: input.turnIndex,
       type: "confusion",
       text: fallbackText,
-      targetConcept: "penjelasan terbaru",
+      targetConcept: "the latest explanation",
       derivedFrom: "gap"
     }
   };
@@ -240,10 +241,10 @@ function normalizeMisconceptions(
 
 function createDefaultQuestion(input: LearnerAgentInput): string {
   if (!input.teachingText.trim()) {
-    return "Aku belum nangkep penjelasannya. Bisa mulai jelasin dari bagian paling dasar?";
+    return "I haven't caught the explanation yet. Could you start from the most basic part?";
   }
 
-  return "Aku masih agak bingung. Bisa jelasin bagian itu pakai contoh yang lebih sederhana?";
+  return "I'm still a bit confused. Could you explain that part with a simpler example?";
 }
 
 function createId(prefix: string): string {

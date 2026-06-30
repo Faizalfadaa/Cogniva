@@ -83,7 +83,7 @@ export default function WorkspacePage() {
   // Resolve first messages with userName substitution — stable across renders
   const seedMessages = useMemo(
     () =>
-      resolveFirstMessages(learner, userName || 'kamu').map((content, i) => ({
+      resolveFirstMessages(learner, userName || 'you').map((content, i) => ({
         id: `seed-${id}-${i}`,
         content,
       })),
