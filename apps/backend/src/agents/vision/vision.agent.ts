@@ -59,7 +59,7 @@ async function callRealAI(input: VisionAgentInput): Promise<Record<string, unkno
 
   const llm = new LLMClient({
     model: config.VISION_MODEL,
-    maxTokens: config.LLM_MAX_TOKENS,
+    maxTokens: config.VISION_MAX_TOKENS,
     timeout: config.LLM_TIMEOUT,
     thinkingBudget: config.LLM_THINKING_BUDGET,
   });
