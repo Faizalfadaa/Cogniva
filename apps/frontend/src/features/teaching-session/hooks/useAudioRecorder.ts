@@ -5,15 +5,20 @@ interface UseAudioRecorderResult {
   /** true if the user denies mic permission, or there's no device - audio stays optional and doesn't block the flow */
   permissionDenied: boolean
   start: () => Promise<void>
-  stop: () => Promise<Blob | undefined>
+  stop: () => Promise<void>
+  /** Drain all accumulated chunks into one Blob and reset the buffer.
+   *  Called by teach() — not by the user directly. */
+  flush: () => Blob | undefined
 }
 
 export function useAudioRecorder(): UseAudioRecorderResult {
   const [isRecording, setIsRecording] = useState(false)
   const [permissionDenied, setPermissionDenied] = useState(false)
   const recorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
+  // Chunks persist across start/stop cycles until flush() is called.
+  const chunksRef = useRef<Blob[]>([])
+  const mimeTypeRef = useRef<string>('audio/webm')
 
   const start = useCallback(async () => {
     if (recorderRef.current) return // already running
@@ -23,7 +28,8 @@ export function useAudioRecorder(): UseAudioRecorderResult {
       streamRef.current = stream
 
       const recorder = new MediaRecorder(stream)
-      chunksRef.current = []
+      mimeTypeRef.current = recorder.mimeType || 'audio/webm'
+      // Append — do NOT reset chunksRef here.
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
@@ -33,34 +39,36 @@ export function useAudioRecorder(): UseAudioRecorderResult {
       setIsRecording(true)
       setPermissionDenied(false)
     } catch {
-      // Mic denied / no device - audio is only optional, carry on without recording.
       setPermissionDenied(true)
       setIsRecording(false)
     }
   }, [])
 
-  const stop = useCallback((): Promise<Blob | undefined> => {
+  const stop = useCallback((): Promise<void> => {
     const recorder = recorderRef.current
-    if (!recorder) return Promise.resolve(undefined)
+    if (!recorder) return Promise.resolve()
 
     return new Promise((resolve) => {
       recorder.onstop = () => {
-        const blob =
-          chunksRef.current.length > 0
-            ? new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
-            : undefined
-
+        // Release the mic track so the browser recording indicator clears.
         streamRef.current?.getTracks().forEach((t) => t.stop())
         streamRef.current = null
         recorderRef.current = null
         setIsRecording(false)
-        resolve(blob)
+        resolve()
       }
       recorder.stop()
     })
   }, [])
 
-  // Auto-start once when the component first mounts (Editing mode begins).
+  const flush = useCallback((): Blob | undefined => {
+    if (chunksRef.current.length === 0) return undefined
+    const blob = new Blob(chunksRef.current, { type: mimeTypeRef.current })
+    chunksRef.current = []
+    return blob
+  }, [])
+
+  // Auto-start once on mount.
   useEffect(() => {
     start()
     return () => {
@@ -70,5 +78,5 @@ export function useAudioRecorder(): UseAudioRecorderResult {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { isRecording, permissionDenied, start, stop }
+  return { isRecording, permissionDenied, start, stop, flush }
 }

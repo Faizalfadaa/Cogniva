@@ -105,6 +105,7 @@ export default function WorkspacePage() {
         saveStatus={titleField.status}
         isRecording={session.isRecording}
         micPermissionDenied={session.micPermissionDenied}
+        onToggleRecording={session.toggleRecording}
         mode={session.mode}
         pending={session.pending}
         onTeach={session.teach}

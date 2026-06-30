@@ -10,6 +10,7 @@ interface WorkspaceHeaderProps {
   saveStatus: TitleSaveStatus
   isRecording: boolean
   micPermissionDenied: boolean
+  onToggleRecording: () => void
   mode: 'editing' | 'locked'
   pending: boolean
   onTeach: () => void
@@ -63,6 +64,7 @@ export function WorkspaceHeader({
   saveStatus,
   isRecording,
   micPermissionDenied,
+  onToggleRecording,
   mode,
   pending,
   onTeach,
@@ -129,8 +131,17 @@ export function WorkspaceHeader({
       </div>
 
       <div className={styles.headerRight}>
-        {isRecording && !micPermissionDenied && (
-          <span className={styles.micDot} title="Recording audio" />
+        {!micPermissionDenied && (
+          <button
+            className={isRecording ? styles.micBtnActive : styles.micBtnIdle}
+            onClick={onToggleRecording}
+            aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+            title={isRecording ? 'Stop recording audio' : 'Start recording audio'}
+          >
+            <span className={styles.micBtnIcon}>{isRecording ? '⏹' : '🎙'}</span>
+            <span className={styles.micBtnLabel}>{isRecording ? 'Stop' : 'Record'}</span>
+            {isRecording && <span className={styles.micDot} />}
+          </button>
         )}
         <button
           className={styles.finishBtn}

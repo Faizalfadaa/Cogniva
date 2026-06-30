@@ -128,16 +128,63 @@
 }
 .finishBtn:disabled { opacity: 0.5; cursor: default; }
 
+.micBtnIdle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), color var(--dur-fast), background var(--dur-fast);
+}
+.micBtnIdle:hover {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+.micBtnActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid #e0453c;
+  background: rgba(224, 69, 60, 0.08);
+  color: #c0342c;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.micBtnActive:hover {
+  background: rgba(224, 69, 60, 0.15);
+}
+
+.micBtnIcon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.micBtnLabel {
+  white-space: nowrap;
+}
+
 .micDot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #e0453c;
+  flex-shrink: 0;
   animation: micPulse 1.4s infinite;
 }
 @keyframes micPulse {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.5; transform: scale(0.85); }
+  50%       { opacity: 0.4; transform: scale(0.8); }
 }
 
 /* ═══════════════════════════════════════════════════════════
