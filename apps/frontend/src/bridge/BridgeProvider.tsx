@@ -25,6 +25,6 @@ export function BridgeProvider({ children, bridge }: BridgeProviderProps) {
 
 export function useBridge(): CognivaBridge {
   const ctx = useContext(BridgeContext);
-  if (!ctx) throw new Error('useBridge() dipanggil di luar <BridgeProvider>.');
+  if (!ctx) throw new Error('useBridge() called outside <BridgeProvider>.');
   return ctx;
 }

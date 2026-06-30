@@ -13,7 +13,7 @@ export function useWorkspaceTitleAutosave(
   const [title, setTitle] = useState(initialTitle ?? '')
   const [status, setStatus] = useState<TitleSaveStatus>('idle')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Setelah user mulai ngetik, jangan biarkan re-fetch initialTitle nimpa balik input-nya.
+  // Once the user starts typing, don't let a re-fetched initialTitle overwrite their input.
   const hasEditedRef = useRef(false)
 
   useEffect(() => {

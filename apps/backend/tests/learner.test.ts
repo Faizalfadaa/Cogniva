@@ -213,9 +213,9 @@ describe("runLearnerTurn agentic loop (mock)", () => {
 
 describe("learner guard", () => {
   it("flags teacher-like or overly long text as unsafe", () => {
-    expect(isLearnerTextSafe("Aku masih bingung, bisa diulang?")).toBe(true);
-    expect(isLearnerTextSafe("Yang benar adalah fotosintesis menghasilkan oksigen.")).toBe(false);
-    expect(isLearnerTextSafe(Array(60).fill("kata").join(" "))).toBe(false);
+    expect(isLearnerTextSafe("I'm still confused, can you repeat that?")).toBe(true);
+    expect(isLearnerTextSafe("The correct answer is that photosynthesis produces oxygen.")).toBe(false);
+    expect(isLearnerTextSafe(Array(60).fill("word").join(" "))).toBe(false);
   });
 
   it("coerces an invalid LLM response into a safe student shape", () => {

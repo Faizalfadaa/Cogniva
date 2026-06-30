@@ -17,12 +17,12 @@ function getViewFilter(state: WorkspaceState): Exclude<ViewFilter, 'All'> {
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'baru saja'
-  if (mins < 60) return `${mins} menit lalu`
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins} min ago`
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} jam lalu`
+  if (hours < 24) return `${hours} hr ago`
   const days = Math.floor(hours / 24)
-  return `${days} hari lalu`
+  return `${days} day${days === 1 ? '' : 's'} ago`
 }
 
 // ─── Badge ───────────────────────────────────────────────────────────────────
@@ -51,17 +51,29 @@ function WorkspaceCard({
 }) {
   const hasTitle = Boolean(ws.title)
   return (
-    <div className={styles.wsCardWrap}>
-      <button
-        className={styles.wsCard}
-        onClick={onClick}
-        aria-label={`Buka workspace ${ws.title ?? 'tanpa judul'}`}
-      >
-        <div className={styles.wsCardThumb}>
-          {ws.thumbnailUrl ? (
-            <img className={styles.wsCardThumbImg} src={ws.thumbnailUrl} alt="" />
-          ) : (
-            <div className={styles.wsCardThumbPlaceholder} aria-hidden="true" />
+    <button
+      className={styles.wsCard}
+      onClick={onClick}
+      aria-label={`Open workspace ${ws.title ?? 'untitled'}`}
+    >
+      <div className={styles.wsCardThumb}>
+        {ws.thumbnailUrl ? (
+          <img className={styles.wsCardThumbImg} src={ws.thumbnailUrl} alt="" />
+        ) : (
+          <div className={styles.wsCardThumbPlaceholder} aria-hidden="true" />
+        )}
+        <span className={styles.wsCardThumbBadge}>
+          <StateBadge state={ws.state} />
+        </span>
+      </div>
+      <div className={styles.wsCardBody}>
+        <p className={`${styles.wsCardTitle} ${!hasTitle ? styles.wsCardTitleEmpty : ''}`}>
+          {ws.title ?? 'Untitled workspace'}
+        </p>
+        <p className={styles.wsCardMeta}>
+          {timeAgo(ws.updatedAt)}
+          {ws.description && (
+            <span className={styles.wsCardDesc}> · {ws.description}</span>
           )}
           <span className={styles.wsCardThumbBadge}>
             <StateBadge state={ws.state} />
@@ -108,7 +120,7 @@ function NewWorkspaceCard({ onClick, loading }: { onClick: () => void; loading: 
       className={styles.newCard}
       onClick={onClick}
       disabled={loading}
-      aria-label="Buat workspace baru"
+      aria-label="Create a new workspace"
     >
       <div className={styles.newCardInner}>
         <div className={styles.newCardPlus}>
@@ -120,7 +132,7 @@ function NewWorkspaceCard({ onClick, loading }: { onClick: () => void; loading: 
             <span>+</span>
           )}
         </div>
-        <p className={styles.newCardLabel}>{loading ? 'Membuat workspace...' : 'Workspace baru'}</p>
+        <p className={styles.newCardLabel}>{loading ? 'Creating workspace...' : 'New workspace'}</p>
       </div>
     </button>
   )
@@ -140,19 +152,19 @@ function EmptyState({ filter, onNew, loading }: { filter: ViewFilter; onNew: () 
       </div>
       {isCompleted ? (
         <>
-          <h3 className={styles.emptyTitle}>Belum ada sesi selesai</h3>
+          <h3 className={styles.emptyTitle}>No finished sessions yet</h3>
           <p className={styles.emptyBody}>
-            Selesaikan sesi mengajarmu dan evaluasi akan muncul di sini.
+            Finish a teaching session and its evaluation will show up here.
           </p>
         </>
       ) : (
         <>
-          <h3 className={styles.emptyTitle}>Belum ada workspace</h3>
+          <h3 className={styles.emptyTitle}>No workspaces yet</h3>
           <p className={styles.emptyBody}>
-            Mulai sesi pertamamu. Pilih topik, buka whiteboard, dan ajari AI muridmu.
+            Start your first session. Pick a topic, open the whiteboard, and teach your AI student.
           </p>
           <button className={styles.emptyBtn} onClick={onNew} disabled={loading}>
-            {loading ? 'Membuat...' : 'Buat workspace pertama'}
+            {loading ? 'Creating...' : 'Create your first workspace'}
           </button>
         </>
       )}
@@ -178,27 +190,27 @@ function NameModal({ onConfirm }: { onConfirm: (name: string) => void }) {
     <div className={styles.modalOverlay}>
       <div className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className={styles.modalMark}>✦</div>
-        <h2 id="modal-title" className={styles.modalTitle}>Hei, siapa namamu?</h2>
+        <h2 id="modal-title" className={styles.modalTitle}>Hey, what's your name?</h2>
         <p className={styles.modalBody}>
-          Murid AI-mu akan memanggilmu dengan nama ini sepanjang sesi.
+          Your AI student will call you by this name throughout the session.
         </p>
         <input
           ref={inputRef}
           className={styles.modalInput}
           type="text"
-          placeholder="Nama kamu..."
+          placeholder="Your name..."
           value={name}
           onChange={e => setName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSubmit()}
           maxLength={40}
-          aria-label="Nama kamu"
+          aria-label="Your name"
         />
         <button
           className={styles.modalBtn}
           onClick={handleSubmit}
           disabled={!name.trim()}
         >
-          Masuk ke Cogniva →
+          Enter Cogniva →
         </button>
       </div>
     </div>
@@ -247,7 +259,7 @@ function DeleteConfirmModal({
 // ─── Filter tabs ─────────────────────────────────────────────────────────────
 
 const FILTER_OPTIONS: Array<{ label: string; value: ViewFilter }> = [
-  { label: 'Semua',     value: 'All' },
+  { label: 'All',       value: 'All' },
   { label: 'Active',    value: 'Active' },
   { label: 'Completed', value: 'Completed' },
 ]
@@ -280,7 +292,7 @@ export default function HomePage() {
       .catch(() => {
         setLoading(false)
         setError(
-          'Tidak bisa terhubung ke server. Pastikan backend berjalan di http://localhost:8000.'
+          'Could not connect to the server. Make sure the backend is running at http://localhost:8000.'
         )
       })
   }, [bridge])
@@ -300,7 +312,7 @@ export default function HomePage() {
     } catch {
       setCreating(false)
       setError(
-        'Gagal membuat workspace. Pastikan backend berjalan di http://localhost:8000.'
+        'Failed to create workspace. Make sure the backend is running at http://localhost:8000.'
       )
     }
   }
@@ -359,14 +371,14 @@ export default function HomePage() {
             className={styles.newBtn}
             onClick={handleCreateWorkspace}
             disabled={creating}
-            aria-label="Buat workspace baru"
+            aria-label="Create a new workspace"
           >
             <span className={styles.newBtnPlus}>{creating ? '…' : '+'}</span>
-            <span>Workspace baru</span>
+            <span>New workspace</span>
           </button>
         </div>
 
-        <nav className={styles.sidebarNav} aria-label="Filter workspace">
+        <nav className={styles.sidebarNav} aria-label="Filter workspaces">
           {FILTER_OPTIONS.map(opt => (
             <button
               key={opt.value}
@@ -397,10 +409,10 @@ export default function HomePage() {
         <header className={styles.mainHeader}>
           <div className={styles.mainHeaderLeft}>
             <h1 className={styles.mainTitle}>
-              {filter === 'All' ? 'Semua workspace' : filter}
+              {filter === 'All' ? 'All workspaces' : filter}
             </h1>
             {hasAny && (
-              <p className={styles.mainSub}>{filtered.length} workspace</p>
+              <p className={styles.mainSub}>{filtered.length} workspace{filtered.length === 1 ? '' : 's'}</p>
             )}
           </div>
 
@@ -413,10 +425,10 @@ export default function HomePage() {
               <input
                 className={styles.searchInput}
                 type="search"
-                placeholder="Cari workspace..."
+                placeholder="Search workspaces..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                aria-label="Cari workspace"
+                aria-label="Search workspaces"
               />
             </div>
           )}
@@ -426,10 +438,10 @@ export default function HomePage() {
         <div className={styles.content}>
           {error ? (
             <div className={styles.emptyState}>
-              <h3 className={styles.emptyTitle}>Tidak bisa terhubung</h3>
+              <h3 className={styles.emptyTitle}>Can't connect</h3>
               <p className={styles.emptyBody}>{error}</p>
               <button className={styles.emptyBtn} onClick={loadWorkspaces}>
-                Coba lagi
+                Try again
               </button>
             </div>
           ) : loading ? (
@@ -442,12 +454,12 @@ export default function HomePage() {
             <EmptyState filter={filter} onNew={handleCreateWorkspace} loading={creating} />
           ) : filtered.length === 0 ? (
             <div className={styles.noResults}>
-              <p>Tidak ada workspace yang cocok.</p>
+              <p>No matching workspaces.</p>
               <button
                 className={styles.clearFilter}
                 onClick={() => { setFilter('All'); setSearchQuery('') }}
               >
-                Hapus filter
+                Clear filters
               </button>
             </div>
           ) : (

@@ -19,12 +19,12 @@ async function main(): Promise<void> {
       {
         turnIndex: 0,
         boardText: "Photosynthesis makes food using sunlight, water and CO2.",
-        learnerUtterance: "Jadi tanamannya makan dari tanah ya?",
+        learnerUtterance: "So the plant eats from the soil, right?",
       },
       {
         turnIndex: 1,
         boardText: "Outputs are glucose and oxygen. Oxygen comes from splitting water.",
-        learnerUtterance: "Oh, oksigennya dari air, bukan dari CO2.",
+        learnerUtterance: "Oh, the oxygen comes from water, not from CO2.",
       },
     ],
     referenceMaterial:

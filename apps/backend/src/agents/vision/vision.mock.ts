@@ -1,10 +1,10 @@
 import type { VisionAgentInput, VisionLLMOutput } from "./vision.types.js";
 
 /**
- * Mock deterministik -- dipakai test dan demo offline (tanpa API key,
- * tanpa jaringan), sama perannya dengan mockLearnerAI. TIDAK membaca gambar
- * sungguhan; hanya menghasilkan bentuk yang valid agar pipeline (guard,
- * pemetaan kontrak, orchestrator) bisa diuji tanpa memanggil model nyata.
+ * Deterministic mock -- used by tests and offline demos (no API key, no
+ * network), same role as mockLearnerAI. It does NOT read a real image; it only
+ * produces a valid shape so the pipeline (guard, contract mapping, orchestrator)
+ * can be exercised without calling the real model.
  */
 export function mockVisionAI(input: VisionAgentInput): VisionLLMOutput {
   if (!input.imageBase64) {
@@ -12,20 +12,20 @@ export function mockVisionAI(input: VisionAgentInput): VisionLLMOutput {
       transcript: "",
       elements: [],
       overallConfidence: 0,
-      ambiguities: ["tidak ada gambar untuk dibaca (mock)"],
+      ambiguities: ["no image to read (mock)"],
       needsConfirmation: true,
-      confirmationPrompt: "Belum ada gambar papan. Bisa tulis atau ketik dulu?",
+      confirmationPrompt: "No board image yet. Could you write or type something first?",
     };
   }
 
   return {
-    transcript: `(mock) papan tentang ${input.topic}`,
+    transcript: `(mock) board about ${input.topic}`,
     elements: [
       {
         kind: "text",
         content: `(mock) ${input.topic}`,
         confidence: 1,
-        location: "tengah",
+        location: "center",
       },
     ],
     overallConfidence: 1,

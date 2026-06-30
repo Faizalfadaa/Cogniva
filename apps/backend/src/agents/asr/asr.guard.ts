@@ -1,9 +1,9 @@
 import * as config from "../../config/index.js";
 import type { AsrAgentInput, AsrLLMOutput, SpeechTranscript } from "./asr.types.js";
 
-/** Parse keluaran mentah dari LLMClient.structured() (sudah berupa objek JSON,
- * bukan teks) jadi AsrLLMOutput yang aman dipakai -- setiap field
- * divalidasi/diberi default, tidak percaya bentuk dari model begitu saja. */
+/** Parse the raw output from LLMClient.structured() (already a JSON object, not
+ * text) into a safe-to-use AsrLLMOutput -- every field is validated/defaulted,
+ * never trusting the model's shape blindly. */
 export function normalizeAsrLLMOutput(raw: Record<string, unknown>): AsrLLMOutput {
   const ambiguities = Array.isArray(raw.ambiguities)
     ? raw.ambiguities.filter((a): a is string => typeof a === "string")
@@ -21,18 +21,18 @@ export function normalizeAsrLLMOutput(raw: Record<string, unknown>): AsrLLMOutpu
 }
 
 /**
- * Pemetaan ke kontrak resmi SpeechTranscript (§6.5). Tidak lossy seperti Vision:
- * SpeechTranscript memang tidak punya field ambiguities/needsConfirmation, jadi
- * sinyal "ada bagian tak jelas" diturunkan ke nilai `confidence` (frontend
- * menampilkan transkrip untuk dikoreksi bila confidence di bawah ambang -- §3.5,
- * §5.3). Lihat GAPS_ASR.md poin B.
+ * Mapping to the official SpeechTranscript contract (§6.5). Not lossy like Vision:
+ * SpeechTranscript has no ambiguities/needsConfirmation field, so the "some part
+ * is unclear" signal is folded into the `confidence` value (the frontend shows the
+ * transcript for correction when confidence is below the threshold -- §3.5, §5.3).
+ * See GAPS_ASR.md point B.
  */
 export function toSpeechTranscript(
   output: AsrLLMOutput,
   input: AsrAgentInput,
 ): SpeechTranscript {
-  // Bila model menandai ambiguitas tapi memberi confidence tinggi, turunkan
-  // agar sinyal "perlu dicek" tidak hilang saat dipetakan ke kontrak.
+  // If the model flags ambiguity but reports high confidence, lower it so the
+  // "needs checking" signal isn't lost when mapped to the contract.
   const confidence =
     output.ambiguities.length > 0
       ? Math.min(output.confidence, config.ASR_CONFIDENCE_THRESHOLD)
@@ -50,9 +50,9 @@ export function toSpeechTranscript(
   };
 }
 
-/** Hasil aman saat panggilan ASR gagal total (network, JSON tak valid, dsb).
- * Transkrip kosong + confidence 0 -- frontend menampilkan kanal kosong dan
- * pengguna bisa mengetik ulang (§5.3). Tidak pernah menjatuhkan giliran. */
+/** Safe result when the ASR call fails completely (network, invalid JSON, etc.).
+ * Empty transcript + confidence 0 -- the frontend shows an empty channel and the
+ * user can retype (§5.3). Never drops the turn. */
 export function createFallbackTranscript(input: AsrAgentInput): SpeechTranscript {
   return {
     segmentId: input.segmentId,

@@ -29,7 +29,7 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
       findings.push({
         category: "CORRECT",
         concept,
-        detail: "Konsep ini tampak tersampaikan dalam penjelasanmu.",
+        detail: "This concept appears to be conveyed in your explanation.",
         evidenceTurnIndex,
       });
     } else {
@@ -37,7 +37,7 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
       findings.push({
         category: "MISSED",
         concept,
-        detail: "Konsep kunci ini belum tersentuh sama sekali dalam sesi.",
+        detail: "This key concept wasn't touched on at all during the session.",
         evidenceTurnIndex: null,
       });
     }
@@ -52,8 +52,8 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
     if (idx !== null) {
       findings.push({
         category: "WRONG",
-        concept: "Miskonsepsi umum",
-        detail: `Penjelasanmu menyerempet miskonsepsi yang umum: "${belief}".`,
+        concept: "Common misconception",
+        detail: `Your explanation brushed against a common misconception: "${belief}".`,
         evidenceTurnIndex: idx,
       });
     }
@@ -66,13 +66,13 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
     findings,
     summary:
       input.turns.length === 0
-        ? "Belum ada giliran mengajar yang terekam, jadi belum ada yang bisa dinilai."
-        : `Kamu menyampaikan ${covered.length} dari ${total} konsep kunci. ` +
+        ? "No teaching turns were recorded yet, so there's nothing to assess."
+        : `You conveyed ${covered.length} of ${total} key concepts. ` +
           (missed.length
-            ? "Masih ada beberapa bagian penting yang terlewat."
-            : "Cakupan konsepnya sudah lengkap, kerja bagus!"),
-    strengths: covered.slice(0, 3).map((c) => `Menjelaskan: ${c}`),
-    improvements: missed.slice(0, 3).map((c) => `Tambahkan penjelasan tentang: ${c}`),
+            ? "A few important parts were still missed."
+            : "Concept coverage is complete, nice work!"),
+    strengths: covered.slice(0, 3).map((c) => `Explained: ${c}`),
+    improvements: missed.slice(0, 3).map((c) => `Add an explanation of: ${c}`),
     generatedAt: utcNowIso(),
   };
 }

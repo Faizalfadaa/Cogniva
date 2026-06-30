@@ -4,7 +4,7 @@ export interface LearnerDTO {
   avatarUrl: string;
   introVideoUrl: string;
   /**
-   * Pesan pembuka learner saat workspace pertama dibuka, hardcoded per karakter.
+   * The learner's opening messages when the workspace is first opened, hardcoded per character.
    */
   firstMessages: string[];
 }

@@ -18,12 +18,12 @@ const ALLOWED_KINDS: VisionElementKind[] = [
 ];
 
 /**
- * Pemetaan kind internal -> ElementType resmi (contracts/enums.ts). "shape"
- * dan "unknown" tidak punya pasangan resmi -- lihat GAPS_VISION.md poin 1.
- * "shape" dipetakan ke "figure" (terdekat secara makna); "unknown" dipetakan
- * ke "text" sebagai default paling netral. Sinyal "ini genuinely tidak
- * terbaca" tetap bertahan lewat needsConfirmation/suggestedClarification di
- * level VisionInterpretation, walau hilang di level Element individual.
+ * Mapping from the internal kind -> the official ElementType (contracts/enums.ts).
+ * "shape" and "unknown" have no official counterpart -- see GAPS_VISION.md point 1.
+ * "shape" maps to "figure" (closest in meaning); "unknown" maps to "text" as the
+ * most neutral default. The "this is genuinely unreadable" signal still survives
+ * via needsConfirmation/suggestedClarification at the VisionInterpretation level,
+ * even though it's lost at the individual Element level.
  */
 const KIND_TO_ELEMENT_TYPE: Record<VisionElementKind, ElementType> = {
   text: "text",
@@ -34,9 +34,9 @@ const KIND_TO_ELEMENT_TYPE: Record<VisionElementKind, ElementType> = {
   unknown: "text",
 };
 
-/** Parse keluaran mentah dari LLMClient.structured() (sudah berupa objek
- * JSON, bukan teks) jadi VisionLLMOutput yang aman dipakai -- setiap field
- * divalidasi/diberi default, tidak percaya bentuk dari model begitu saja. */
+/** Parse the raw output from LLMClient.structured() (already a JSON object, not
+ * text) into a safe-to-use VisionLLMOutput -- every field is validated/defaulted,
+ * never trusting the model's shape blindly. */
 export function normalizeVisionLLMOutput(raw: Record<string, unknown>): VisionLLMOutput {
   const elements = Array.isArray(raw.elements)
     ? raw.elements.map(normalizeElement)
@@ -61,8 +61,8 @@ export function normalizeVisionLLMOutput(raw: Record<string, unknown>): VisionLL
   };
 }
 
-/** Pemetaan ke kontrak resmi VisionInterpretation -- lossy di dua titik,
- * didokumentasikan di GAPS_VISION.md. */
+/** Mapping to the official VisionInterpretation contract -- lossy at two points,
+ * documented in GAPS_VISION.md. */
 export function toVisionInterpretation(
   output: VisionLLMOutput,
   snapshotId: string,
@@ -71,8 +71,8 @@ export function toVisionInterpretation(
   const elements: Element[] = output.elements.map((e) => ({
     type: KIND_TO_ELEMENT_TYPE[e.kind],
     content: e.content,
-    // bbox sengaja tidak diisi: model vision yang dipakai tidak
-    // mengembalikan koordinat piksel presisi dari deskripsi posisi teks.
+    // bbox is intentionally left unset: the vision model used doesn't return
+    // precise pixel coordinates from a text-position description.
   }));
 
   const needsConfirmation =
@@ -95,9 +95,9 @@ export function toVisionInterpretation(
   };
 }
 
-/** Hasil aman saat panggilan LLM gagal total (network, JSON tak valid, dsb).
- * Tidak pernah menjatuhkan giliran -- selalu minta klarifikasi ke pengguna,
- * konsisten dengan invarian "jangan menebak saat ragu" (§3.4). */
+/** Safe result when the LLM call fails completely (network, invalid JSON, etc.).
+ * Never drops the turn -- it always asks the user to clarify, consistent with the
+ * "don't guess when unsure" invariant (§3.4). */
 export function createFallbackInterpretation(snapshotId: string): VisionInterpretation {
   return {
     snapshotId,
@@ -106,7 +106,7 @@ export function createFallbackInterpretation(snapshotId: string): VisionInterpre
     confidence: 0,
     needsConfirmation: true,
     suggestedClarification:
-      "Papan belum bisa terbaca saat ini. Bisa tulis ulang lebih jelas atau ketik poin utamanya?",
+      "The board can't be read right now. Could you rewrite it more clearly or type the main points?",
   };
 }
 
@@ -140,9 +140,9 @@ function nonEmptyString(value: unknown): string | undefined {
 
 function defaultClarification(ambiguities: string[]): string {
   if (ambiguities.length > 0) {
-    return `Ada bagian yang kurang jelas: ${ambiguities.join("; ")}. Bisa diperjelas atau diketik?`;
+    return `Some parts aren't clear: ${ambiguities.join("; ")}. Could you clarify or type them?`;
   }
-  return "Papan kurang terbaca jelas. Bisa tulis ulang lebih rapi atau ketik poin utamanya?";
+  return "The board isn't very legible. Could you rewrite it more neatly or type the main points?";
 }
 
 export { VisionAgentInput };

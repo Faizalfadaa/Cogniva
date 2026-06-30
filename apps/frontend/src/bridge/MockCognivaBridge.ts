@@ -45,14 +45,14 @@ const store: MockStore = {
 // ---------------------------------------------------------------------------
 
 const LEARNER_REACTIONS = [
-  'Hmm... jadi maksudnya tuh...?',
-  'Oh! Aku nangkep yang bagian awal, tapi yang tengah masih belum jelas deh...',
-  'Wait, itu tadi kenapa bisa gitu? Bisa diulangin?',
-  'Ohhh... *tulis-tulis* ...gini ya?',
-  'Eh, terus kalau kasusnya beda gimana? Misalnya kalau inputnya kosong?',
-  '...Aku ngerti sih, tapi rasanya ada yang kelewat. Lanjut dulu?',
-  'Interesting... aku belum pernah liat yang kayak gitu sebelumnya.',
-  '...Mmm. Boleh lihat contoh yang lain?',
+  'Hmm... so what you mean is...?',
+  'Oh! I caught the first part, but the middle is still unclear...',
+  'Wait, why did that happen? Could you repeat it?',
+  'Ohhh... *scribbles* ...like this?',
+  'Hmm, and what if the case is different? Like if the input is empty?',
+  "...I think I get it, but it feels like I missed something. Keep going?",
+  'Interesting... I have never seen anything like that before.',
+  '...Mmm. Could I see another example?',
 ];
 
 function randomReaction(): string {
@@ -66,52 +66,52 @@ function randomReaction(): string {
 function generateMockReport(workspaceId: string): EvaluationReportDTO {
   const checkpoints = store.checkpoints.get(workspaceId) ?? [];
   const ws = store.workspaces.get(workspaceId);
-  const topic = ws?.title || 'topik ini';
+  const topic = ws?.title || 'this topic';
   const count = checkpoints.length;
 
   const learned =
     count > 0
       ? [
-          'Konsep utama yang kamu jelaskan di awal sesi',
-          'Alur pemikiran step-by-step yang kamu gambar di whiteboard',
-          'Contoh konkret yang kamu berikan — itu yang paling bikin aku "oh!"',
+          'The main concept you explained early in the session',
+          'The step-by-step reasoning you drew on the whiteboard',
+          'The concrete example you gave — that\'s what made it click for me',
         ]
-      : ['Pengenalan awal topik'];
+      : ['A first introduction to the topic'];
 
   const stillConfused =
     count < 2
       ? [
-          'Koneksi antara konsep pertama dan kedua masih agak kabur',
-          'Edge case — belum sempat dibahas',
+          'The connection between the first and second concepts is still a bit fuzzy',
+          'Edge cases — we didn\'t get to them yet',
         ]
       : [
-          'Detail implementasi di kasus khusus',
-          'Kenapa pendekatan ini lebih baik dari alternatifnya',
-          'Aku masih ragu soal batasan / limitasi-nya',
+          'Implementation details in special cases',
+          'Why this approach is better than the alternatives',
+          'I\'m still unsure about its limits / limitations',
         ];
 
   const date = now().slice(0, 10);
 
   return {
-    letter: `Haii!\n\nMakasih banget udah ngajarin aku soal ${topic} tadi. Serius, aku beneran berusaha ngerti semua yang kamu jelasin — dan lumayan banyak yang nyantol!\n\nYang paling aku suka, kamu nggak langsung loncat ke hal yang rumit. Kamu mulai dari yang dasar dulu, pelan-pelan, sampai aku bisa bayangin gambaran besarnya. Diagram di whiteboard-nya juga ngebantu banget — kadang lihat tulisan/gambar langsung lebih masuk daripada dengerin penjelasan doang.\n\nJujur sih, ada beberapa bagian yang aku masih perlu waktu buat nyerap. Bukan salah kamu — kayaknya otak aku aja yang butuh diulang beberapa kali hehe. Tapi overall, sesi ini kerasa progress banget.\n\nKapan-kapan ngajar aku lagi ya? Aku mau tau kelanjutannya!\n\nSampai ketemu lagi~\n— Learner-mu 🌱\n\n(${date})`,
+    letter: `Hi!\n\nThank you so much for teaching me about ${topic} earlier. Seriously, I really tried to understand everything you explained — and a lot of it clicked!\n\nWhat I liked most is that you didn't jump straight to the hard stuff. You started from the basics, slowly, until I could picture the big picture. The whiteboard diagrams helped a ton too — sometimes seeing it written/drawn lands better than just hearing it.\n\nHonestly, there are a few parts I still need time to absorb. It's not your fault — I think my brain just needs a few repeats, haha. But overall, this session felt like real progress.\n\nTeach me again sometime, okay? I want to know what comes next!\n\nSee you again~\n— Your learner 🌱\n\n(${date})`,
     notebook: {
       learned,
       stillConfused,
       reflection:
         count >= 3
-          ? 'Penjelasan kamu runtut dan ada contoh konkret di tiap bagian — itu yang bikin aku gampang ngikutin. Kalau next time bisa bahas edge case-nya juga, pasti makin lengkap!'
+          ? 'Your explanation flowed well and had a concrete example in each part — that\'s what made it easy to follow. If you can cover the edge cases next time, it\'ll be even more complete!'
           : count >= 1
-          ? 'Fondasi awalnya udah kena. Rasanya kalau sesi-nya lebih panjang lagi aku bisa nangkep lebih banyak. Diagram di whiteboard sangat membantu!'
-          : 'Sesi ini singkat, tapi aku nangkep arahnya ke mana. Lanjut lebih dalam di sesi berikutnya ya!',
+          ? 'The foundation is there. I feel like with a longer session I could catch even more. The whiteboard diagrams were a big help!'
+          : 'This session was short, but I caught where it was heading. Let\'s go deeper next time!',
     },
     continueLearning:
       count > 0
         ? [
-            `${topic} — kasus lanjutan & edge case`,
-            'Perbandingan dengan pendekatan alternatif',
-            'Implementasi nyata / contoh di dunia nyata',
+            `${topic} — advanced cases & edge cases`,
+            'Comparison with alternative approaches',
+            'Real implementations / real-world examples',
           ]
-        : ['Teori VSEPR', 'Diagram Orbital Molekul'],
+        : ['VSEPR Theory', 'Molecular Orbital Diagrams'],
   };
 }
 
@@ -142,7 +142,7 @@ export class MockCognivaBridge implements CognivaBridge {
     };
     store.workspaces.set(id, workspace);
     store.checkpoints.set(id, []);
-    store.messages.set(id, []); // kosong — UI yang isi first messages setelah ini
+    store.messages.set(id, []); // empty — the UI fills in the first messages after this
     return workspace;
   }
 

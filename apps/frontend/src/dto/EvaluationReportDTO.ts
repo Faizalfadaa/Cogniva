@@ -5,7 +5,7 @@ export interface EvaluationNotebookDTO {
 }
 
 export interface EvaluationReportDTO {
-  /** Surat dari learner ke user */
+  /** A letter from the learner to the user */
   letter: string;
   notebook: EvaluationNotebookDTO;
   /** Daftar topik rekomendasi belajar selanjutnya */
