@@ -51,29 +51,17 @@ function WorkspaceCard({
 }) {
   const hasTitle = Boolean(ws.title)
   return (
-    <button
-      className={styles.wsCard}
-      onClick={onClick}
-      aria-label={`Open workspace ${ws.title ?? 'untitled'}`}
-    >
-      <div className={styles.wsCardThumb}>
-        {ws.thumbnailUrl ? (
-          <img className={styles.wsCardThumbImg} src={ws.thumbnailUrl} alt="" />
-        ) : (
-          <div className={styles.wsCardThumbPlaceholder} aria-hidden="true" />
-        )}
-        <span className={styles.wsCardThumbBadge}>
-          <StateBadge state={ws.state} />
-        </span>
-      </div>
-      <div className={styles.wsCardBody}>
-        <p className={`${styles.wsCardTitle} ${!hasTitle ? styles.wsCardTitleEmpty : ''}`}>
-          {ws.title ?? 'Untitled workspace'}
-        </p>
-        <p className={styles.wsCardMeta}>
-          {timeAgo(ws.updatedAt)}
-          {ws.description && (
-            <span className={styles.wsCardDesc}> · {ws.description}</span>
+    <div className={styles.wsCardWrap}>
+      <button
+        className={styles.wsCard}
+        onClick={onClick}
+        aria-label={`Open workspace ${ws.title ?? 'untitled'}`}
+      >
+        <div className={styles.wsCardThumb}>
+          {ws.thumbnailUrl ? (
+            <img className={styles.wsCardThumbImg} src={ws.thumbnailUrl} alt="" />
+          ) : (
+            <div className={styles.wsCardThumbPlaceholder} aria-hidden="true" />
           )}
           <span className={styles.wsCardThumbBadge}>
             <StateBadge state={ws.state} />
@@ -81,7 +69,7 @@ function WorkspaceCard({
         </div>
         <div className={styles.wsCardBody}>
           <p className={`${styles.wsCardTitle} ${!hasTitle ? styles.wsCardTitleEmpty : ''}`}>
-            {ws.title ?? 'Workspace tanpa judul'}
+            {ws.title ?? 'Untitled workspace'}
           </p>
           <p className={styles.wsCardMeta}>
             {timeAgo(ws.updatedAt)}
