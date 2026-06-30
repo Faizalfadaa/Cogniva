@@ -44,6 +44,12 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     return ws ?? notFound(reply);
   });
 
+  app.delete("/workspaces/:id", async (req, reply) => {
+    const ok = service.deleteWorkspace(idOf(req.params));
+    if (!ok) return notFound(reply);
+    return reply.code(204).send();
+  });
+
   app.put("/workspaces/:id/draft", async (req, reply) => {
     const parsed = saveDraftSchema.safeParse(req.body);
     if (!parsed.success) return badRequest(reply, "Invalid draft payload");

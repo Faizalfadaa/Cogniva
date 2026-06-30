@@ -40,36 +40,65 @@ function StateBadge({ state }: { state: WorkspaceState }) {
 
 // ─── Cards ───────────────────────────────────────────────────────────────────
 
-function WorkspaceCard({ ws, onClick }: { ws: WorkspaceDTO; onClick: () => void }) {
+function WorkspaceCard({
+  ws,
+  onClick,
+  onDeleteClick,
+}: {
+  ws: WorkspaceDTO
+  onClick: () => void
+  onDeleteClick: () => void
+}) {
   const hasTitle = Boolean(ws.title)
   return (
-    <button
-      className={styles.wsCard}
-      onClick={onClick}
-      aria-label={`Buka workspace ${ws.title ?? 'tanpa judul'}`}
-    >
-      <div className={styles.wsCardThumb}>
-        {ws.thumbnailUrl ? (
-          <img className={styles.wsCardThumbImg} src={ws.thumbnailUrl} alt="" />
-        ) : (
-          <div className={styles.wsCardThumbPlaceholder} aria-hidden="true" />
-        )}
-        <span className={styles.wsCardThumbBadge}>
-          <StateBadge state={ws.state} />
-        </span>
-      </div>
-      <div className={styles.wsCardBody}>
-        <p className={`${styles.wsCardTitle} ${!hasTitle ? styles.wsCardTitleEmpty : ''}`}>
-          {ws.title ?? 'Workspace tanpa judul'}
-        </p>
-        <p className={styles.wsCardMeta}>
-          {timeAgo(ws.updatedAt)}
-          {ws.description && (
-            <span className={styles.wsCardDesc}> · {ws.description}</span>
+    <div className={styles.wsCardWrap}>
+      <button
+        className={styles.wsCard}
+        onClick={onClick}
+        aria-label={`Buka workspace ${ws.title ?? 'tanpa judul'}`}
+      >
+        <div className={styles.wsCardThumb}>
+          {ws.thumbnailUrl ? (
+            <img className={styles.wsCardThumbImg} src={ws.thumbnailUrl} alt="" />
+          ) : (
+            <div className={styles.wsCardThumbPlaceholder} aria-hidden="true" />
           )}
-        </p>
-      </div>
-    </button>
+          <span className={styles.wsCardThumbBadge}>
+            <StateBadge state={ws.state} />
+          </span>
+        </div>
+        <div className={styles.wsCardBody}>
+          <p className={`${styles.wsCardTitle} ${!hasTitle ? styles.wsCardTitleEmpty : ''}`}>
+            {ws.title ?? 'Workspace tanpa judul'}
+          </p>
+          <p className={styles.wsCardMeta}>
+            {timeAgo(ws.updatedAt)}
+            {ws.description && (
+              <span className={styles.wsCardDesc}> · {ws.description}</span>
+            )}
+          </p>
+        </div>
+      </button>
+      <button
+        className={styles.wsCardDeleteBtn}
+        onClick={e => {
+          e.stopPropagation()
+          onDeleteClick()
+        }}
+        aria-label={`Hapus workspace ${ws.title ?? 'tanpa judul'}`}
+        title="Hapus workspace"
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path
+            d="M2.5 3.5h9M5.5 3.5V2a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M5.8 6.3v4M8.2 6.3v4M3.3 3.5l.5 8a1 1 0 0 0 1 .95h4.4a1 1 0 0 0 1-.95l.5-8"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+    </div>
   )
 }
 
@@ -176,6 +205,45 @@ function NameModal({ onConfirm }: { onConfirm: (name: string) => void }) {
   )
 }
 
+// ─── Delete Confirm Modal ─────────────────────────────────────────────────────
+
+function DeleteConfirmModal({
+  ws,
+  deleting,
+  onConfirm,
+  onCancel,
+}: {
+  ws: WorkspaceDTO
+  deleting: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div className={styles.modalOverlay} onClick={() => !deleting && onCancel()}>
+      <div
+        className={styles.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-modal-title"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={styles.modalMarkDanger}>!</div>
+        <h2 id="delete-modal-title" className={styles.modalTitle}>Hapus workspace ini?</h2>
+        <p className={styles.modalBody}>
+          {ws.title ? <>"{ws.title}"</> : 'Workspace tanpa judul'} akan dihapus permanen,
+          termasuk seluruh riwayat mengajar dan evaluasinya. Tindakan ini tidak bisa dibatalkan.
+        </p>
+        <button className={styles.modalBtnDanger} onClick={onConfirm} disabled={deleting}>
+          {deleting ? 'Menghapus...' : 'Ya, hapus workspace'}
+        </button>
+        <button className={styles.modalBtnGhost} onClick={onCancel} disabled={deleting}>
+          Batal
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Filter tabs ─────────────────────────────────────────────────────────────
 
 const FILTER_OPTIONS: Array<{ label: string; value: ViewFilter }> = [
@@ -197,6 +265,8 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<ViewFilter>('All')
   const [searchQuery, setSearchQuery] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<WorkspaceDTO | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const loadWorkspaces = useCallback(() => {
     setLoading(true)
@@ -238,6 +308,20 @@ export default function HomePage() {
   function handleOpenWorkspace(ws: WorkspaceDTO) {
     const isCompleted = getViewFilter(ws.state) === 'Completed'
     navigate(isCompleted ? `/evaluation/${ws.id}` : `/workspace/${ws.id}`)
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget || deleting) return
+    setDeleting(true)
+    try {
+      await bridge.deleteWorkspace(deleteTarget.id)
+      setWorkspaces(prev => prev.filter(w => w.id !== deleteTarget.id))
+      setDeleteTarget(null)
+    } catch {
+      setError('Gagal menghapus workspace. Coba lagi.')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const filtered = workspaces.filter(ws => {
@@ -373,6 +457,7 @@ export default function HomePage() {
                   key={ws.id}
                   ws={ws}
                   onClick={() => handleOpenWorkspace(ws)}
+                  onDeleteClick={() => setDeleteTarget(ws)}
                 />
               ))}
               {/* Only show new workspace card in All / Active views */}
@@ -383,6 +468,15 @@ export default function HomePage() {
           )}
         </div>
       </main>
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          ws={deleteTarget}
+          deleting={deleting}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => !deleting && setDeleteTarget(null)}
+        />
+      )}
     </div>
   )
 }

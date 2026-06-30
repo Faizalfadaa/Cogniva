@@ -49,6 +49,16 @@ export class WorkspaceStore {
     );
   }
 
+  delete(id: string): void {
+    this.workspaces.delete(id);
+    this.sessionIdByWorkspace.delete(id);
+    this.checkpoints.delete(id);
+    this.messages.delete(id);
+    this.reports.delete(id);
+    this.pdfs.delete(id);
+    this.references.delete(id);
+  }
+
   // --- Workspace -> Session link ----------------------------------------
 
   linkSession(workspaceId: string, sessionId: string): void {

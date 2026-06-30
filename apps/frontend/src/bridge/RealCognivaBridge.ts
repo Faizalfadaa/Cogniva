@@ -71,6 +71,14 @@ export class RealCognivaBridge implements CognivaBridge {
     return sendJson<WorkspaceDTO>('/api/workspaces', 'POST');
   }
 
+  async deleteWorkspace(workspaceId: string): Promise<void> {
+    const res = await fetch(`${BASE}/api/workspaces/${workspaceId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(`${res.status} ${res.statusText}: ${detail}`);
+    }
+  }
+
   // ── Workspace meta ───────────────────────────────────────────────────────
 
   getWorkspace(workspaceId: string): Promise<WorkspaceDTO> {

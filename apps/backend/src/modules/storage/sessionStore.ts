@@ -44,6 +44,15 @@ export class SessionStore {
     return this.sessions.get(sessionId);
   }
 
+  deleteSession(sessionId: string): void {
+    this.sessions.delete(sessionId);
+    const evalIds = this.evaluationIdsBySession.get(sessionId) ?? [];
+    for (const evalId of evalIds) this.evaluationsById.delete(evalId);
+    this.evaluationIdsBySession.delete(sessionId);
+    this.learnerStates.delete(sessionId);
+    this.turns.delete(sessionId);
+  }
+
   // --- Evaluation (history: one per ended round, oldest first) ----------
 
   saveEvaluation(result: EvaluationResult): EvaluationResult {

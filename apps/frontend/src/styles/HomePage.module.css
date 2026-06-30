@@ -282,6 +282,35 @@
 }
 
 /* ─── Workspace Card ─── */
+.wsCardWrap {
+  position: relative;
+}
+
+.wsCardWrap:hover .wsCardDeleteBtn {
+  opacity: 1;
+}
+
+.wsCardDeleteBtn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 20, 16, 0.55);
+  color: #fff;
+  border-radius: var(--radius-sm, 6px);
+  opacity: 0;
+  transition: opacity var(--dur-fast), background var(--dur-fast);
+  z-index: 2;
+}
+
+.wsCardDeleteBtn:hover {
+  background: #c0392b;
+}
+
 .wsCard {
   display: flex;
   flex-direction: column;
@@ -586,6 +615,54 @@
 .modalBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.modalMarkDanger {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(192, 57, 43, 0.12);
+  color: #c0392b;
+  font-size: 20px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.modalBtnDanger {
+  width: 100%;
+  padding: 12px;
+  background: #c0392b;
+  color: #fff;
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  font-size: 15px;
+  transition: background var(--dur-fast), opacity var(--dur-fast);
+  margin-top: 4px;
+}
+
+.modalBtnDanger:hover:not(:disabled) {
+  background: #a93226;
+}
+
+.modalBtnDanger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modalBtnGhost {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.modalBtnGhost:hover:not(:disabled) {
+  color: var(--text-primary);
 }
 
 .logoImg {
