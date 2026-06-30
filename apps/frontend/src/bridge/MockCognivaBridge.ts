@@ -146,6 +146,17 @@ export class MockCognivaBridge implements CognivaBridge {
     return workspace;
   }
 
+  async deleteWorkspace(workspaceId: string): Promise<void> {
+    await delay(300);
+    const timer = store.evaluationTimers.get(workspaceId);
+    if (timer) clearTimeout(timer);
+    store.evaluationTimers.delete(workspaceId);
+    store.workspaces.delete(workspaceId);
+    store.checkpoints.delete(workspaceId);
+    store.messages.delete(workspaceId);
+    store.reports.delete(workspaceId);
+  }
+
   // ── Workspace meta ────────────────────────────────────────────────────────
 
   async getWorkspace(workspaceId: string): Promise<WorkspaceDTO> {

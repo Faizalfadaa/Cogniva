@@ -7,6 +7,7 @@ export interface CognivaBridge {
   // Home
   listWorkspaces(): Promise<WorkspaceDTO[]>;
   createWorkspace(): Promise<WorkspaceDTO>;
+  deleteWorkspace(workspaceId: string): Promise<void>;
 
   // Workspace meta
   getWorkspace(workspaceId: string): Promise<WorkspaceDTO>;

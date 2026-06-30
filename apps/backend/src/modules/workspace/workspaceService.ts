@@ -70,6 +70,17 @@ export function getWorkspace(id: string): Workspace | undefined {
   return workspaces.get(id);
 }
 
+export function deleteWorkspace(id: string): boolean {
+  const ws = workspaces.get(id);
+  if (!ws) return false;
+
+  const sessionId = workspaces.sessionId(id);
+  if (sessionId) sessions.deleteSession(sessionId);
+  workspaces.delete(id);
+
+  return true;
+}
+
 export function updateMeta(
   id: string,
   meta: { title?: string; description?: string },
