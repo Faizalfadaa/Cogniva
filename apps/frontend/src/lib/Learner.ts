@@ -46,7 +46,7 @@ const LEARNERS: LearnerCharacter[] = [
       '...Hm?',
       'Oh.',
       "So you're {userName}-sensei.",
-      "...I'm Rhen.",
+      "...I'm Akira.",
       'Remember my name.',
       "...You're going to hear it a lot from now on.",
     ],
