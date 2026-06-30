@@ -1,9 +1,9 @@
 import type { Element, VisionInterpretation } from "../../contracts/board.js";
 
-/** Bentuk kaya yang diminta ke model -- confidence per elemen dan ambiguitas
- * eksplisit -- lebih detail daripada VisionInterpretation resmi (lihat
- * GAPS_VISION.md poin 1-2 untuk alasan dua sinyal ini tidak semuanya
- * bertahan setelah dipetakan ke kontrak resmi). */
+/** The richer shape requested from the model -- per-element confidence and
+ * explicit ambiguities -- more detailed than the official VisionInterpretation
+ * (see GAPS_VISION.md points 1-2 for why these two signals don't all survive
+ * after mapping to the official contract). */
 export type VisionElementKind =
   | "text"
   | "equation"
@@ -31,15 +31,15 @@ export type VisionLLMOutput = {
 export type VisionAgentInput = {
   snapshotId: string;
   topic: string;
-  /** Base64 (tanpa prefix data:) atau string kosong bila tak ada gambar. */
+  /** Base64 (no data: prefix) or an empty string when there's no image. */
   imageBase64: string;
   mimeType: string;
-  /** Hasil giliran sebelumnya, untuk konteks pembacaan bertahap (opsional). */
+  /** Previous turn's result, for incremental-reading context (optional). */
   previousElements?: Element[];
 };
 
 export type RunVisionOptions = {
-  /** Paksa mode mock (dipakai test dan demo offline). */
+  /** Force mock mode (used by tests and offline demos). */
   useMock?: boolean;
 };
 

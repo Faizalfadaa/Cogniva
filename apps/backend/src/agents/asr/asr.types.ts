@@ -1,35 +1,36 @@
 import type { SpeechTranscript } from "../../contracts/speech.js";
 
 /**
- * Bentuk kaya yang diminta ke model -- transcript, confidence, kode bahasa
- * terdeteksi, dan ambiguitas eksplisit. Lebih detail dari SpeechTranscript
- * resmi (lihat GAPS_ASR.md): kontrak resmi tidak punya field ambiguities/
- * needsConfirmation, jadi sinyal "ada bagian tak jelas" hanya bertahan lewat
- * confidence yang diturunkan saat dipetakan ke kontrak.
+ * The richer shape requested from the model -- transcript, confidence, detected
+ * language code, and explicit ambiguities. More detailed than the official
+ * SpeechTranscript (see GAPS_ASR.md): the official contract has no ambiguities/
+ * needsConfirmation field, so the "some part is unclear" signal only survives
+ * through the lowered confidence when mapped to the contract.
  */
 export type AsrLLMOutput = {
   transcript: string;
   confidence: number;
-  /** Kode bahasa BCP-47 terdeteksi model, mis. "id-ID". */
+  /** BCP-47 language code detected by the model, e.g. "en-US". */
   language: string;
   ambiguities: string[];
 };
 
 /**
- * Klip suara satu giliran. Tidak ada kontrak resmi untuk ini (teaching_input
- * cuma membawa `audio` base64); sessionId/turnIndex/capturedAt diisi
- * orchestrator dari konteks sesi. Lihat GAPS_ASR.md untuk usul kontrak resmi.
+ * A single turn's audio clip. There is no official contract for this
+ * (teaching_input only carries base64 `audio`); sessionId/turnIndex/capturedAt
+ * are filled by the orchestrator from session context. See GAPS_ASR.md for a
+ * proposed official contract.
  */
 export type AudioClip = {
   segmentId: string;
   sessionId: string;
   turnIndex: number;
-  /** Base64 (tanpa prefix data:) atau string kosong bila tak ada audio. */
+  /** Base64 (no data: prefix) or an empty string when there's no audio. */
   audio: string;
-  /** Format kontainer, mis. "webm" / "wav" / "mp3". */
+  /** Container format, e.g. "webm" / "wav" / "mp3". */
   format: string;
   capturedAt: string;
-  /** Referensi penyimpanan klip (opsional), diteruskan ke audioRef. */
+  /** Optional storage reference for the clip, passed through to audioRef. */
   audioRef?: string;
 };
 
@@ -38,7 +39,7 @@ export type AsrAgentInput = {
   sessionId: string;
   turnIndex: number;
   topic: string;
-  /** Base64 (tanpa prefix data:) atau string kosong bila tak ada audio. */
+  /** Base64 (no data: prefix) or an empty string when there's no audio. */
   audioBase64: string;
   mimeType: string;
   capturedAt: string;
@@ -46,7 +47,7 @@ export type AsrAgentInput = {
 };
 
 export type RunAsrOptions = {
-  /** Paksa mode mock (dipakai test dan demo offline). */
+  /** Force mock mode (used by tests and offline demos). */
   useMock?: boolean;
 };
 

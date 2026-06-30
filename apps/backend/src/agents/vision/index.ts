@@ -54,7 +54,7 @@ export class VisionAgent {
         confidence: 0,
         needsConfirmation: true,
         suggestedClarification:
-          "Belum ada gambar papan atau teks. Bisa tulis atau ketik apa yang dijelaskan?",
+          "There's no board image or text yet. Could you write or type what you're explaining?",
       };
     }
 

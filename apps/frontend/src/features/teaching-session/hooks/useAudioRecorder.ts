@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface UseAudioRecorderResult {
   isRecording: boolean
-  /** true kalau user menolak izin mic, atau device gak ada - audio tetap optional, gak menghalangi flow */
+  /** true if the user denies mic permission, or there's no device - audio stays optional and doesn't block the flow */
   permissionDenied: boolean
   start: () => Promise<void>
   stop: () => Promise<void>

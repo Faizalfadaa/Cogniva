@@ -8,11 +8,11 @@ export interface WorkspaceDTO {
   state: WorkspaceState;
   /**
    * Snapshot di-autosave selama state Editing.
-   * Ini beda yaa dari TeachingCheckpointDTO.whiteboardSnapshot
-   * yang merupakan histori tiap kali tombol Teach ditekan.
+   * Note this differs from TeachingCheckpointDTO.whiteboardSnapshot,
+   * which is the history each time the Teach button is pressed.
    */
   currentWhiteboardSnapshot?: unknown;
-  /** Thumbnail raster kecil dari whiteboard, dipakai sebagai preview di card Home */
+  /** Small raster thumbnail of the whiteboard, used as a preview on the Home card */
   thumbnailUrl?: string;
   createdAt: string;
   updatedAt: string;

@@ -18,9 +18,9 @@ export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
 
   if (!text) {
     const question =
-      "Aku belum dapat penjelasannya. Bisa mulai dari hal paling dasar?";
+      "I haven't gotten the explanation yet. Could you start from the very basics?";
 
-    addUnique(nextState.openGaps, "materi dasar");
+    addUnique(nextState.openGaps, "the basics");
     addUnique(nextState.questionsAsked, question);
 
     return {
@@ -29,7 +29,7 @@ export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
       response: {
         type: "question",
         text: question,
-        targetConcept: "materi dasar",
+        targetConcept: "the basics",
         derivedFrom: "gap"
       }
     };
@@ -46,7 +46,7 @@ export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
     addUnique(nextState.openGaps, unclearTerm);
   }
 
-  const responseText = createMockResponse(concept, unclearTerm, input.turnIndex, text);
+  const responseText = createMockResponse(concept, unclearTerm, input.turnIndex);
   if (unclearTerm) {
     addUnique(nextState.questionsAsked, responseText);
   }
@@ -79,7 +79,7 @@ export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
     response: {
       type: unclearTerm ? "question" : "paraphrase",
       text: responseText,
-      targetConcept: unclearTerm ?? concept ?? "penjelasan terbaru",
+      targetConcept: unclearTerm ?? concept ?? "the latest explanation",
       derivedFrom: unclearTerm ? "gap" : "new_info"
     }
   };
@@ -89,9 +89,12 @@ function extractPossibleConcept(text: string): string | null {
   const normalized = text.replace(/\s+/g, " ").trim();
 
   const patterns = [
+    /(.+?)\s+is\s+(.+)/i,
+    /(.+?)\s+are\s+(.+)/i,
+    /(.+?)\s+means\s+(.+)/i,
+    // Indonesian fallbacks (kept so mixed input still extracts a concept).
     /(.+?)\s+adalah\s+(.+)/i,
-    /(.+?)\s+merupakan\s+(.+)/i,
-    /(.+?)\s+yaitu\s+(.+)/i
+    /(.+?)\s+merupakan\s+(.+)/i
   ];
 
   for (const pattern of patterns) {
@@ -132,81 +135,11 @@ function extractUnclearTerm(text: string): string | null {
 function createMockResponse(
   concept: string | null,
   unclearTerm: string | null,
-  turnIndex: number,
-  teachingText: string
+  turnIndex: number
 ): string {
+  // styleIndex 0/1/2 -> tsundere / kuudere / yandere-lite tone.
   const styleIndex = Math.abs(turnIndex) % 3;
-  if (isLikelyEnglish(teachingText)) {
-    return createEnglishMockResponse(concept, unclearTerm, turnIndex, styleIndex);
-  }
 
-  if (unclearTerm) {
-    const templates = styleIndex === 0
-      ? [
-          `Hmm, istilah "${unclearTerm}" itu maksudnya apa ya? Aku baru denger.`,
-          `B-bukan berarti aku kepo banget ya, tapi "${unclearTerm}" itu maksudnya apa?`,
-          `Aku bukannya gak ngerti semua, cuma "${unclearTerm}" itu apaan sih?`,
-          `Hmph, jelasin "${unclearTerm}" dikit dong. Biar aku gak salah nangkep.`
-        ]
-      : styleIndex === 1
-      ? [
-          `Eh "${unclearTerm}" itu apa sih? Kayak nama alat gitu?`,
-          `Istilah "${unclearTerm}" belum jelas buatku. Definisinya apa?`,
-          `Aku belum punya pegangan untuk "${unclearTerm}". Jelaskan singkat.`,
-          `"${unclearTerm}" itu bagian mana? Aku perlu konteksnya.`
-        ]
-      : [
-          `Wait, "${unclearTerm}" itu yang mana? Aku ketinggalan.`,
-          `Aku harus ngerti "${unclearTerm}" sekarang, jangan biarin konsep itu kabur dari aku.`,
-          `"${unclearTerm}" masih nempel di kepala tapi belum kebuka. Jelasin lagi, ya?`,
-          `Tunggu, aku gak mau kehilangan bagian "${unclearTerm}" ini. Itu maksudnya apa?`
-        ];
-
-    return templates[turnIndex % templates.length];
-  }
-
-  if (concept) {
-    const templates = styleIndex === 0
-      ? [
-          `Ohh jadi ${concept} itu kayak gitu ya! Aku mulai ngerti deh.`,
-          `Ohh jadi ${concept} itu kayak gitu ya. B-bukan berarti aku kagum, tapi mulai masuk sih.`,
-          `Hmm menarik sih soal ${concept}. Tapi jangan seneng dulu, aku masih mau tanya kenapa bisa gitu.`,
-          `Berarti ${concept} intinya begitu kan? Aku cuma ngecek, bukan karena bingung banget.`
-        ]
-      : styleIndex === 1
-      ? [
-          `Hmm menarik sih soal ${concept}. Tapi kok bisa gitu ya?`,
-          `Oke. ${concept} mulai terbaca, tapi hubungan detailnya masih perlu diperjelas.`,
-          `${concept} aku tangkap sebagai inti penjelasan tadi. Masih ada bagian yang kosong.`,
-          `Aku memahami garis besar ${concept}. Contohnya masih kurang konkret.`
-        ]
-      : [
-          `Berarti ${concept} itu intinya kayak yang tadi kan? Bener ga kak?`,
-          `Oh ${concept} toh. Aku mikirnya beda loh tadi, kirain kayak yang di kehidupan sehari-hari.`,
-          `Aku mulai nangkep ${concept}, tapi aku butuh bagian lanjutannya biar pemahamanku gak lepas.`,
-          `${concept} udah masuk, tapi aku masih pengin nempel ke alurnya sampai jelas semua.`,
-          `Jadi ${concept} itu pusatnya ya? Jangan pindah dulu, aku mau pastiin ini bener.`
-        ];
-
-    return templates[turnIndex % templates.length];
-  }
-
-  const fallback = [
-    "Aku mulai paham sedikit, tapi bisa jelasin lagi pakai contoh yang lebih gampang?",
-    "Aku bukannya gak merhatiin, tapi bisa jelasin lagi pakai contoh yang lebih gampang?",
-    "Aku menangkap sedikit. Contoh yang lebih sederhana akan membantu.",
-    "Aku mulai paham sedikit, tapi jangan tinggalin aku di bagian yang masih setengah jelas ini."
-  ];
-
-  return fallback[styleIndex];
-}
-
-function createEnglishMockResponse(
-  concept: string | null,
-  unclearTerm: string | null,
-  turnIndex: number,
-  styleIndex: number
-): string {
   if (unclearTerm) {
     const templates = styleIndex === 0
       ? [
@@ -259,40 +192,6 @@ function createEnglishMockResponse(
   ];
 
   return fallback[styleIndex];
-}
-
-function isLikelyEnglish(text: string): boolean {
-  const normalized = ` ${text.toLowerCase()} `;
-  const englishMarkers = [
-    " the ",
-    " and ",
-    " is ",
-    " are ",
-    " because ",
-    " means ",
-    " process ",
-    " example ",
-    " concept ",
-    " function ",
-    " variable "
-  ];
-  const indonesianMarkers = [
-    " yang ",
-    " dan ",
-    " adalah ",
-    " karena ",
-    " yaitu ",
-    " contoh ",
-    " konsep ",
-    " proses ",
-    " fungsi ",
-    " variabel "
-  ];
-
-  const englishScore = englishMarkers.filter((marker) => normalized.includes(marker)).length;
-  const indonesianScore = indonesianMarkers.filter((marker) => normalized.includes(marker)).length;
-
-  return englishScore > indonesianScore;
 }
 
 function cleanupConcept(value: string): string {

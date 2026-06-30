@@ -17,7 +17,7 @@ export function ContinueLearning({ topics, onNewSession, onResumeSession, resumi
 
       <div className={styles.continueCard}>
         {topics.length === 0 ? (
-          <p className={styles.continueEmpty}>Tidak ada rekomendasi saat ini.</p>
+          <p className={styles.continueEmpty}>No recommendations right now.</p>
         ) : (
           <ul className={styles.continueList}>
             {topics.map((topic, i) => (
@@ -32,7 +32,7 @@ export function ContinueLearning({ topics, onNewSession, onResumeSession, resumi
 
         <div className={styles.continueFooter}>
           <p className={styles.continueFooterText}>
-            Siap mengajar topik-topik baru? Buat sesi baru atau lanjutkan sesi ini.
+            Ready to teach new topics? Start a new session or continue this one.
           </p>
           <div className={styles.continueActions}>
             <button
@@ -40,10 +40,10 @@ export function ContinueLearning({ topics, onNewSession, onResumeSession, resumi
               onClick={onResumeSession}
               disabled={resuming}
             >
-              {resuming ? 'Membuka...' : 'Lanjutkan Sesi ↩'}
+              {resuming ? 'Opening...' : 'Continue Session ↩'}
             </button>
             <button className={styles.continueBtn} onClick={onNewSession} disabled={resuming}>
-              Mulai sesi baru ↗
+              Start a new session ↗
             </button>
           </div>
         </div>

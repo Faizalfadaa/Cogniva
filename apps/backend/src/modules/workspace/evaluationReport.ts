@@ -30,7 +30,7 @@ export function buildEvaluationReport(
   result: EvaluationResult,
   ctx: ReportContext,
 ): EvaluationReport {
-  const topic = ctx.title?.trim() || "topik ini";
+  const topic = ctx.title?.trim() || "this topic";
   const meaningful = ctx.meaningfulScore !== false;
   const tone = meaningful ? toneFromScore(result.score) : toneFromTurns(ctx.turnCount);
 
@@ -40,17 +40,17 @@ export function buildEvaluationReport(
   // What landed: correct findings, then explicit strengths, then the Learner's
   // understood concepts — whichever we have.
   const learned = dedupe([
-    ...correct.map((f) => f.detail || `Kamu menjelaskan ${f.concept} dengan baik`),
+    ...correct.map((f) => f.detail || `You explained ${f.concept} well`),
     ...result.strengths,
     ...(ctx.learnerState?.understoodConcepts ?? []).map(
-      (c) => `Aku jadi paham soal ${c}`,
+      (c) => `I finally get ${c}`,
     ),
   ]).slice(0, 4);
 
   // What's still fuzzy: non-correct findings, then improvements, then the
   // Learner's open gaps and the questions it never got answered.
   const stillConfused = dedupe([
-    ...shaky.map((f) => f.detail || `Bagian ${f.concept} masih belum nyangkut`),
+    ...shaky.map((f) => f.detail || `The part about ${f.concept} didn't quite click`),
     ...result.improvements,
     ...(ctx.learnerState?.openGaps ?? []),
     ...(ctx.learnerState?.questionsAsked ?? []),
@@ -102,28 +102,28 @@ function composeLetter(result: EvaluationResult, topic: string, tone: Tone): str
   const strength = result.strengths[0];
   const improvement = result.improvements[0];
 
-  const opening = `Haii!\n\nMakasih banget udah ngajarin aku soal ${topic} tadi. Aku beneran berusaha ngikutin tiap penjelasanmu.`;
+  const opening = `Hi!\n\nThank you so much for teaching me about ${topic} earlier. I really tried to follow every part of your explanation.`;
 
   let body: string;
   if (tone === "high") {
     body =
-      "Jujur, kali ini banyak banget yang nyantol! Cara kamu nyusun penjelasannya runtut, jadi gampang aku bayangin gambaran besarnya.";
+      "Honestly, so much clicked this time! The way you laid it out was easy to follow, so I could picture the big picture.";
   } else if (tone === "mid") {
     body =
-      "Lumayan banyak yang aku tangkap, walau ada beberapa bagian yang masih perlu aku ulang-ulang sendiri biar makin paham.";
+      "I caught a fair amount, though there are a few parts I still need to go over again on my own to really get them.";
   } else {
     body =
-      "Aku nangkep arah besarnya, tapi jujur masih ada banyak yang belum sepenuhnya aku ngerti. Bukan salah kamu kok — aku cuma butuh diulang pelan-pelan.";
+      "I got the general direction, but honestly there's still a lot I don't fully understand yet. It's not your fault — I just need it broken down slowly.";
   }
 
   const praise = strength
-    ? `\n\nYang paling ngebantu: ${lower(strength)}.`
+    ? `\n\nWhat helped the most: ${lower(strength)}.`
     : "";
   const ask = improvement
-    ? `\n\nKalau nanti kita lanjut lagi, boleh dong bahas ${lower(improvement)}? Aku penasaran banget.`
-    : "\n\nKapan-kapan ajarin aku lagi ya, aku mau tau kelanjutannya!";
+    ? `\n\nNext time we continue, could we go over ${lower(improvement)}? I'm really curious about it.`
+    : "\n\nTeach me again sometime, okay? I want to know what comes next!";
 
-  const closing = `\n\nSampai ketemu lagi~\n— Learner-mu 🌱\n\n(${date})`;
+  const closing = `\n\nSee you again~\n— Your learner 🌱\n\n(${date})`;
 
   return `${opening}\n\n${body}${praise}${ask}${closing}`;
 }
@@ -131,40 +131,40 @@ function composeLetter(result: EvaluationResult, topic: string, tone: Tone): str
 // --- Fallbacks -------------------------------------------------------------
 
 function fallbackLearned(turnCount: number): string[] {
-  if (turnCount === 0) return ["Pengenalan awal topik"];
+  if (turnCount === 0) return ["A first introduction to the topic"];
   return [
-    "Konsep utama yang kamu jelaskan di awal sesi",
-    "Alur step-by-step yang kamu gambar di whiteboard",
-    "Contoh konkret yang kamu kasih — itu yang paling bikin aku 'oh!'",
+    "The main concept you explained early in the session",
+    "The step-by-step flow you drew on the whiteboard",
+    "The concrete example you gave — that's what made it click for me",
   ];
 }
 
 function fallbackConfused(turnCount: number): string[] {
   if (turnCount < 2) {
     return [
-      "Koneksi antar konsep masih agak kabur buat aku",
-      "Edge case-nya belum sempat kebahas",
+      "The connection between the concepts is still a bit fuzzy for me",
+      "We didn't get to the edge cases yet",
     ];
   }
   return [
-    "Detail di kasus-kasus khusus",
-    "Kenapa pendekatan ini lebih baik dari alternatifnya",
-    "Batasan / limitasi-nya masih bikin aku ragu",
+    "The details in special cases",
+    "Why this approach is better than the alternatives",
+    "I'm still unsure about its limits / limitations",
   ];
 }
 
 function fallbackReflection(turnCount: number): string {
   if (turnCount === 0) {
-    return "Sesi ini singkat banget, jadi belum banyak yang bisa aku serap. Lanjut lebih dalam di sesi berikutnya ya!";
+    return "This session was really short, so I couldn't absorb much yet. Let's go deeper next time!";
   }
-  return "Fondasi awalnya udah kena. Diagram di whiteboard sangat membantu — kalau sesinya lebih panjang aku yakin bisa nangkep lebih banyak.";
+  return "The foundation is there. The whiteboard diagrams helped a lot — with a longer session I'm sure I could catch even more.";
 }
 
 function fallbackContinue(topic: string): string[] {
   return [
-    `${topic} — kasus lanjutan & edge case`,
-    "Perbandingan dengan pendekatan alternatif",
-    "Contoh penerapan di dunia nyata",
+    `${topic} — advanced cases & edge cases`,
+    "Comparison with alternative approaches",
+    "Real-world application examples",
   ];
 }
 
@@ -185,7 +185,7 @@ function dedupe(items: string[]): string[] {
 }
 
 function cleanTopic(s: string, topic: string): string {
-  const t = s.trim().replace(/^Tambahkan penjelasan tentang:\s*/i, "");
+  const t = s.trim().replace(/^Add an explanation of:\s*/i, "");
   return t || topic;
 }
 

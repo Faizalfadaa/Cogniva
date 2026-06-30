@@ -1,10 +1,10 @@
 export interface TeachingCheckpointDTO {
   id: string;
-  /** Snapshot gambar canvas, dikirim ke Vision saat tombol Teach ditekan */
+  /** Snapshot image of the canvas, sent to Vision when the Teach button is pressed */
   snapshotImageUrl: string;
-  /** Snapshot dokumen tldraw (JSON) supaya whiteboard bisa di-restore persis */
+  /** The tldraw document snapshot (JSON) so the whiteboard can be restored exactly */
   whiteboardSnapshot: unknown;
-  /** URL audio penjelasan user yang direkam selama editing, di-upload bareng saat Teach ditekan */
+  /** URL of the user's spoken-explanation audio recorded during editing, uploaded with the Teach press */
   audioUrl?: string;
   /** Respon learner setelah Vision + agent memproses snapshot. Kosong selagi diproses. */
   learnerResponse?: string;

@@ -4,7 +4,7 @@ const USER_NAME_KEY = 'cogniva:userName';
 
 interface UserState {
   userName: string | null;
-  /** true saat popup "siapa namamu" harus ditampilkan */
+  /** true when the "what's your name" popup should be shown */
   needsNameSetup: boolean;
   setUserName: (name: string) => void;
 }
@@ -27,7 +27,7 @@ export const useUserStore = create<UserState>((set) => {
       try {
         localStorage.setItem(USER_NAME_KEY, trimmed);
       } catch {
-        // localStorage tidak tersedia (private mode, dll) - lanjut saja
+        // localStorage unavailable (private mode, etc.) - just carry on
       }
       set({ userName: trimmed, needsNameSetup: false });
     },

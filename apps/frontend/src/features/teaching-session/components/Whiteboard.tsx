@@ -3,23 +3,23 @@ import { Tldraw, getSnapshot, loadSnapshot, type Editor, type TLComponents } fro
 import 'tldraw/tldraw.css'
 
 interface WhiteboardProps {
-  /** Bagian "document" dari snapshot tldraw sebelumnya (dari WorkspaceDTO.currentWhiteboardSnapshot) */
+  /** The "document" part of the previous tldraw snapshot (from WorkspaceDTO.currentWhiteboardSnapshot) */
   initialSnapshot?: unknown
-  /** Dipanggil debounced setiap ada perubahan di kanvas (autosave draft) */
+  /** Called debounced whenever the canvas changes (draft autosave) */
   onAutosave: (payload: { snapshot: unknown; thumbnail?: Blob }) => void
-  /** true saat checkpoint dikunci (setelah Teach ditekan) - whiteboard jadi read-only */
+  /** true when the checkpoint is locked (after Teach is pressed) - the whiteboard becomes read-only */
   readOnly?: boolean
 }
 
 export interface WhiteboardHandle {
-  /** Ambil snapshot dokumen + gambar SAAT INI - dipanggil TeachButton pas ditekan, bukan debounced */
+  /** Grab the CURRENT document + image snapshot - called when TeachButton is pressed, not debounced */
   exportSnapshot: () => Promise<{ document: unknown; image?: Blob }>
 }
 
 const AUTOSAVE_DEBOUNCE_MS = 3000
 
-// Background custom (Parchment + dot grid) - ini cara resmi tldraw v5 untuk
-// override canvas background lewat komponen `Background`, bukan hack CSS variable.
+// Custom background (Parchment + dot grid) - this is the official tldraw v5 way
+// to override the canvas background via the `Background` component, not a CSS-variable hack.
 function ParchmentBackground() {
   return (
     <div
@@ -41,10 +41,10 @@ export const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function
   const editorRef = useRef<Editor | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // StylePanel & SelectionForeground dipaksa null saat locked - jangan andalkan
-  // readonly bawaan tldraw buat nyembunyiin ini sendiri, karena shape masih bisa
-  // ke-select dalam mode readonly (lihat tldraw/tldraw#5903) dan panel ikut nongol.
-  // Ini juga yang bikin posisi LearnerResponseBubble di top-right aman dari collision.
+  // StylePanel & SelectionForeground are forced null when locked - don't rely on
+  // tldraw's built-in readonly to hide these itself, because shapes can still be
+  // selected in readonly mode (see tldraw/tldraw#5903) and the panel shows up too.
+  // This is also what keeps the LearnerResponseBubble's top-right position collision-safe.
   const components = useMemo<TLComponents>(
     () => ({
       Background: ParchmentBackground,
@@ -65,7 +65,7 @@ export const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function
       return
     }
 
-    // Thumbnail kecil buat preview card di Home - resolusi rendah, gak perlu tajam.
+    // Small thumbnail for the Home preview card - low resolution, doesn't need to be sharp.
     editor
       .toImage(shapeIds, { format: 'png', background: true, scale: 0.4 })
       .then((result) => onAutosave({ snapshot: document, thumbnail: result?.blob }))
@@ -103,7 +103,7 @@ export const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function
         try {
           loadSnapshot(editor.store, { document: initialSnapshot as never })
         } catch {
-          // Snapshot lama/incompatible - lanjut dengan kanvas kosong saja.
+          // Old/incompatible snapshot - just continue with an empty canvas.
         }
       }
 
@@ -124,8 +124,8 @@ export const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function
     [initialSnapshot, runAutosave]
   )
 
-  // readOnly bisa berubah setelah editor mount (toggle lock/unlock berulang kali
-  // dalam satu sesi) - sinkronkan tiap kali nilainya berubah.
+  // readOnly can change after the editor mounts (toggling lock/unlock repeatedly
+  // within one session) - sync it whenever the value changes.
   useEffect(() => {
     editorRef.current?.updateInstanceState({ isReadonly: readOnly })
   }, [readOnly])
