@@ -34,7 +34,7 @@ export function LearnerResponseBubble({ learner, text, pending, checkpointId }: 
         <button
           className={styles.notifClose}
           onClick={() => setDismissed(true)}
-          aria-label="Tutup respon learner"
+          aria-label="Close learner response"
         >
           ×
         </button>

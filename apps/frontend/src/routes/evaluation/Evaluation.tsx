@@ -116,9 +116,9 @@ export default function EvaluationPage() {
 
       {/* Hero */}
       <div className={styles.reportHero}>
-        <p className={styles.reportHeroEyebrow}>Sesi selesai</p>
+        <p className={styles.reportHeroEyebrow}>Session complete</p>
         <h1 className={styles.reportHeroTitle}>
-          {workspace.title ?? 'Workspace tanpa judul'}
+          {workspace.title ?? 'Untitled workspace'}
         </h1>
       </div>
 
