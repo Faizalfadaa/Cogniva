@@ -13,7 +13,10 @@ import '@excalidraw/excalidraw/index.css'
 import '../../../styles/excalidraw-theme.css'
 import type { WhiteboardHandle, WhiteboardProps } from './whiteboardTypes'
 
-const AUTOSAVE_DEBOUNCE_MS = 3000
+const AUTOSAVE_DEBOUNCE_MS = 1500
+// Even during non-stop editing (where the debounce keeps resetting), force a
+// save at least this often so a long session is never left unsaved.
+const AUTOSAVE_MAX_INTERVAL_MS = 8000
 
 // Parchment tone to match the app's look (tldraw uses the same #f5f0e4).
 const CANVAS_BG = '#f5f0e4'
@@ -57,11 +60,15 @@ const ExcalidrawWhiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(funct
   const buildDocument = useCallback(() => {
     const api = apiRef.current
     if (!api) return undefined
-    const elements = api.getSceneElements()
-    return {
-      elements,
-      files: api.getFiles(),
-      appState: { viewBackgroundColor: api.getAppState().viewBackgroundColor ?? CANVAS_BG },
+    try {
+      const elements = api.getSceneElements()
+      return {
+        elements,
+        files: api.getFiles(),
+        appState: { viewBackgroundColor: api.getAppState().viewBackgroundColor ?? CANVAS_BG },
+      }
+    } catch {
+      return undefined // API torn down (e.g. during unmount)
     }
   }, [])
 
@@ -83,24 +90,48 @@ const ExcalidrawWhiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(funct
     }
   }, [])
 
-  const runAutosave = useCallback(() => {
-    const document = buildDocument()
-    if (!document) return
-    // Empty canvas: persist the (empty) document, no thumbnail — mirrors tldraw.
-    if ((document.elements as readonly unknown[]).length === 0) {
-      onAutosave({ snapshot: document })
-      return
-    }
-    exportImage(0.4)
-      .then((thumbnail) => onAutosave({ snapshot: document, thumbnail }))
-      .catch(() => onAutosave({ snapshot: document }))
-  }, [buildDocument, exportImage, onAutosave])
+  const dirtyRef = useRef(false)
 
-  // Excalidraw's onChange fires for any scene/appState change; debounce like tldraw.
+  const runAutosave = useCallback(
+    (withThumbnail: boolean) => {
+      const doc = buildDocument()
+      if (!doc) return
+      // Skip empty scenes: nothing to persist yet, and it avoids flipping a fresh
+      // Draft into Teaching on Excalidraw's initial onChange (which fires on mount).
+      if ((doc.elements as readonly unknown[]).length === 0) return
+      if (!withThumbnail) {
+        onAutosave({ snapshot: doc })
+        return
+      }
+      exportImage(0.4)
+        .then((thumbnail) => onAutosave({ snapshot: doc, thumbnail }))
+        .catch(() => onAutosave({ snapshot: doc }))
+    },
+    [buildDocument, exportImage, onAutosave]
+  )
+
+  /** Run the pending save immediately (if there are unsaved changes). */
+  const flush = useCallback(
+    (withThumbnail: boolean) => {
+      if (!dirtyRef.current) return
+      dirtyRef.current = false
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+        debounceRef.current = null
+      }
+      runAutosave(withThumbnail)
+    },
+    [runAutosave]
+  )
+
+  // Excalidraw's onChange fires for any scene/appState change; mark dirty and
+  // save shortly after the last edit (the interval + exit handlers below cover
+  // long sessions and leaving the page).
   const handleChange = useCallback(() => {
+    dirtyRef.current = true
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(runAutosave, AUTOSAVE_DEBOUNCE_MS)
-  }, [runAutosave])
+    debounceRef.current = setTimeout(() => flush(true), AUTOSAVE_DEBOUNCE_MS)
+  }, [flush])
 
   useImperativeHandle(
     ref,
@@ -114,12 +145,24 @@ const ExcalidrawWhiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(funct
     [buildDocument, exportImage]
   )
 
-  useEffect(
-    () => () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-    },
-    []
-  )
+  // Safety nets so a session is saved even without pausing: a periodic flush
+  // during long editing, and a flush when the tab is hidden/closed or the
+  // component unmounts (navigating away).
+  useEffect(() => {
+    const interval = setInterval(() => flush(true), AUTOSAVE_MAX_INTERVAL_MS)
+    const onPageHide = () => flush(false)
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush(false)
+    }
+    window.addEventListener('pagehide', onPageHide)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('pagehide', onPageHide)
+      document.removeEventListener('visibilitychange', onVisibility)
+      flush(false) // persist the latest before this editor goes away
+    }
+  }, [flush])
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
