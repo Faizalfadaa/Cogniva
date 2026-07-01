@@ -41,7 +41,7 @@ services:
     networks:
       - cogniva
   
-    caddy:
+  caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on:
