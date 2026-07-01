@@ -1,0 +1,46 @@
+# Cogniva — two independent services, one network.
+#
+#   frontend  nginx serving the built SPA + reverse-proxying to the backend (:80)
+#   backend   Fastify API run with tsx (:8000, internal)
+#
+# Only the frontend publishes a host port; the browser reaches the API through
+# nginx on the same origin. Copy .env.docker.example to .env and set your key:
+#
+#   cp .env.docker.example .env
+#   docker compose up -d --build
+
+services:
+  backend:
+    build:
+      context: ./apps/backend
+    image: cogniva-backend:latest
+    restart: unless-stopped
+    environment:
+      # Optional — without it the Learner uses a deterministic mock.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      COGNIVA_LEARNER_MODEL: ${COGNIVA_LEARNER_MODEL:-gemini-2.5-flash}
+      PORT: "8000"
+      NODE_ENV: production
+    expose:
+      - "8000"
+    networks:
+      - cogniva
+
+  frontend:
+    build:
+      context: ./apps/frontend
+      args:
+        # Empty => the SPA calls relative /api paths, proxied by nginx.
+        VITE_API_BASE: ""
+    image: cogniva-frontend:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    networks:
+      - cogniva
+
+networks:
+  cogniva:
+    driver: bridge
