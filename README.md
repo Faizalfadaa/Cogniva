@@ -58,9 +58,8 @@ Cogniva/
 |       |   |-- routes/          # App routes
 |       |   `-- main.tsx
 |       `-- package.json
-|-- docs/
-|   |-- CONTRACTS.md
-|   `-- LAPORAN_PROGRES.md
+|-- caddy/
+|   `-- Caddyfile                # Reverse proxy and HTTPS configuration
 |-- packages/
 |-- scripts/
 `-- README.md
