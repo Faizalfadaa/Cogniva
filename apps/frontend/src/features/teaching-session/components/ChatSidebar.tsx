@@ -11,7 +11,6 @@ interface ChatSidebarProps {
   learner: LearnerCharacter
   messages: ChatMessageDTO[]
   isOpen: boolean
-  unreadCount: number
   onToggle: () => void
   onSend: (content: string) => void
 }
@@ -20,7 +19,6 @@ export function ChatSidebar({
   learner,
   messages,
   isOpen,
-  unreadCount,
   onToggle,
   onSend,
 }: ChatSidebarProps) {
@@ -79,23 +77,9 @@ export function ChatSidebar({
     setDraft('')
   }
 
-  // ── Avatar trigger (collapsed state) ─────────────────────────────────────
-  if (!isOpen) {
-    return (
-      <div className={styles.sidebarTrigger}>
-        <button
-          className={styles.sidebarAvatarBtn}
-          onClick={onToggle}
-          aria-label={`Open chat with ${learner.name}`}
-        >
-          <img src={learner.avatarUrl} alt={learner.name} className={styles.sidebarAvatarImg} />
-          {unreadCount > 0 && (
-            <span className={styles.sidebarBadge}>{unreadCount > 9 ? '9+' : unreadCount}</span>
-          )}
-        </button>
-      </div>
-    )
-  }
+  // Collapsed state renders nothing — the chat is opened from the header button
+  // (a floating avatar over the canvas overlapped the whiteboard tools).
+  if (!isOpen) return null
 
   // ── Full sidebar (open state) ─────────────────────────────────────────────
   return (

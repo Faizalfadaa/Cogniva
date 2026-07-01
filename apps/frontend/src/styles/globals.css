@@ -83,3 +83,10 @@ input, textarea { font-family: inherit; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ─── Mobile safety ─── */
+/* Guard against accidental horizontal scroll on phones. Scoped to ≤768px so
+   the desktop layout is untouched. */
+@media (max-width: 768px) {
+  html, body { max-width: 100%; overflow-x: hidden; }
+}
