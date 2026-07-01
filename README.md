@@ -1,131 +1,263 @@
 # Cogniva
-<img width="900" height="600" alt="Color Blocke (3)" src="https://github.com/user-attachments/assets/75fa83c8-64a3-47d5-abda-393b8bbbb871" />
 
-A **Learning-by-Teaching** study platform — the user teaches an AI that plays
-the role of a student, then receives an evaluation of how well they explained.
+<img width="900" height="600" alt="Cogniva preview" src="https://github.com/user-attachments/assets/75fa83c8-64a3-47d5-abda-393b8bbbb871" />
 
-This repository implements **Milestone M0 (Alignment & Contracts)** and the
-**M1 (end-to-end skeleton) backend** — one full teaching turn runs through the
-backend orchestrator and Learner agent.
-Design reference: `Cogniva_Dokumen_Arsitektur.pdf` (in Indonesian).
+Cogniva is a **Learning-by-Teaching** study platform where users learn by
+explaining a topic to an AI learner. The user prepares material in a workspace,
+teaches through a whiteboard and chat-based interaction, receives questions from
+the AI learner, and gets an evaluation of their explanation at the end of the
+session.
 
-> Note: the architecture PDF is written in Indonesian; the code, comments, and
-> contract enum values in this repo are in English for an international
-> submission. See `docs/CONTRACTS.md` for the enum value mapping.
+The application is built as a small monorepo with a React frontend and a
+Fastify backend. The backend can use Gemini through the official
+`@google/genai` SDK for real AI responses, while still supporting mock mode for
+offline development and testing.
 
-## Milestone M0 status
+## Features
 
-M0 deliverables per the document (§11): _the document, the data contracts, the
-repo & scaffold, and 1–2 demo topics._
+- Workspace creation and management
+- Interactive whiteboard for writing and drawing teaching material
+- AI learner persona that responds like a student
+- Chat interaction for follow-up questions and clarification
+- Teaching checkpoint submission with whiteboard and optional audio input
+- Session evaluation report after the learning session is completed
+- Mock AI fallback when no Gemini API key is configured
 
-| M0 deliverable | Status | Location |
-| --- | --- | --- |
-| Architecture document | ✅ | `Cogniva_Dokumen_Arsitektur.pdf` |
-| Data contracts (§6) | ✅ | `apps/backend/src/contracts/`, `apps/frontend/src/contracts/` |
-| Session state machine (§4) | ✅ | `apps/backend/src/modules/session/stateMachine.ts` |
-| REST + WebSocket API skeleton (§7) | ✅ | `apps/backend/src/api/` |
-| Frontend repo & scaffold (React+TS+Vite+Tailwind) | ✅ | `apps/frontend/` |
-| 1–2 demo topics (§6.1) | ✅ | `apps/backend/src/data/topics/` |
+## Tech Stack
 
-## Milestone M1 status (backend)
+- Frontend: React, TypeScript, Vite, tldraw
+- Backend: Node.js, TypeScript, Fastify, Zod
+- AI provider: Gemini via `@google/genai`
+- Testing: Vitest
 
-M1 per the document (§11): _Backend + canvas + Learner — one full teaching turn
-runs._ The backend half is implemented:
+## Project Structure
 
-| M1 backend piece | Status | Location |
-| --- | --- | --- |
-| Orchestrator — one teaching turn end to end (§3.3, §5.1) | ✅ | `apps/backend/src/orchestrator/index.ts` |
-| Learner agent — student persona, real LLM (§3.6) | ✅ | `apps/backend/src/agents/learner/index.ts` |
-| Centralized LLM wrapper (§3.3, §7.3) | ✅ | `apps/backend/src/llm/providers/gemini.ts` |
-| WebSocket teaching loop wired (§7.2) | ✅ | `apps/backend/src/api/websocket/index.ts` |
-| Vision / ASR | ⏳ M2 stub | `apps/backend/src/agents/vision/index.ts` |
-| Evaluator | ⏳ M3 | placeholder in `api/rest/index.ts` |
-
-The **Learner** calls a Gemini text model (via the official `@google/genai` SDK)
-with a strict student persona and structured-JSON output, maintaining its
-`LearnerState` across turns. It receives only the topic title/description, what
-was explained, and its own state — never the answer key (`referenceMaterial` /
-`keyConcepts`), structurally honoring the §1.4 invariants.
-
-**No API key? Still runs.** Without `GEMINI_API_KEY`, the Learner uses a
-deterministic in-character fallback so the end-to-end loop (and the test suite)
-works offline. Set the key to get the real LLM-driven student. See
-`apps/backend/.env.example`.
-
-Vision/ASR are M2 (the canvas-image channel); the Evaluator is M3. Those points
-are marked `TODO(Mx)` in the code and return passthrough stubs / recoverable
-`error` messages rather than crashing.
-
-## Structure
-
-```
-Cogniva/                             # monorepo (apps / packages / scripts)
-├── Cogniva_Dokumen_Arsitektur.pdf   # design reference (M0 output)
-├── docs/
-│   └── CONTRACTS.md                 # data-contract → code map
-├── packages/                        # shared packages (future)
-├── scripts/                         # repo scripts (future)
-└── apps/
-    ├── backend/                     # TypeScript + Fastify (modular monolith)
-    │   ├── src/
-    │   │   ├── main.ts              # Fastify entrypoint (loads .env, listens)
-    │   │   ├── app.ts               # app factory: REST + WebSocket + CORS
-    │   │   ├── config/              # env-driven config (model, thresholds)
-    │   │   ├── contracts/           # Zod schemas + types — §6 contracts & §7.2 messages
-    │   │   ├── llm/                 # centralized LLM wrapper (providers, prompts) §3.3
-    │   │   ├── agents/              # Learner (real) + Vision (M2 stub) §3.4-§3.6
-    │   │   ├── orchestrator/        # one teaching turn end to end §3.3, §5.1
-    │   │   ├── api/                 # rest/ §7.1 + websocket/ §7.2
-    │   │   ├── modules/             # session, topic, storage (+ teaching/evaluation stubs)
-    │   │   └── data/topics/         # curated demo topics §6.1
-    │   ├── tests/                   # state machine, learner, llm, orchestrator, ws
-    │   ├── .env.example             # GEMINI_API_KEY + tuning knobs
-    │   ├── tsconfig.json
-    │   └── package.json
-    └── frontend/                    # React + TypeScript + Vite + Tailwind
-        └── src/
-            ├── contracts/           # TS mirror of §6 contracts & §7.2 messages
-            ├── api/client.ts        # thin REST client
-            └── App.tsx              # UI skeleton (loads the demo topics)
+```text
+Cogniva/
+|-- apps/
+|   |-- backend/
+|   |   |-- src/
+|   |   |   |-- agents/          # Learner, vision, ASR, evaluator agents
+|   |   |   |-- api/             # REST and WebSocket endpoints
+|   |   |   |-- config/          # Environment-based runtime config
+|   |   |   |-- contracts/       # Zod schemas and shared backend types
+|   |   |   |-- llm/             # Gemini client and prompts
+|   |   |   |-- modules/         # Workspace, session, topic, and storage logic
+|   |   |   |-- orchestrator/    # Teaching turn orchestration
+|   |   |   |-- app.ts           # Fastify app factory
+|   |   |   `-- main.ts          # Backend entrypoint
+|   |   |-- tests/               # Backend tests and demos
+|   |   |-- .env.example
+|   |   `-- package.json
+|   `-- frontend/
+|       |-- public/              # Static assets
+|       |-- src/
+|       |   |-- bridge/          # Frontend bridge to real or mock backend
+|       |   |-- dto/             # Frontend DTO types
+|       |   |-- features/        # UI features
+|       |   |-- routes/          # App routes
+|       |   `-- main.tsx
+|       `-- package.json
+|-- docs/
+|   |-- CONTRACTS.md
+|   `-- LAPORAN_PROGRES.md
+|-- packages/
+|-- scripts/
+`-- README.md
 ```
 
-## Running
+## Prerequisites
 
-### Backend (port 8000)
+Install these before running the project:
 
-```bash
+- Node.js 20 or newer
+- npm
+- A Gemini API key, if you want to use real AI responses
+
+You can still run the project without an API key. In that case, the backend uses
+mock AI responses.
+
+## Environment Setup
+
+Create the backend environment file:
+
+```powershell
+cd apps/backend
+Copy-Item .env.example .env
+```
+
+Open `apps/backend/.env` and configure the values you need:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+USE_MOCK_AI=false
+COGNIVA_LEARNER_MODEL=gemini-2.5-flash
+PORT=8000
+```
+
+Important environment variables:
+
+- `GEMINI_API_KEY`: Enables real Gemini-powered AI responses.
+- `USE_MOCK_AI`: Set to `false` to use Gemini, or `true` to force mock AI.
+- `COGNIVA_LEARNER_MODEL`: Gemini model used by the learner agent.
+- `PORT`: Backend server port. The frontend expects `8000` by default.
+
+If the backend starts on a different port, either change `PORT=8000` in the
+backend `.env` file or configure the frontend with `VITE_API_BASE`.
+
+Optional frontend environment file:
+
+```powershell
+cd apps/frontend
+New-Item .env.local
+```
+
+Example `apps/frontend/.env.local`:
+
+```env
+VITE_API_BASE=http://localhost:8000
+VITE_USE_MOCK=false
+```
+
+## Running the Application
+
+Run the backend in the first terminal:
+
+```powershell
 cd apps/backend
 npm install
-npm run dev           # watch mode on :8000 (configurable via PORT)
+npm run dev
 ```
 
-Health check: http://localhost:8000/health
+The backend should print:
 
-Tests (Vitest):
-
-```bash
-cd apps/backend
-npm test
+```text
+Cogniva backend listening on http://localhost:8000
 ```
 
-### Frontend (port 5173)
+Check the backend health endpoint:
 
-```bash
+```text
+http://localhost:8000/health
+```
+
+Run the frontend in a second terminal:
+
+```powershell
 cd apps/frontend
 npm install
 npm run dev
 ```
 
-Make sure the backend is running so the topic list loads (CORS is already
-allowed for `localhost:5173` in `src/app.ts`).
+Open the frontend in your browser:
 
-## Tech stack (§9)
+```text
+http://localhost:5173
+```
 
-Frontend: React + TypeScript + Vite + Tailwind · Backend: TypeScript + Fastify ·
-Real-time: WebSocket · Storage (later): SQLite + object store.
+## Using Real AI
 
-## Contract notes
+To use real Gemini responses:
 
-The data contracts are the single source of truth across the team (§6, §12).
-Any change must be agreed with the tech lead and synced on **both** sides
-(backend Zod ⇄ frontend TypeScript). See `docs/CONTRACTS.md`.
+1. Put a valid Gemini API key in `apps/backend/.env`.
+2. Set `USE_MOCK_AI=false`.
+3. Make sure the backend is running.
+4. Use the app from the frontend.
+
+You can also test the learner agent directly from the backend:
+
+```powershell
+cd apps/backend
+npm run chat:learner
+```
+
+If the AI is connected correctly, the command shows Gemini mode. If no API key
+is found, it falls back to mock mode.
+
+## Testing
+
+Run backend tests:
+
+```powershell
+cd apps/backend
+npm test
+```
+
+Run backend type checking:
+
+```powershell
+cd apps/backend
+npm run typecheck
+```
+
+Build the frontend:
+
+```powershell
+cd apps/frontend
+npm run build
+```
+
+## Demo Scripts
+
+The backend includes a few demo scripts for testing individual AI features:
+
+```powershell
+cd apps/backend
+npm run chat:learner
+npm run demo:learner
+npm run demo:vision -- ./gambar-uji/papan1.jpeg "Photosynthesis"
+npm run demo:asr -- ./path-to-audio.wav "Photosynthesis"
+```
+
+Some demos default to mock mode so they can run without an API key. Set
+`USE_MOCK_AI=false` in `.env` when you want to call Gemini.
+
+## Main User Flow
+
+1. Open the frontend.
+2. Create a new workspace.
+3. Add teaching material on the whiteboard.
+4. Submit a teaching checkpoint.
+5. Read the AI learner response.
+6. Continue the discussion through chat.
+7. Finish the session.
+8. Review the generated evaluation report.
+
+## Troubleshooting
+
+### Frontend says "Can't connect"
+
+Make sure the backend is running on the same port expected by the frontend. The
+default is:
+
+```text
+http://localhost:8000
+```
+
+If the backend prints a different port, update `PORT=8000` in
+`apps/backend/.env`, restart the backend, and refresh the frontend.
+
+### Browser shows "Route tidak ditemukan"
+
+This is normal if you open the backend root URL directly. Use the health
+endpoint instead:
+
+```text
+http://localhost:8000/health
+```
+
+### AI still uses mock responses
+
+Check these values in `apps/backend/.env`:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+USE_MOCK_AI=false
+```
+
+Then restart the backend.
+
+## Documentation
+
+- `docs/CONTRACTS.md`: Data contracts and DTO mapping
+- `docs/LAPORAN_PROGRES.md`: Project progress notes
