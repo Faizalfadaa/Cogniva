@@ -1,0 +1,37 @@
+/* Cogniva brand accent for Excalidraw's UI (toolbar, active tool, hover,
+ * selection, links). Replaces Excalidraw's default indigo/purple with the
+ * lime + forest-green palette from globals.css.
+ *
+ * Every purple in Excalidraw comes through a CSS variable (no hardcoded hex in
+ * its rules), so overriding the full family below is enough. The doubled class
+ * `.excalidraw.excalidraw` raises specificity so it beats Excalidraw's own
+ * `.excalidraw` / `.excalidraw.theme--*` definitions regardless of light/dark.
+ */
+.excalidraw.excalidraw {
+  /* Selected tool — lime-tint background with a dark forest icon (the "pop"). */
+  --color-surface-primary-container: #edffd0; /* lime-tint */
+  --color-on-primary-container: #1e2d08; /* forest-dark (icon/text on selected) */
+
+  /* Hover background for toolbar/menu items — soft green instead of lavender. */
+  --color-surface-high: #eef4e0;
+
+  /* Primary buttons/actions (white icon on top) — dark forest green. */
+  --color-primary: #2d3a1a; /* forest-mid */
+  --color-primary-darker: #243014;
+  --color-primary-darkest: #1e2d08; /* forest-dark */
+  --color-primary-hover: #243014;
+
+  /* Light primary highlights — lime tint. */
+  --color-primary-light: #edffd0;
+  --color-primary-light-darker: #dff5b8;
+
+  /* Brand hovers (links, footer, logo) + selection outline. */
+  --color-brand-hover: #2d3a1a;
+  --color-brand-active: #1e2d08;
+  --color-selection: #2d3a1a;
+  --color-logo-text: #1e2d08;
+
+  /* Range sliders (opacity, font size, …) — track was lavender hsl(240,…). */
+  --color-slider-track: #dff5b8; /* soft lime */
+  --color-slider-thumb: #2d3a1a; /* forest-mid knob */
+}
