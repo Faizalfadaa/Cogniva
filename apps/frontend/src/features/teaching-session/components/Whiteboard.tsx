@@ -1,140 +1,27 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
-import { Tldraw, getSnapshot, loadSnapshot, type Editor, type TLComponents } from 'tldraw'
-import 'tldraw/tldraw.css'
+import { forwardRef, lazy, Suspense } from 'react'
+import type { WhiteboardHandle, WhiteboardProps } from './whiteboardTypes'
 
-interface WhiteboardProps {
-  /** The "document" part of the previous tldraw snapshot (from WorkspaceDTO.currentWhiteboardSnapshot) */
-  initialSnapshot?: unknown
-  /** Called debounced whenever the canvas changes (draft autosave) */
-  onAutosave: (payload: { snapshot: unknown; thumbnail?: Blob }) => void
-  /** true when the checkpoint is locked (after Teach is pressed) - the whiteboard becomes read-only */
-  readOnly?: boolean
-}
+export type { WhiteboardHandle } from './whiteboardTypes'
 
-export interface WhiteboardHandle {
-  /** Grab the CURRENT document + image snapshot - called when TeachButton is pressed, not debounced */
-  exportSnapshot: () => Promise<{ document: unknown; image?: Blob }>
-}
+// Which whiteboard engine to bundle/render, chosen at BUILD time:
+//   - tldraw     → local development on localhost (tldraw's free dev mode)
+//   - excalidraw → production on a real HTTPS domain, where tldraw would demand a
+//                  paid license and blank the canvas. Excalidraw is MIT with no
+//                  license/domain enforcement, so it's the safe production choice.
+// Set VITE_WHITEBOARD=excalidraw for the production build (see Dockerfile). Unset
+// defaults to tldraw, so `npm run dev` on localhost keeps tldraw automatically.
+const ENGINE = (import.meta.env.VITE_WHITEBOARD as string | undefined) ?? 'tldraw'
 
-const AUTOSAVE_DEBOUNCE_MS = 3000
+// Lazy so only the selected engine's chunk is ever fetched — the production
+// bundle never runs tldraw's license code, and dev never loads Excalidraw.
+const TldrawWhiteboard = lazy(() => import('./TldrawWhiteboard'))
+const ExcalidrawWhiteboard = lazy(() => import('./ExcalidrawWhiteboard'))
 
-// Custom background (Parchment + dot grid) - this is the official tldraw v5 way
-// to override the canvas background via the `Background` component, not a CSS-variable hack.
-function ParchmentBackground() {
+export const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteboard(props, ref) {
+  const Engine = ENGINE === 'excalidraw' ? ExcalidrawWhiteboard : TldrawWhiteboard
   return (
-    <div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        background: '#f5f0e4',
-        backgroundImage: 'radial-gradient(circle, #bba98855 1px, transparent 1px)',
-        backgroundSize: '20px 20px',
-      }}
-    />
-  )
-}
-
-export const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteboard(
-  { initialSnapshot, onAutosave, readOnly = false },
-  ref
-) {
-  const editorRef = useRef<Editor | null>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // StylePanel & SelectionForeground are forced null when locked - don't rely on
-  // tldraw's built-in readonly to hide these itself, because shapes can still be
-  // selected in readonly mode (see tldraw/tldraw#5903) and the panel shows up too.
-  // This is also what keeps the LearnerResponseBubble's top-right position collision-safe.
-  const components = useMemo<TLComponents>(
-    () => ({
-      Background: ParchmentBackground,
-      ...(readOnly ? { StylePanel: null, SelectionForeground: null } : {}),
-    }),
-    [readOnly]
-  )
-
-  const runAutosave = useCallback(() => {
-    const editor = editorRef.current
-    if (!editor) return
-
-    const { document } = getSnapshot(editor.store)
-    const shapeIds = [...editor.getCurrentPageShapeIds()]
-
-    if (shapeIds.length === 0) {
-      onAutosave({ snapshot: document })
-      return
-    }
-
-    // Small thumbnail for the Home preview card - low resolution, doesn't need to be sharp.
-    editor
-      .toImage(shapeIds, { format: 'png', background: true, scale: 0.4 })
-      .then((result) => onAutosave({ snapshot: document, thumbnail: result?.blob }))
-      .catch(() => onAutosave({ snapshot: document }))
-  }, [onAutosave])
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      exportSnapshot: async () => {
-        const editor = editorRef.current
-        if (!editor) return { document: undefined }
-
-        const { document } = getSnapshot(editor.store)
-        const shapeIds = [...editor.getCurrentPageShapeIds()]
-        if (shapeIds.length === 0) return { document }
-
-        try {
-          const result = await editor.toImage(shapeIds, { format: 'png', background: true })
-          return { document, image: result?.blob }
-        } catch {
-          return { document }
-        }
-      },
-    }),
-    []
-  )
-
-  const handleMount = useCallback(
-    (editor: Editor) => {
-      editorRef.current = editor
-      editor.updateInstanceState({ isReadonly: readOnly })
-
-      if (initialSnapshot) {
-        try {
-          loadSnapshot(editor.store, { document: initialSnapshot as never })
-        } catch {
-          // Old/incompatible snapshot - just continue with an empty canvas.
-        }
-      }
-
-      const unsubscribe = editor.store.listen(
-        () => {
-          if (debounceRef.current) clearTimeout(debounceRef.current)
-          debounceRef.current = setTimeout(runAutosave, AUTOSAVE_DEBOUNCE_MS)
-        },
-        { scope: 'document', source: 'user' }
-      )
-
-      return () => {
-        if (debounceRef.current) clearTimeout(debounceRef.current)
-        unsubscribe()
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [initialSnapshot, runAutosave]
-  )
-
-  // readOnly can change after the editor mounts (toggling lock/unlock repeatedly
-  // within one session) - sync it whenever the value changes.
-  useEffect(() => {
-    editorRef.current?.updateInstanceState({ isReadonly: readOnly })
-  }, [readOnly])
-
-  return (
-    // Ngisi parent-nya (.canvasArea di WorkspacePage, flex:1 + position:relative).
-    // Bukan lagi full-viewport - itu sebabnya kanvas sekarang gak pernah ketiban header.
-    <div style={{ position: 'absolute', inset: 0 }}>
-      <Tldraw onMount={handleMount} components={components} />
-    </div>
+    <Suspense fallback={null}>
+      <Engine ref={ref} {...props} />
+    </Suspense>
   )
 })

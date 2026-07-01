@@ -32,6 +32,9 @@ services:
       args:
         # Empty => the SPA calls relative /api paths, proxied by nginx.
         VITE_API_BASE: ""
+        # Production runs on an HTTPS domain → Excalidraw (tldraw needs a paid
+        # license there). Override to "tldraw" only if you have a tldraw license.
+        VITE_WHITEBOARD: ${VITE_WHITEBOARD:-excalidraw}
     image: cogniva-frontend:latest
     restart: unless-stopped
     depends_on:
