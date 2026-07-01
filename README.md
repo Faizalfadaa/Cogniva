@@ -237,7 +237,7 @@ http://localhost:8000
 If the backend prints a different port, update `PORT=8000` in
 `apps/backend/.env`, restart the backend, and refresh the frontend.
 
-### Browser shows "Route tidak ditemukan"
+### Browser shows "Route not found"
 
 This is normal if you open the backend root URL directly. Use the health
 endpoint instead:
@@ -257,7 +257,3 @@ USE_MOCK_AI=false
 
 Then restart the backend.
 
-## Documentation
-
-- `docs/CONTRACTS.md`: Data contracts and DTO mapping
-- `docs/LAPORAN_PROGRES.md`: Project progress notes
