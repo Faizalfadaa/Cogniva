@@ -14,12 +14,16 @@ FROM node:20-alpine
 # Small init so PID 1 reaps children and forwards signals (clean Ctrl-C / stop).
 RUN apk add --no-cache tini
 
-ENV NODE_ENV=production
 WORKDIR /app
 
 # Install dependencies first so this layer is cached until the lockfile changes.
+# --include=dev is required: the app is started with `tsx` (npm start), and tsx
+# lives in devDependencies. NODE_ENV=production is set *after* the install so it
+# can't cause npm to omit dev deps and drop tsx.
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --include=dev
+
+ENV NODE_ENV=production
 
 # Application source (see .dockerignore for what is excluded).
 COPY . .
