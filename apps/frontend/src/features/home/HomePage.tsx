@@ -85,8 +85,8 @@ function WorkspaceCard({
           e.stopPropagation()
           onDeleteClick()
         }}
-        aria-label={`Hapus workspace ${ws.title ?? 'tanpa judul'}`}
-        title="Hapus workspace"
+        aria-label={`Delete workspace ${ws.title ?? 'untitled'}`}
+        title="Delete workspace"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
           <path
@@ -228,16 +228,16 @@ function DeleteConfirmModal({
         onClick={e => e.stopPropagation()}
       >
         <div className={styles.modalMarkDanger}>!</div>
-        <h2 id="delete-modal-title" className={styles.modalTitle}>Hapus workspace ini?</h2>
+        <h2 id="delete-modal-title" className={styles.modalTitle}>Delete this workspace?</h2>
         <p className={styles.modalBody}>
-          {ws.title ? <>"{ws.title}"</> : 'Workspace tanpa judul'} akan dihapus permanen,
-          termasuk seluruh riwayat mengajar dan evaluasinya. Tindakan ini tidak bisa dibatalkan.
+          {ws.title ? <>"{ws.title}"</> : 'Untitled workspace'} will be permanently deleted,
+          including all its teaching history and evaluation. This action cannot be undone.
         </p>
         <button className={styles.modalBtnDanger} onClick={onConfirm} disabled={deleting}>
-          {deleting ? 'Menghapus...' : 'Ya, hapus workspace'}
+          {deleting ? 'Deleting...' : 'Yes, delete workspace'}
         </button>
         <button className={styles.modalBtnGhost} onClick={onCancel} disabled={deleting}>
-          Batal
+          Cancel
         </button>
       </div>
     </div>
@@ -318,7 +318,7 @@ export default function HomePage() {
       setWorkspaces(prev => prev.filter(w => w.id !== deleteTarget.id))
       setDeleteTarget(null)
     } catch {
-      setError('Gagal menghapus workspace. Coba lagi.')
+      setError('Failed to delete workspace. Please try again.')
     } finally {
       setDeleting(false)
     }
