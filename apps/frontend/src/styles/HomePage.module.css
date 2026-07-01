@@ -284,6 +284,10 @@
 /* ─── Workspace Card ─── */
 .wsCardWrap {
   position: relative;
+  /* Column flex so the inner .wsCard stretches to the full (grid-stretched)
+     cell height — keeps every card the same size across the row. */
+  display: flex;
+  flex-direction: column;
 }
 
 .wsCardWrap:hover .wsCardDeleteBtn {
@@ -314,6 +318,9 @@
 .wsCard {
   display: flex;
   flex-direction: column;
+  /* Fill the grid cell so every card in a row is exactly the same height,
+     regardless of how much text its body holds. */
+  height: 100%;
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -381,6 +388,11 @@
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 2px;
+  /* Single line + ellipsis so a long description can't make one card taller
+     than the rest (the main source of the uneven card heights). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .wsCardDesc {
