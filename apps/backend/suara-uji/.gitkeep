@@ -1,3 +1,0 @@
-# Letakkan klip audio uji (.wav) di folder ini untuk `npm run demo:asr`.
-# File .wav sengaja tidak di-commit (lihat .gitignore) — tiap kontributor
-# menyiapkan rekaman suaranya sendiri.
