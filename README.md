@@ -1,4 +1,5 @@
 # Cogniva
+<img width="900" height="600" alt="Color Blocke (3)" src="https://github.com/user-attachments/assets/75fa83c8-64a3-47d5-abda-393b8bbbb871" />
 
 A **Learning-by-Teaching** study platform — the user teaches an AI that plays
 the role of a student, then receives an evaluation of how well they explained.
