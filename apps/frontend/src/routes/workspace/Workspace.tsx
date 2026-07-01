@@ -115,6 +115,11 @@ export default function WorkspacePage() {
         onUploadPdf={handleUploadPdf}
         pdfUrl={workspace?.pdfUrl}
         uploadingPdf={uploadingPdf}
+        learnerAvatarUrl={learner.avatarUrl}
+        learnerName={learner.name}
+        chatOpen={chat.isOpen}
+        chatUnread={chat.unreadCount}
+        onToggleChat={chat.toggle}
       />
 
       <div className={styles.workspaceBody}>
@@ -154,7 +159,6 @@ export default function WorkspacePage() {
             learner={learner}
             messages={chat.messages}
             isOpen={chat.isOpen}
-            unreadCount={chat.unreadCount}
             onToggle={chat.toggle}
             onSend={chat.sendMessage}
           />
