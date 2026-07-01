@@ -42,14 +42,23 @@ const chatLearner = new LearnerAgent();
 
 // --- Lifecycle / metadata --------------------------------------------------
 
-export function listWorkspaces(): Workspace[] {
-  return workspaces.list();
+/** Anonymous owner for requests that arrive without an x-client-id (e.g. curl). */
+export const ANON_OWNER = "anonymous";
+
+export function listWorkspaces(ownerId: string = ANON_OWNER): Workspace[] {
+  return workspaces.list(ownerId);
 }
 
-export function createWorkspace(): Workspace {
+/** True when this device owns the workspace — gates every per-workspace route. */
+export function isOwner(id: string, ownerId: string = ANON_OWNER): boolean {
+  return workspaces.isOwner(id, ownerId);
+}
+
+export function createWorkspace(ownerId: string = ANON_OWNER): Workspace {
   const id = newWorkspaceId();
   const now = utcNowIso();
   const workspace: Workspace = { id, state: "Draft", createdAt: now, updatedAt: now };
+  workspaces.setOwner(id, ownerId);
 
   // Back it with a Session so the orchestrator/Evaluator drive it unchanged.
   const session: Session = {

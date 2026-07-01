@@ -8,7 +8,7 @@
  * ./index.ts are unchanged — this is an additive layer over the same store.
  */
 
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import {
   saveDraftSchema,
@@ -21,13 +21,24 @@ import * as service from "../../modules/workspace/workspaceService.js";
 import { workspaces } from "../../modules/workspace/workspaceStore.js";
 
 export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
+  // Per-device isolation: every /workspaces/:id route must belong to the calling
+  // device (x-client-id). The collection routes (no :id) and the PDF GET — which
+  // the browser loads via <img>/<iframe> and so can't carry a custom header — are
+  // exempt. Runs only for routes registered in this plugin.
+  app.addHook("preHandler", async (req, reply) => {
+    const id = (req.params as { id?: string })?.id;
+    if (!id) return; // /workspaces collection
+    if (req.method === "GET" && req.url.split("?")[0].endsWith("/pdf")) return;
+    if (!service.isOwner(id, clientOf(req))) return notFound(reply);
+  });
+
   // --- Home ---------------------------------------------------------------
 
-  app.get("/workspaces", async () => service.listWorkspaces());
+  app.get("/workspaces", async (req) => service.listWorkspaces(clientOf(req)));
 
-  app.post("/workspaces", async (_req, reply) => {
+  app.post("/workspaces", async (req, reply) => {
     reply.code(201);
-    return service.createWorkspace();
+    return service.createWorkspace(clientOf(req));
   });
 
   // --- Workspace meta -----------------------------------------------------
@@ -132,6 +143,13 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
 
 function idOf(params: unknown): string {
   return (params as { id: string }).id;
+}
+
+/** The calling device's id (x-client-id header); "anonymous" when absent. */
+function clientOf(req: FastifyRequest): string {
+  const h = req.headers["x-client-id"];
+  const value = Array.isArray(h) ? h[0] : h;
+  return value?.trim() || service.ANON_OWNER;
 }
 
 function notFound(reply: FastifyReply): FastifyReply {

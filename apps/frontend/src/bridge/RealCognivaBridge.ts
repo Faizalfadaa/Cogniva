@@ -15,6 +15,34 @@ import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
 
 const BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 
+// A stable per-device id so the backend can keep each device's workspaces
+// separate (there are no user accounts). Sent as x-client-id on every request.
+// Persisted in localStorage; regenerated only if storage is wiped.
+const DEVICE_ID_KEY = 'cogniva:deviceId';
+
+function getDeviceId(): string {
+  try {
+    let id = localStorage.getItem(DEVICE_ID_KEY);
+    if (!id) {
+      id =
+        globalThis.crypto?.randomUUID?.() ??
+        `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(DEVICE_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    // localStorage unavailable (private mode) — fall back to a per-tab id.
+    return 'anonymous';
+  }
+}
+
+const CLIENT_ID = getDeviceId();
+
+/** Headers sent on every request so the backend scopes data to this device. */
+function clientHeaders(): Record<string, string> {
+  return { 'x-client-id': CLIENT_ID };
+}
+
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
@@ -24,7 +52,7 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 function getJson<T>(path: string): Promise<T> {
-  return fetch(`${BASE}${path}`).then(json<T>);
+  return fetch(`${BASE}${path}`, { headers: clientHeaders() }).then(json<T>);
 }
 
 function sendJson<T>(path: string, method: string, body?: unknown): Promise<T> {
@@ -32,9 +60,9 @@ function sendJson<T>(path: string, method: string, body?: unknown): Promise<T> {
   // rejects an empty body sent with `Content-Type: application/json` (400
   // FST_ERR_CTP_EMPTY_JSON_BODY), which is exactly the no-body POST that
   // createWorkspace() / finishSession() make.
-  const init: RequestInit = { method };
+  const init: RequestInit = { method, headers: clientHeaders() };
   if (body !== undefined) {
-    init.headers = { 'Content-Type': 'application/json' };
+    init.headers = { ...init.headers, 'Content-Type': 'application/json' };
     init.body = JSON.stringify(body);
   }
   return fetch(`${BASE}${path}`, init).then(json<T>);
@@ -72,7 +100,10 @@ export class RealCognivaBridge implements CognivaBridge {
   }
 
   async deleteWorkspace(workspaceId: string): Promise<void> {
-    const res = await fetch(`${BASE}/api/workspaces/${workspaceId}`, { method: 'DELETE' });
+    const res = await fetch(`${BASE}/api/workspaces/${workspaceId}`, {
+      method: 'DELETE',
+      headers: clientHeaders(),
+    });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
       throw new Error(`${res.status} ${res.statusText}: ${detail}`);
@@ -151,7 +182,10 @@ export class RealCognivaBridge implements CognivaBridge {
   // ── Evaluation ────────────────────────────────────────────────────────────
 
   async finishSession(workspaceId: string): Promise<void> {
-    const res = await fetch(`${BASE}/api/workspaces/${workspaceId}/finish`, { method: 'POST' });
+    const res = await fetch(`${BASE}/api/workspaces/${workspaceId}/finish`, {
+      method: 'POST',
+      headers: clientHeaders(),
+    });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
       throw new Error(`${res.status} ${res.statusText}: ${detail}`);

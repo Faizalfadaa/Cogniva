@@ -30,6 +30,10 @@ export class WorkspaceStore {
   private reports = new Map<string, EvaluationReport>();
   private pdfs = new Map<string, StoredBlob>();
   private references = new Map<string, string>();
+  // Per-device ownership: which client (x-client-id) created each workspace, so
+  // one device only ever sees/touches its own. There's no user accounts in the
+  // skeleton — a device id stands in for "who". (§8 placeholder isolation.)
+  private owners = new Map<string, string>();
 
   // --- Workspaces -------------------------------------------------------
 
@@ -42,11 +46,21 @@ export class WorkspaceStore {
     return this.workspaces.get(id);
   }
 
-  /** All workspaces, most-recently-updated first (Home grid order). */
-  list(): Workspace[] {
-    return [...this.workspaces.values()].sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    );
+  /** Record the owning device for a workspace (called once, at creation). */
+  setOwner(id: string, ownerId: string): void {
+    this.owners.set(id, ownerId);
+  }
+
+  /** True when `ownerId` owns an existing workspace `id`. */
+  isOwner(id: string, ownerId: string): boolean {
+    return this.workspaces.has(id) && this.owners.get(id) === ownerId;
+  }
+
+  /** This device's workspaces, most-recently-updated first (Home grid order). */
+  list(ownerId: string): Workspace[] {
+    return [...this.workspaces.values()]
+      .filter((w) => this.owners.get(w.id) === ownerId)
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }
 
   delete(id: string): void {
@@ -57,6 +71,7 @@ export class WorkspaceStore {
     this.reports.delete(id);
     this.pdfs.delete(id);
     this.references.delete(id);
+    this.owners.delete(id);
   }
 
   // --- Workspace -> Session link ----------------------------------------
