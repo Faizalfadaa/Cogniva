@@ -54,6 +54,15 @@ export interface GenAILike {
       text?: string;
       promptFeedback?: { blockReason?: string } | null;
     }>;
+    /**
+     * Optional so a stub that only implements generateContent still satisfies
+     * this interface — only EmbeddingClient needs it.
+     */
+    embedContent?(args: {
+      model: string;
+      contents: string[];
+      config?: Record<string, unknown>;
+    }): Promise<{ embeddings?: Array<{ values?: number[] }> }>;
   };
 }
 
@@ -138,6 +147,109 @@ export class LLMClient implements LLM {
       throw new LLMError(`model returned invalid JSON: ${errMsg(err)}`);
     }
   }
+}
+
+/** What an embedding call is for. Gemini tunes the vector to the task. */
+export type EmbeddingTask = "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY";
+
+export interface EmbedArgs {
+  texts: string[];
+  /** Defaults to RETRIEVAL_DOCUMENT (indexing). Use RETRIEVAL_QUERY to search. */
+  taskType?: EmbeddingTask;
+}
+
+/**
+ * The embedding seam, mirroring `LLM`. Retrieval depends on this interface
+ * rather than the concrete client, so tests can index without a network call.
+ */
+export interface Embedder {
+  embed(args: EmbedArgs): Promise<number[][]>;
+}
+
+export interface EmbeddingClientOptions {
+  model: string;
+  /** Requested vector size; the model's native output is truncated to it. */
+  dimensions: number;
+  /** Request timeout in seconds. */
+  timeout: number;
+  /** Texts per request. */
+  batchSize: number;
+}
+
+/**
+ * Wraps Gemini's embedContent for the reference index (§3.7 retrieval).
+ *
+ * Two details matter for correctness. First, documents and queries must be
+ * embedded with different task types — that is what makes a short query land
+ * near the long passage that answers it. Second, a truncated vector (any
+ * `dimensions` below the model's native size) is not unit-length, so it is
+ * re-normalized here; afterwards cosine similarity is just a dot product.
+ */
+export class EmbeddingClient implements Embedder {
+  /** Public so tests can swap in a stub, mirroring LLMClient. */
+  client: GenAILike;
+  readonly model: string;
+  readonly dimensions: number;
+  readonly batchSize: number;
+
+  constructor({ model, dimensions, timeout, batchSize }: EmbeddingClientOptions) {
+    const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
+    this.client = new GoogleGenAI({
+      apiKey,
+      httpOptions: { timeout: Math.round(timeout * 1000) },
+    }) as unknown as GenAILike;
+    this.model = model;
+    this.dimensions = dimensions;
+    this.batchSize = Math.max(1, batchSize);
+  }
+
+  /** Embed texts in order. Throws LLMError so callers can fall back. */
+  async embed({ texts, taskType = "RETRIEVAL_DOCUMENT" }: EmbedArgs): Promise<number[][]> {
+    if (texts.length === 0) return [];
+
+    const embedContent = this.client.models.embedContent;
+    if (!embedContent) {
+      throw new LLMError("embedding is not supported by this client");
+    }
+
+    const vectors: number[][] = [];
+    for (let i = 0; i < texts.length; i += this.batchSize) {
+      const batch = texts.slice(i, i + this.batchSize);
+      let response: { embeddings?: Array<{ values?: number[] }> };
+      try {
+        response = await embedContent.call(this.client.models, {
+          model: this.model,
+          contents: batch,
+          config: { taskType, outputDimensionality: this.dimensions },
+        });
+      } catch (err) {
+        throw new LLMError(`embedding request failed: ${errMsg(err)}`);
+      }
+
+      const embeddings = response.embeddings ?? [];
+      if (embeddings.length !== batch.length) {
+        throw new LLMError(
+          `embedding count mismatch: asked ${batch.length}, got ${embeddings.length}`,
+        );
+      }
+      for (const embedding of embeddings) {
+        const values = embedding.values;
+        if (!values || values.length === 0) {
+          throw new LLMError("embedding response contained an empty vector");
+        }
+        vectors.push(normalize(values));
+      }
+    }
+    return vectors;
+  }
+}
+
+/** Scale a vector to unit length so cosine similarity becomes a dot product. */
+export function normalize(values: number[]): number[] {
+  let sum = 0;
+  for (const v of values) sum += v * v;
+  const length = Math.sqrt(sum);
+  return length > 0 ? values.map((v) => v / length) : values.slice();
 }
 
 /** Tolerate models that wrap JSON in a ```json code fence. */

@@ -30,9 +30,29 @@ export interface TranscriptTurn {
 }
 
 /**
- * Everything the Evaluator needs for one assessment. `referenceMaterial`,
- * `keyConcepts`, and `commonMisconceptions` come from the Topic (§6.1); the full
- * reference is the source of truth the Evaluator grades against (§3.7).
+ * One retrieved passage of the reference material, with a label saying where in
+ * the document it came from. Produced by modules/retrieval; the agent stays
+ * decoupled from how retrieval works.
+ */
+export interface ReferenceExcerpt {
+  label: string;
+  text: string;
+}
+
+/**
+ * Everything the Evaluator needs for one assessment. `keyConcepts` and
+ * `commonMisconceptions` come from the Topic (§6.1).
+ *
+ * The reference material reaches the agent in one of two ways:
+ *
+ *  - `referenceExcerpts` + `referenceOutline` — the RAG path. Only the passages
+ *    relevant to what the user taught are included, plus a one-line-per-section
+ *    outline of the whole document so a concept the user never mentioned can
+ *    still be recognised as MISSED.
+ *  - `referenceMaterial` — the whole document, used when there is no index
+ *    (curated demo topics, whose reference is short enough to send in full).
+ *
+ * When excerpts are present they take precedence and the full text is not sent.
  */
 export interface EvaluatorInput {
   sessionId: string;
@@ -40,4 +60,8 @@ export interface EvaluatorInput {
   referenceMaterial: string;
   keyConcepts: string[];
   commonMisconceptions: string[];
+  /** Retrieved passages (RAG path). Empty or absent -> use referenceMaterial. */
+  referenceExcerpts?: ReferenceExcerpt[];
+  /** One line per section of the whole document, for coverage awareness. */
+  referenceOutline?: string[];
 }

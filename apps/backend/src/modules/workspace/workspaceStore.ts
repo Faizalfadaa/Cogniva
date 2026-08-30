@@ -15,6 +15,7 @@ import type {
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
+import type { ReferenceIndex } from "../retrieval/index.js";
 
 /** A stored binary blob (PDF) we serve back through a GET endpoint. */
 export interface StoredBlob {
@@ -30,6 +31,9 @@ export class WorkspaceStore {
   private reports = new Map<string, EvaluationReport>();
   private pdfs = new Map<string, StoredBlob>();
   private references = new Map<string, string>();
+  /** Chunked + embedded reference, built once per upload and searched at
+   * evaluation time (§3.7 retrieval). Volatile like everything else here. */
+  private referenceIndexes = new Map<string, ReferenceIndex>();
   // Per-device ownership: which client (x-client-id) created each workspace, so
   // one device only ever sees/touches its own. There's no user accounts in the
   // skeleton — a device id stands in for "who". (§8 placeholder isolation.)
@@ -71,6 +75,7 @@ export class WorkspaceStore {
     this.reports.delete(id);
     this.pdfs.delete(id);
     this.references.delete(id);
+    this.referenceIndexes.delete(id);
     this.owners.delete(id);
   }
 
@@ -151,6 +156,16 @@ export class WorkspaceStore {
 
   getReference(workspaceId: string): string | undefined {
     return this.references.get(workspaceId);
+  }
+
+  // --- Reference index (chunked/embedded reference, §3.7 retrieval) -------
+
+  saveReferenceIndex(workspaceId: string, index: ReferenceIndex): void {
+    this.referenceIndexes.set(workspaceId, index);
+  }
+
+  getReferenceIndex(workspaceId: string): ReferenceIndex | undefined {
+    return this.referenceIndexes.get(workspaceId);
   }
 }
 

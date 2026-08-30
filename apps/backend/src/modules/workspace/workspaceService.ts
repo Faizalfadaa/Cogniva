@@ -33,6 +33,13 @@ import type {
   Workspace,
 } from "../../contracts/workspace.js";
 import { getOrchestrator } from "../../orchestrator/index.js";
+import {
+  buildOutline,
+  buildReferenceIndex,
+  queriesFromTranscript,
+  retrieveExcerpts,
+  type ReferenceExcerpt,
+} from "../retrieval/index.js";
 import { newId, sessions } from "../storage/sessionStore.js";
 import { buildEvaluationReport } from "./evaluationReport.js";
 import { newWorkspaceId, workspaces } from "./workspaceStore.js";
@@ -126,12 +133,34 @@ export async function setPdf(
 
   // Extract the text and keep it as this session's reference material — the
   // answer key the Evaluator grades against (§3.7). It flows ONLY to the
-  // Evaluator (via synthTopic), never to the Learner (§1.4). Extraction failures
-  // (e.g. a scanned/image-only PDF) are non-fatal: the session has no reference.
+  // Evaluator, never to the Learner (§1.4). Extraction failures (e.g. a
+  // scanned/image-only PDF) are non-fatal: the session has no reference.
   const text = await extractPdfText(data);
-  if (text) workspaces.saveReference(id, text);
+  if (text) {
+    workspaces.saveReference(id, text);
+    // Chunk + embed in the background so the upload response stays fast, the
+    // same pattern the checkpoint/chat/finish calls use. Evaluation builds the
+    // index synchronously if it is still missing by then.
+    void indexReference(id, text);
+  }
 
   return touch(ws);
+}
+
+/** Build (or rebuild) the retrieval index for a workspace's reference text. */
+async function indexReference(id: string, text: string): Promise<void> {
+  try {
+    const index = await buildReferenceIndex(text);
+    workspaces.saveReferenceIndex(id, index);
+    console.log(
+      `[workspace] reference indexed for ${id}: ${index.size} bagian, mode ${index.mode}`,
+    );
+  } catch (err) {
+    // buildReferenceIndex already degrades to keyword mode internally; reaching
+    // here means chunking itself failed, and the Evaluator falls back to the
+    // full-text path.
+    console.error("[workspace] reference indexing failed:", err);
+  }
 }
 
 /** Pull plain text out of a PDF buffer. Loaded lazily so the heavy PDF engine is
@@ -142,8 +171,13 @@ async function extractPdfText(data: Buffer): Promise<string> {
     const pdf = await getDocumentProxy(new Uint8Array(data));
     const { text } = await extractText(pdf, { mergePages: true });
     const merged = Array.isArray(text) ? text.join("\n") : text;
-    // Cap the length to keep the Evaluator prompt bounded.
-    return merged.replace(/[ \t]+\n/g, "\n").trim().slice(0, 20000);
+    // Retrieval (§3.7) now bounds the Evaluator prompt by selecting passages, so
+    // the old 20k truncation is gone — a long PDF is chunked, not cut off. What
+    // remains is a sanity bound against a pathologically large upload.
+    return merged
+      .replace(/[ \t]+\n/g, "\n")
+      .trim()
+      .slice(0, config.RAG_MAX_REFERENCE_CHARS);
   } catch (err) {
     console.error("[workspace] PDF text extraction failed:", err);
     return "";
@@ -402,13 +436,22 @@ async function runEvaluation(ws: Workspace): Promise<void> {
   });
 
   const topic = synthTopic(ws);
+  const { referenceExcerpts, referenceOutline } = await retrieveReference(
+    ws,
+    transcript,
+    topic,
+  );
+
   const result = await getEvaluator().evaluate(
     {
       sessionId: session.sessionId,
       turns: transcript,
-      referenceMaterial: topic.referenceMaterial,
+      // Only sent when retrieval produced nothing; excerpts take precedence.
+      referenceMaterial: referenceExcerpts.length ? "" : topic.referenceMaterial,
       keyConcepts: topic.keyConcepts,
       commonMisconceptions: topic.commonMisconceptions,
+      referenceExcerpts,
+      referenceOutline,
     },
     newId("ev"),
   );
@@ -431,6 +474,43 @@ async function runEvaluation(ws: Workspace): Promise<void> {
       meaningfulScore: !usedMock,
     }),
   );
+}
+
+/**
+ * The retrieval step of the Evaluator's RAG path (§3.7).
+ *
+ * Searches this workspace's indexed reference for the passages relevant to what
+ * the user actually taught, and returns them alongside an outline of the whole
+ * document. A workspace with no PDF returns nothing, and the Evaluator falls
+ * back to whatever full reference text the topic carries.
+ */
+async function retrieveReference(
+  ws: Workspace,
+  transcript: TranscriptTurn[],
+  topic: Topic,
+): Promise<{ referenceExcerpts: ReferenceExcerpt[]; referenceOutline: string[] }> {
+  const empty = { referenceExcerpts: [], referenceOutline: [] };
+
+  const text = workspaces.getReference(ws.id);
+  if (!text) return empty;
+
+  // The upload indexes in the background; if the user finished before that
+  // landed, build it now rather than silently grading against nothing.
+  let index = workspaces.getReferenceIndex(ws.id);
+  if (!index) {
+    index = await buildReferenceIndex(text);
+    workspaces.saveReferenceIndex(ws.id, index);
+  }
+  if (index.size === 0) return empty;
+
+  const queries = queriesFromTranscript(transcript, topic.keyConcepts);
+  const referenceExcerpts = await retrieveExcerpts(index, queries);
+  if (referenceExcerpts.length === 0) return empty;
+
+  console.log(
+    `[workspace] retrieval untuk ${ws.id}: ${referenceExcerpts.length}/${index.size} bagian (mode ${index.mode})`,
+  );
+  return { referenceExcerpts, referenceOutline: buildOutline(index) };
 }
 
 /** Move a Draft workspace (and its Session) into the teaching loop. */
