@@ -108,6 +108,7 @@ async function runTurn(
       type: "confirmation_request",
       snapshotId: result.snapshotId ?? "",
       suggestedClarification: result.suggestedClarification ?? "",
+      source: result.source,
     });
     return;
   }

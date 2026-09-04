@@ -10,8 +10,9 @@
  *                                                       +--> [Learner] --> response
  *                        [ASR] --> speech -------------+
  *
- * If the board reading needs confirmation (low confidence, §5.3), the turn
- * pauses and asks the user instead of running the Learner.
+ * If EITHER the board reading or the voice transcript needs confirmation (low
+ * confidence or flagged ambiguity, §5.3), the turn pauses and asks the user
+ * instead of running the Learner. `source` says which channel asked.
  */
 
 import { LearnerAgent, VisionAgent, AsrAgent, seedLearnerState, type LearnerTools, type RespondArgs } from "../agents/index.js";
@@ -56,6 +57,8 @@ export interface TurnResult {
   response?: LearnerResponse;
   snapshotId?: string;
   suggestedClarification?: string;
+  /** Which channel caused a "confirmation" pause. Only set for that kind. */
+  source?: "board" | "voice";
 }
 
 export interface TeachingInput {
@@ -102,6 +105,7 @@ export class Orchestrator {
         interpretation,
         snapshotId: snapshot.snapshotId,
         suggestedClarification: interpretation.suggestedClarification,
+        source: "board",
       };
     }
 
@@ -120,6 +124,19 @@ export class Orchestrator {
       };
       speech = await this.asr.transcribe(clip, null, topic.title);
       sessions.saveTranscript(speech);
+
+      if (speech.needsConfirmation) {
+        // Same pause as the board reading above (§5.3), for the voice channel:
+        // handing a probably-wrong transcript to the Learner teaches it the
+        // wrong thing, so ask the teacher to confirm or retype first.
+        return {
+          kind: "confirmation",
+          speech,
+          snapshotId: snapshot.snapshotId,
+          suggestedClarification: speech.suggestedClarification,
+          source: "voice",
+        };
+      }
     }
 
     const state =

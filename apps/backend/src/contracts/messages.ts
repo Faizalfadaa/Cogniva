@@ -56,6 +56,9 @@ export interface ConfirmationRequest {
   type: "confirmation_request";
   snapshotId: string;
   suggestedClarification: string;
+  /** Which channel is unsure -- the board reading or the voice transcript.
+   * Optional so clients written when only the board could pause still work. */
+  source?: "board" | "voice";
 }
 
 export interface LearnerMessage {

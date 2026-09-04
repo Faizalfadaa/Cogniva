@@ -27,6 +27,12 @@ export const elementSchema = z.object({
   type: elementTypeSchema,
   content: z.string(),
   bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
+  /**
+   * How sure Vision is about this one element, 0..1. Optional because not
+   * every element comes from a model: the typed-text fallback builds elements
+   * by hand and has no confidence to report.
+   */
+  confidence: z.number().optional(),
 });
 export type Element = z.infer<typeof elementSchema>;
 

@@ -6,7 +6,7 @@ import { LearnerAgent, VisionAgent } from "../src/agents/index.js";
 import { utcNowIso } from "../src/contracts/common.js";
 import type { LearnerResponse, LearnerState } from "../src/contracts/learner.js";
 import type { Session } from "../src/contracts/session.js";
-import { Orchestrator, type Learner } from "../src/orchestrator/index.js";
+import { Orchestrator, type Asr, type Learner } from "../src/orchestrator/index.js";
 import { newId, sessions } from "../src/modules/storage/sessionStore.js";
 import { topics } from "../src/modules/topic/repository.js";
 
@@ -130,7 +130,48 @@ describe("orchestrator", () => {
     expect(result.kind).toBe("confirmation");
     expect(result.snapshotId).toBeTruthy();
     expect(result.suggestedClarification).toBeTruthy();
+    // The pause came from the board channel, not the voice one.
+    expect(result.source).toBe("board");
     // No learner turn ran, so the counter did not advance.
+    expect(session.turnCount).toBe(0);
+    expect(sessions.listTurns(session.sessionId)).toEqual([]);
+  });
+
+  it("also pauses when only the voice channel is uncertain", async () => {
+    const session = newSession();
+    const topic = topics.get("topic_photosynthesis")!;
+    // The board is fine (typed text reads at full confidence), so any pause
+    // here has to come from ASR — proving the voice channel can stop a turn
+    // on its own, not just ride along with a bad board reading.
+    const asr: Asr = {
+      transcribe: async () => ({
+        segmentId: newId("seg"),
+        sessionId: session.sessionId,
+        turnIndex: session.turnCount,
+        transcript: "...suaranya kurang jelas...",
+        confidence: 0.2,
+        language: "id-ID",
+        capturedAt: utcNowIso(),
+        needsConfirmation: true,
+        suggestedClarification: "Bisa diulang lebih jelas?",
+      }),
+    };
+    const orch = new Orchestrator({
+      learner: new FakeLearner(),
+      vision: new VisionAgent({ confidenceThreshold: 0.6 }),
+      asr,
+    });
+
+    const result = await orch.runTeachingTurn(session, topic, {
+      image: null,
+      typedText: "Fotosintesis mengubah cahaya jadi energi.",
+      audio: "ZmFrZQ==",
+    });
+
+    expect(result.kind).toBe("confirmation");
+    expect(result.source).toBe("voice");
+    expect(result.suggestedClarification).toBe("Bisa diulang lebih jelas?");
+    // The Learner never ran, so the counter did not advance.
     expect(session.turnCount).toBe(0);
     expect(sessions.listTurns(session.sessionId)).toEqual([]);
   });
