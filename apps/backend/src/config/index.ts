@@ -37,6 +37,47 @@ export const LLM_THINKING_BUDGET: number = num(
   0,
 );
 
+// --- Planner / Orchestrator (§3.3) -----------------------------------------
+
+/**
+ * The Planner decides the order of work for a turn (which agents run, and
+ * whether any can be skipped). It is a small, cheap call on purpose — the fast
+ * model is the right default; a stronger one buys little for a scheduling
+ * decision but is paid on every turn.
+ */
+export const PLANNER_MODEL: string =
+  process.env.COGNIVA_PLANNER_MODEL ?? "gemini-2.5-flash";
+
+/**
+ * A plan is a handful of step names and one-line reasons, so it needs far fewer
+ * tokens than the agents' outputs. Keeping it small also keeps the extra latency
+ * the Planner adds to the teaching loop small.
+ */
+export const PLANNER_MAX_TOKENS: number = num(process.env.COGNIVA_PLANNER_MAX_TOKENS, 512);
+
+/**
+ * "auto" plans with the model when a credential is configured and falls back to
+ * the deterministic rules otherwise. Set COGNIVA_PLANNER_MODE=rules to force the
+ * rule engine even with a key — the same decisions, zero extra latency, which is
+ * what you want for load tests and for reproducible demos.
+ */
+export const PLANNER_MODE: "auto" | "rules" =
+  process.env.COGNIVA_PLANNER_MODE === "rules" ? "rules" : "auto";
+
+/**
+ * Hard ceiling on steps per teaching turn (§S8 budgets). A full turn is
+ * read_board -> verify_board -> transcribe_audio -> ask_learner; the extra slot
+ * is headroom so a re-plan cannot strand a turn before it reaches the student.
+ */
+export const PLANNER_MAX_STEPS: number = num(process.env.COGNIVA_PLANNER_MAX_STEPS, 5);
+
+/**
+ * How many times one turn may ask for a new plan after a step surprises it
+ * (typically: the board came back unreadable). Each re-plan is one extra model
+ * call, so one is usually the right number.
+ */
+export const PLANNER_MAX_REPLANS: number = num(process.env.COGNIVA_PLANNER_MAX_REPLANS, 1);
+
 // --- Vision (§3.4) ---------------------------------------------------------
 
 /**
