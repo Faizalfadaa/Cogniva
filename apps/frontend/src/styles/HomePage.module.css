@@ -548,6 +548,58 @@
   text-underline-offset: 3px;
 }
 
+/* ─── Onboarding (first visit) ─── */
+.onbDots {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.onbDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  transition: width var(--dur-base) var(--ease-out), background var(--dur-base);
+}
+
+.onbDotActive {
+  width: 18px;
+  border-radius: var(--radius-pill);
+  background: var(--lime);
+}
+
+.onbIcon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--lime-tint);
+  color: var(--lime-text);
+  margin-bottom: 4px;
+}
+
+/* Slightly wider than .modalBody — these steps carry a full sentence or two. */
+.onbBody {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  max-width: 320px;
+  min-height: 92px;
+}
+
+.onbNav {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+}
+
+.onbNav > button {
+  flex: 1;
+}
+
 /* ─── Name Modal ─── */
 .modalOverlay {
   position: fixed;
@@ -557,10 +609,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
   z-index: 100;
 }
 
 .modal {
+  /* auto margins (not align-items) do the centering, so a card taller than the
+     viewport stays fully scrollable instead of having its top clipped. */
+  margin: auto;
   background: var(--card-bg);
   border-radius: var(--radius-xl);
   padding: 40px 36px;
@@ -788,6 +845,7 @@
   .newCard { min-height: 170px; }
 
   .modal { padding: 32px 24px; }
+  .onbBody { min-height: 0; }
 }
 
 /* Small phones (≤420px) — go single column so titles/thumbs stay legible. */

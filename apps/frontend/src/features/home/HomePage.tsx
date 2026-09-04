@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import { useUserStore } from '../../state/UserStore'
+import Onboarding from './Onboarding'
 import type { WorkspaceDTO, WorkspaceState } from '../../dto/WorkspaceDTO'
 import styles from '../../styles/HomePage.module.css'
 
@@ -160,51 +161,6 @@ function EmptyState({ filter, onNew, loading }: { filter: ViewFilter; onNew: () 
   )
 }
 
-// ─── Name Setup Modal ────────────────────────────────────────────────────────
-
-function NameModal({ onConfirm }: { onConfirm: (name: string) => void }) {
-  const [name, setName] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => { inputRef.current?.focus() }, [])
-
-  function handleSubmit() {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    onConfirm(trimmed)
-  }
-
-  return (
-    <div className={styles.modalOverlay}>
-      <div className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <div className={styles.modalMark}>✦</div>
-        <h2 id="modal-title" className={styles.modalTitle}>Hey, what's your name?</h2>
-        <p className={styles.modalBody}>
-          Your AI student will call you by this name throughout the session.
-        </p>
-        <input
-          ref={inputRef}
-          className={styles.modalInput}
-          type="text"
-          placeholder="Your name..."
-          value={name}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          maxLength={40}
-          aria-label="Your name"
-        />
-        <button
-          className={styles.modalBtn}
-          onClick={handleSubmit}
-          disabled={!name.trim()}
-        >
-          Enter Cogniva →
-        </button>
-      </div>
-    </div>
-  )
-}
-
 // ─── Delete Confirm Modal ─────────────────────────────────────────────────────
 
 function DeleteConfirmModal({
@@ -343,7 +299,8 @@ export default function HomePage() {
 
   const hasAny = workspaces.length > 0
 
-  if (needsNameSetup) return <NameModal onConfirm={setUserName} />
+  // First visit: short intro explaining what Cogniva is, ending with the name step.
+  if (needsNameSetup) return <Onboarding onDone={setUserName} />
 
   return (
     <div className={styles.layout}>
