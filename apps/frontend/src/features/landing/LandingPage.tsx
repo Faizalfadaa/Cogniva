@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styles from '../../styles/LandingPage.module.css'
 import { LEARNERS } from '../../lib/Learner'
+import { TeamSlider } from './TeamSlider'
+import { BackToTop } from './BackToTop'
 
 /**
  * Fade-and-lift sections in as they scroll into view.
@@ -625,6 +627,8 @@ export default function LandingPage() {
           <span className={styles.copyright}>© 2026 Cogniva. Open beta.</span>
         </div>
       </section>
+
+      <BackToTop />
     </div>
   )
 }

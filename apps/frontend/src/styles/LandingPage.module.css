@@ -1085,30 +1085,99 @@
   color: var(--text-primary);
 }
 
-.teamRow {
+/* ── Team slider ──
+   One scrolling row instead of a grid, because eight cards in a 4-wide grid
+   left a ragged half-empty second line. */
+.sliderWrap {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+  align-items: center;
+  gap: 8px;
 }
 
+.sliderTrack {
+  /* Makes the track the offsetParent of the cards, so their offsetLeft is
+     measured against it. TeamSlider's loop maths reads those offsets as scroll
+     positions; without this they would also include the left arrow's width. */
+  position: relative;
+  /* Not inherited from html's smooth scrolling, and it must stay `auto`: the
+     loop moves scrollLeft directly and that jump has to be instant. */
+  scroll-behavior: auto;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  /* Room for the scaled-up active card to grow into without being clipped. */
+  padding: 14px 4px 18px;
+  scrollbar-width: none;
+}
+
+.sliderTrack::-webkit-scrollbar { display: none; }
+
 .teamMember {
-  flex: 1 1 200px;
+  flex: 0 0 clamp(150px, 20vw, 190px);
+  scroll-snap-align: center;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  opacity: 0.55;
+  transform: scale(0.94);
+  transition: opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
 }
 
+/* Whichever card is crossing the middle of the track (see TeamSlider). */
+.teamMemberActive {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.teamMemberActive .teamPhoto {
+  border-color: var(--lime);
+  box-shadow: 0 14px 34px rgba(30, 45, 8, 0.18);
+}
+
+.sliderArrow {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-warm);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color var(--dur-fast), color var(--dur-fast),
+    background var(--dur-fast);
+}
+
+.sliderArrow:hover {
+  border-color: var(--forest-dark);
+  color: var(--forest-dark);
+}
+
+.sliderArrow:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+.sliderArrowLeft,
+.sliderArrowRight { /* placement handled by the flex row */ }
+
+/* No portraits exist, so the hatch pattern stays as the placeholder. */
 .teamPhoto {
   width: 100%;
   aspect-ratio: 1;
   border-radius: 20px;
+  border: 2px solid transparent;
   background: repeating-linear-gradient(135deg, var(--ln-hatch-a) 0 10px, var(--ln-hatch-b) 10px 20px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  font: 500 10.5px/1.5 var(--font-mono);
-  color: var(--ln-numeral);
+  transition: border-color var(--dur-base), box-shadow var(--dur-base);
 }
 
 .teamMeta {
@@ -1289,3 +1358,53 @@
   .faqChevron { transition: none; }
 }
 
+/* ═══════════════ Back to top ═══════════════ */
+/* Kept mounted and faded rather than unmounted, so both appearing and leaving
+   can animate. pointer-events is what stops the invisible button catching
+   clicks meant for the page underneath. */
+.backToTop {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 40;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-warm);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 26px rgba(30, 45, 8, 0.16);
+
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out),
+    background var(--dur-fast);
+}
+
+.backToTopIn {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.backToTop:hover { background: var(--lime); }
+
+.backToTop:focus-visible {
+  outline: 2px solid var(--forest-dark);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backToTop { transition: opacity var(--dur-fast); transform: none; }
+  .backToTopIn { transform: none; }
+  .teamMember { transition: none; }
+  .sliderTrack { scroll-behavior: auto; }
+}
