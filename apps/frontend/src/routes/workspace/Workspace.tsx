@@ -10,6 +10,9 @@ import { ChatSidebar } from '../../features/teaching-session/components/ChatSide
 import { ChatToasts } from '../../features/teaching-session/components/ChatToasts'
 import { ChatLauncher } from '../../features/teaching-session/components/ChatLauncher'
 import { ErrorBanner } from '../../features/teaching-session/components/ErrorBanner'
+import { ProductTour } from '../../features/tour/ProductTour'
+import { WORKSPACE_TOUR_STEPS } from '../../features/tour/tourSteps'
+import { useAppTour } from '../../features/tour/useAppTour'
 import { LearnerSelect } from '../../features/teaching-session/components/LearnerSelect'
 import { useTeachingSession } from '../../features/teaching-session/state/useTeachingSession'
 import { useWorkspaceTitleAutosave } from '../../features/teaching-session/hooks/useWorkspaceTitleAutosave'
@@ -133,6 +136,13 @@ export default function WorkspacePage() {
     [id]
   )
 
+  /**
+   * Second leg of the app tour, resumed from the dashboard. Held until the
+   * greeting is over: LearnerIntro owns the screen with its own overlay, and
+   * two dimmed layers at once would be a mess.
+   */
+  const showTour = tour.active && intro.seen && !needsLearnerPick
+
   // One banner, two sources. Teaching errors win: the user just pressed Teach
   // and is waiting on that, whereas a chat poll fails quietly in the background.
   // Both hooks report `network` identically, so a dropped connection reads the
@@ -164,7 +174,10 @@ export default function WorkspacePage() {
 
       <div className={styles.workspaceBody}>
         {/* Canvas takes remaining space; sidebar is a flex sibling */}
-        <div className={styles.canvasArea}>
+        {/* data-tour sits on the canvas area rather than inside Whiteboard:
+            the engine is swapped at build time (tldraw vs Excalidraw), and this
+            wrapper is the one element both render into. */}
+        <div className={styles.canvasArea} data-tour="whiteboard-area">
           <Whiteboard
             ref={whiteboardRef}
             initialSnapshot={workspace?.currentWhiteboardSnapshot}
@@ -197,6 +210,16 @@ export default function WorkspacePage() {
               toasts={chat.toasts}
               onDismiss={chat.dismissToast}
               onOpenChat={chat.open}
+            />
+          )}
+
+          {showTour && (
+            <ProductTour
+              steps={WORKSPACE_TOUR_STEPS}
+              index={tour.index}
+              onIndexChange={tour.setIndex}
+              onFinish={tour.advance}
+              onSkip={tour.skipAll}
             />
           )}
 

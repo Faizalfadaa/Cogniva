@@ -5,6 +5,9 @@ import { useUserStore } from '../../state/UserStore'
 import Onboarding from './Onboarding'
 import type { WorkspaceDTO, WorkspaceState } from '../../dto/WorkspaceDTO'
 import styles from '../../styles/HomePage.module.css'
+import { ProductTour } from '../tour/ProductTour'
+import { HOME_TOUR_STEPS } from '../tour/tourSteps'
+import { useAppTour } from '../tour/useAppTour'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -389,6 +392,8 @@ export default function HomePage() {
 
   const hasAny = workspaces.length > 0
 
+  const tour = useAppTour('home')
+
   // First visit: short intro explaining what Cogniva is, ending with the name step.
   if (needsNameSetup) return <Onboarding onDone={setUserName} />
 
@@ -403,6 +408,7 @@ export default function HomePage() {
           </div>
 
           <button
+            data-tour="new-workspace"
             className={styles.newBtn}
             onClick={handleCreateWorkspace}
             disabled={creating}
@@ -415,7 +421,11 @@ export default function HomePage() {
           </button>
         </div>
 
-        <nav className={styles.sidebarNav} aria-label="Filter workspaces">
+        <nav
+          className={styles.sidebarNav}
+          data-tour="workspace-filters"
+          aria-label="Filter workspaces"
+        >
           {FILTER_OPTIONS.map(opt => (
             <button
               key={opt.value}
@@ -433,6 +443,7 @@ export default function HomePage() {
 
         <div className={styles.sidebarBottom}>
           <button
+            data-tour="profile"
             className={styles.userChip}
             onClick={() => setProfileOpen(true)}
             aria-haspopup="dialog"
@@ -507,7 +518,7 @@ export default function HomePage() {
               </button>
             </div>
           ) : (
-            <div className={styles.grid}>
+            <div className={styles.grid} data-tour="workspace-list">
               {filtered.map(ws => (
                 <WorkspaceCard
                   key={ws.id}
@@ -539,6 +550,20 @@ export default function HomePage() {
           deleting={deleting}
           onConfirm={handleConfirmDelete}
           onCancel={() => !deleting && setDeleteTarget(null)}
+        />
+      )}
+
+      {/* First leg of the app tour. It cannot start before this point: the
+          name-setup Onboarding returns early above, so none of these targets
+          exist yet while that is on screen. */}
+      {tour.active && (
+        <ProductTour
+          steps={HOME_TOUR_STEPS}
+          index={tour.index}
+          onIndexChange={tour.setIndex}
+          onFinish={tour.advance}
+          onSkip={tour.skipAll}
+          finishLabel="Got it"
         />
       )}
     </div>

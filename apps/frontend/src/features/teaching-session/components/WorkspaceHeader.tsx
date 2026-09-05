@@ -113,7 +113,11 @@ export function WorkspaceHeader({
               📄 Reference attached
             </a>
           )}
-          <label style={{ ...pdfBtnStyle, opacity: uploadingPdf ? 0.6 : 1 }} title="Upload reference material (PDF) to ground your evaluation">
+          <label
+            data-tour="pdf-upload"
+            style={{ ...pdfBtnStyle, opacity: uploadingPdf ? 0.6 : 1 }}
+            title="Upload reference material (PDF) to ground your evaluation"
+          >
             {uploadingPdf ? 'Uploading…' : pdfUrl ? 'Replace' : '📎 Reference (PDF)'}
             <input
               type="file"
@@ -133,6 +137,7 @@ export function WorkspaceHeader({
       <div className={styles.headerRight}>
         {!micPermissionDenied && (
           <button
+            data-tour="mic-button"
             className={isRecording ? styles.micBtnActive : styles.micBtnIdle}
             onClick={onToggleRecording}
             aria-label={isRecording ? 'Stop recording' : 'Start recording'}
@@ -144,6 +149,7 @@ export function WorkspaceHeader({
           </button>
         )}
         <button
+          data-tour="finish-button"
           className={styles.finishBtn}
           onClick={onFinishSession}
           disabled={finishingSession || pending}
