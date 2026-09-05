@@ -53,3 +53,7 @@ apps/backend/suara-uji/*.wav
 
 # Design doc (shared separately, not version-controlled as binary)
 Cogniva.docx
+
+.agents/
+.windsurf/
+.claude/
