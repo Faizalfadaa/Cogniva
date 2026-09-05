@@ -13,6 +13,7 @@
  */
 
 import { z } from "zod";
+import { timelineSchema, type Timeline } from "./timeline.js";
 
 /**
  * Workspace lifecycle as the UI sees it. Maps onto the session state machine
@@ -62,6 +63,13 @@ export interface TeachingCheckpoint {
    * poll would swamp the response. Absent when speech is off or unavailable.
    */
   learnerAudioUrl?: string;
+  /**
+   * When each board change happened relative to the recording (Phase 1).
+   * Stored only — like whiteboardSnapshot, nothing reads it yet. Absent on
+   * checkpoints made before this field existed, and on clients that can't
+   * capture it.
+   */
+  timeline?: Timeline;
   createdAt: string;
 }
 
@@ -112,6 +120,9 @@ export const submitCheckpointSchema = z.object({
   /** Raw base64 audio clip of the spoken explanation, optional. */
   audio: z.string().optional(),
   audioMime: z.string().optional(),
+  /** Board-change timeline for this checkpoint (Phase 1). Optional so older
+   * clients keep posting valid checkpoints. */
+  timeline: timelineSchema.optional(),
 });
 
 export const sendMessageSchema = z.object({

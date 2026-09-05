@@ -1,3 +1,5 @@
+import type { TimelineDTO } from './TimelineDTO';
+
 export interface TeachingCheckpointDTO {
   id: string;
   /** Snapshot image of the canvas, sent to Vision when the Teach button is pressed */
@@ -8,7 +10,10 @@ export interface TeachingCheckpointDTO {
   audioUrl?: string;
   /** Respon learner setelah Vision + agent memproses snapshot. Kosong selagi diproses. */
   learnerResponse?: string;
-  /** Endpoint URL of the spoken learner response (XTTS). Absent when voice is off. */
+  /** Endpoint URL of the spoken learner response (TTS). Absent when voice is off. */
   learnerAudioUrl?: string;
+  /** When each board change happened relative to the recording (Phase 1).
+   *  Absent on older checkpoints and on clients that can't capture it. */
+  timeline?: TimelineDTO;
   createdAt: string;
 }

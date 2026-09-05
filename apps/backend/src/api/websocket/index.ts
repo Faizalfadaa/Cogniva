@@ -26,17 +26,31 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
     const { sessionId } = req.params as { sessionId: string };
     const send: Send = (message) => socket.send(JSON.stringify(message));
 
-    const session = sessions.getSession(sessionId);
-    if (!session) {
-      send({ type: "error", message: "Session not found" });
-      socket.close();
-      return;
-    }
+    // The handshake is synchronous but the session lookup is a query, so the
+    // greeting is sent once it lands. Messages that arrive in the meantime are
+    // queued behind it rather than dropped.
+    const ready = (async () => {
+      const session = await sessions.getSession(sessionId);
+      if (!session) {
+        send({ type: "error", message: "Session not found" });
+        socket.close();
+        return false;
+      }
+      send({ type: "state_update", status: session.status });
+      return true;
+    })();
 
-    send({ type: "state_update", status: session.status });
-
+    let queue: Promise<void> = ready.then(() => undefined);
     socket.on("message", (raw) => {
-      void handleMessage(send, sessionId, raw.toString());
+      const text = raw.toString();
+      queue = queue
+        .then(async () => {
+          if (!(await ready)) return;
+          await handleMessage(send, sessionId, text);
+        })
+        .catch((err) => {
+          log(`Message handling failed: ${err instanceof Error ? err.message : String(err)}`);
+        });
     });
   });
 }
@@ -73,7 +87,7 @@ async function runTurn(
   typedText: string | null,
   audio: string | null,
 ): Promise<void> {
-  const session = sessions.getSession(sessionId);
+  const session = await sessions.getSession(sessionId);
   if (!session) {
     send({ type: "error", message: "Session not found" });
     return;
@@ -103,11 +117,20 @@ async function runTurn(
     return;
   }
 
+  if (result.kind === "budget_exceeded") {
+    send({
+      type: "budget_exceeded",
+      message: "Sesi ini sudah mencapai batas token untuk babak ini.",
+    });
+    return;
+  }
+
   if (result.kind === "confirmation") {
     send({
       type: "confirmation_request",
       snapshotId: result.snapshotId ?? "",
       suggestedClarification: result.suggestedClarification ?? "",
+      source: result.source,
     });
     return;
   }

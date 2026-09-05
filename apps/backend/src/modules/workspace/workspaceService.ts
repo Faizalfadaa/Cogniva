@@ -26,6 +26,7 @@ import * as config from "../../config/index.js";
 import type { VisionInterpretation } from "../../contracts/board.js";
 import { utcNowIso } from "../../contracts/common.js";
 import type { Session } from "../../contracts/session.js";
+import type { Timeline } from "../../contracts/timeline.js";
 import type { Topic } from "../../contracts/topic.js";
 import type {
   ChatMessage,
@@ -53,72 +54,72 @@ const chatLearner = new LearnerAgent();
 /** Anonymous owner for requests that arrive without an x-client-id (e.g. curl). */
 export const ANON_OWNER = "anonymous";
 
-export function listWorkspaces(ownerId: string = ANON_OWNER): Workspace[] {
+export async function listWorkspaces(ownerId: string = ANON_OWNER): Promise<Workspace[]> {
   return workspaces.list(ownerId);
 }
 
 /** True when this device owns the workspace — gates every per-workspace route. */
-export function isOwner(id: string, ownerId: string = ANON_OWNER): boolean {
+export async function isOwner(id: string, ownerId: string = ANON_OWNER): Promise<boolean> {
   return workspaces.isOwner(id, ownerId);
 }
 
-export function createWorkspace(ownerId: string = ANON_OWNER): Workspace {
+export async function createWorkspace(ownerId: string = ANON_OWNER): Promise<Workspace> {
   const id = newWorkspaceId();
   const now = utcNowIso();
   const workspace: Workspace = { id, state: "Draft", createdAt: now, updatedAt: now };
-  workspaces.setOwner(id, ownerId);
 
   // Back it with a Session so the orchestrator/Evaluator drive it unchanged.
+  // The session is written first: the workspace row references it.
   const session: Session = {
     sessionId: newId("ses"),
     topicId: id, // synthetic — the Topic is built from workspace metadata
     status: "SETUP",
     createdAt: now,
     turnCount: 0,
+    tokensUsed: 0,
     evaluationIds: [],
   };
-  sessions.saveSession(session);
-  workspaces.linkSession(id, session.sessionId);
+  await sessions.saveSession(session);
 
-  return workspaces.save(workspace);
+  return workspaces.create(workspace, ownerId, session.sessionId);
 }
 
-export function getWorkspace(id: string): Workspace | undefined {
+export async function getWorkspace(id: string): Promise<Workspace | undefined> {
   return workspaces.get(id);
 }
 
-export function deleteWorkspace(id: string): boolean {
-  const ws = workspaces.get(id);
+export async function deleteWorkspace(id: string): Promise<boolean> {
+  const ws = await workspaces.get(id);
   if (!ws) return false;
 
-  const sessionId = workspaces.sessionId(id);
-  if (sessionId) sessions.deleteSession(sessionId);
-  workspaces.delete(id);
+  const sessionId = await workspaces.sessionId(id);
+  await workspaces.delete(id);
+  if (sessionId) await sessions.deleteSession(sessionId);
 
   return true;
 }
 
-export function updateMeta(
+export async function updateMeta(
   id: string,
   meta: { title?: string; description?: string },
-): Workspace | undefined {
-  const ws = workspaces.get(id);
+): Promise<Workspace | undefined> {
+  const ws = await workspaces.get(id);
   if (!ws) return undefined;
   if (meta.title !== undefined) ws.title = meta.title;
   if (meta.description !== undefined) ws.description = meta.description;
   return touch(ws);
 }
 
-export function saveDraft(
+export async function saveDraft(
   id: string,
   payload: { snapshot?: unknown; thumbnail?: string },
-): Workspace | undefined {
-  const ws = workspaces.get(id);
+): Promise<Workspace | undefined> {
+  const ws = await workspaces.get(id);
   if (!ws) return undefined;
   ws.currentWhiteboardSnapshot = payload.snapshot;
   if (payload.thumbnail) ws.thumbnailUrl = payload.thumbnail;
   // First real draft flips a blank workspace into Teaching (mirrors the mock).
-  if (ws.state === "Draft") startTeaching(ws);
+  if (ws.state === "Draft") await startTeaching(ws);
   return touch(ws);
 }
 
@@ -127,9 +128,9 @@ export async function setPdf(
   data: Buffer,
   mime: string,
 ): Promise<Workspace | undefined> {
-  const ws = workspaces.get(id);
+  const ws = await workspaces.get(id);
   if (!ws) return undefined;
-  workspaces.savePdf(id, { data, mime });
+  await workspaces.savePdf(id, { data, mime });
   ws.pdfUrl = `/api/workspaces/${id}/pdf`;
 
   // Extract the text and keep it as this session's reference material — the
@@ -138,7 +139,7 @@ export async function setPdf(
   // scanned/image-only PDF) are non-fatal: the session has no reference.
   const text = await extractPdfText(data);
   if (text) {
-    workspaces.saveReference(id, text);
+    await workspaces.saveReference(id, text);
     // Chunk + embed in the background so the upload response stays fast, the
     // same pattern the checkpoint/chat/finish calls use. Evaluation builds the
     // index synchronously if it is still missing by then.
@@ -152,7 +153,7 @@ export async function setPdf(
 async function indexReference(id: string, text: string): Promise<void> {
   try {
     const index = await buildReferenceIndex(text);
-    workspaces.saveReferenceIndex(id, index);
+    await workspaces.saveReferenceIndex(id, index);
     console.log(
       `[workspace] reference indexed for ${id}: ${index.size} bagian, mode ${index.mode}`,
     );
@@ -187,7 +188,7 @@ async function extractPdfText(data: Buffer): Promise<string> {
 
 // --- Teaching checkpoints --------------------------------------------------
 
-export function submitCheckpoint(
+export async function submitCheckpoint(
   id: string,
   payload: {
     snapshotImage: string;
@@ -195,13 +196,14 @@ export function submitCheckpoint(
     whiteboardSnapshot?: unknown;
     audio?: string;
     audioMime?: string;
+    timeline?: Timeline;
   },
-): TeachingCheckpoint | undefined {
-  const ws = workspaces.get(id);
+): Promise<TeachingCheckpoint | undefined> {
+  const ws = await workspaces.get(id);
   if (!ws) return undefined;
 
   // A checkpoint implies teaching; make sure the session is live first.
-  if (ws.state === "Draft") startTeaching(ws);
+  if (ws.state === "Draft") await startTeaching(ws);
 
   const checkpoint: TeachingCheckpoint = {
     id: newId("chk"),
@@ -211,14 +213,17 @@ export function submitCheckpoint(
       ? dataUrl(payload.audioMime ?? "audio/webm", payload.audio)
       : undefined,
     learnerResponse: undefined,
+    // Phase 1: stored alongside whiteboardSnapshot and deliberately NOT passed
+    // to runTeachingTurn -- wiring it into Vision/Learner is Phase 2.
+    timeline: payload.timeline,
     createdAt: utcNowIso(),
   };
-  workspaces.addCheckpoint(id, checkpoint);
-  touch(ws);
+  await workspaces.addCheckpoint(id, checkpoint);
+  await touch(ws);
 
   // Run the actual teaching turn in the background; the UI polls getCheckpoints
   // for `learnerResponse` and getChatMessages for the mirrored reply.
-  void (async () => {
+  inBackground("teaching turn", async () => {
     let reply: string;
     try {
       reply = await runTeachingTurn(ws, {
@@ -229,37 +234,44 @@ export function submitCheckpoint(
       console.error("[workspace] teaching turn failed:", err);
       reply = "Hmm, I'm a little confused about this one... could you walk me through it again slowly?";
     }
-    // Publish the text immediately; the voice is attached when it is ready.
+    if (!(await stillExists(id))) return;
+
+    // Publish the text immediately; the voice is attached once it is ready.
     //
     // Speech used to be rendered first so both landed on the same poll. That
-    // only held while a render took a few seconds — one measured at 68 s, well
-    // past the client timeout, and the reply would have been held back that
-    // long for audio that never arrived. Text is the part the user is waiting
-    // for; the voice can catch up on a later poll.
-    workspaces.updateCheckpoint(id, checkpoint.id, { learnerResponse: reply });
-    const message = workspaces.addMessage(id, learnerMessage(reply));
-    touch(ws);
+    // only held while a render took a few seconds — one was measured at over
+    // three minutes, well past the client timeout, and the reply would have
+    // been held back that long for audio that never arrived. Text is what the
+    // user is waiting for; the voice catches up on a later poll.
+    await workspaces.updateCheckpoint(id, checkpoint.id, { learnerResponse: reply });
+    const message = await workspaces.addMessage(id, learnerMessage(reply));
+    await bump(id);
 
     const learnerAudioUrl = await speakLearnerReply(id, reply);
-    if (learnerAudioUrl) {
-      workspaces.updateCheckpoint(id, checkpoint.id, { learnerAudioUrl });
-      workspaces.updateMessage(id, message.id, { learnerAudioUrl });
-      touch(ws);
+    // Re-check: synthesis can take minutes, and the workspace may have been
+    // deleted while it ran.
+    if (learnerAudioUrl && (await stillExists(id))) {
+      await workspaces.updateCheckpoint(id, checkpoint.id, { learnerAudioUrl });
+      await workspaces.updateMessage(id, message.id, { learnerAudioUrl });
+      await bump(id);
     }
-  })();
+  });
 
   return checkpoint;
 }
 
-export function getCheckpoints(id: string): TeachingCheckpoint[] | undefined {
-  if (!workspaces.get(id)) return undefined;
+export async function getCheckpoints(id: string): Promise<TeachingCheckpoint[] | undefined> {
+  if (!(await workspaces.get(id))) return undefined;
   return workspaces.listCheckpoints(id);
 }
 
 // --- Chat ------------------------------------------------------------------
 
-export function sendChatMessage(id: string, content: string): ChatMessage | undefined {
-  const ws = workspaces.get(id);
+export async function sendChatMessage(
+  id: string,
+  content: string,
+): Promise<ChatMessage | undefined> {
+  const ws = await workspaces.get(id);
   if (!ws) return undefined;
 
   const userMsg: ChatMessage = {
@@ -268,12 +280,12 @@ export function sendChatMessage(id: string, content: string): ChatMessage | unde
     content,
     createdAt: utcNowIso(),
   };
-  workspaces.addMessage(id, userMsg);
-  touch(ws);
+  await workspaces.addMessage(id, userMsg);
+  await touch(ws);
 
   // The Learner replies asynchronously so the user's own bubble lands instantly;
   // the reply surfaces on the next getChatMessages poll.
-  void (async () => {
+  inBackground("chat reply", async () => {
     let reply: string;
     try {
       reply = await runChatReply(ws, content);
@@ -281,63 +293,64 @@ export function sendChatMessage(id: string, content: string): ChatMessage | unde
       console.error("[workspace] chat reply failed:", err);
       reply = "Oh, sorry, I blanked for a second there... could you say that again?";
     }
-    const message = workspaces.addMessage(id, learnerMessage(reply));
-    touch(ws);
+    if (!(await stillExists(id))) return;
+    const message = await workspaces.addMessage(id, learnerMessage(reply));
+    await bump(id);
 
     // Same as the checkpoint path: the text does not wait on the voice.
     const learnerAudioUrl = await speakLearnerReply(id, reply);
-    if (learnerAudioUrl) {
-      workspaces.updateMessage(id, message.id, { learnerAudioUrl });
-      touch(ws);
+    if (learnerAudioUrl && (await stillExists(id))) {
+      await workspaces.updateMessage(id, message.id, { learnerAudioUrl });
+      await bump(id);
     }
-  })();
+  });
 
   return userMsg;
 }
 
-export function getChatMessages(id: string): ChatMessage[] | undefined {
-  if (!workspaces.get(id)) return undefined;
+export async function getChatMessages(id: string): Promise<ChatMessage[] | undefined> {
+  if (!(await workspaces.get(id))) return undefined;
   return workspaces.listMessages(id);
 }
 
 // --- Evaluation ------------------------------------------------------------
 
-export function finishSession(id: string): boolean {
-  const ws = workspaces.get(id);
+export async function finishSession(id: string): Promise<boolean> {
+  const ws = await workspaces.get(id);
   if (!ws) return false;
   // Idempotent: only a teaching workspace can be finished.
   if (ws.state !== "Teaching" && ws.state !== "Draft") return true;
 
   ws.state = "Evaluating";
-  touch(ws);
+  await touch(ws);
 
-  void (async () => {
+  inBackground("evaluation", async () => {
     try {
       await runEvaluation(ws);
     } catch (err) {
       console.error("[workspace] evaluation failed:", err);
     }
+    if (!(await stillExists(id))) return;
     // Even on failure, surface a report so the debrief never dead-ends (§10).
-    if (!workspaces.getReport(id)) {
-      const session = requireSession(ws);
-      workspaces.saveReport(
+    if (!(await workspaces.getReport(id))) {
+      const session = await requireSession(ws);
+      await workspaces.saveReport(
         id,
         buildEvaluationReport(emptyEvaluation(session.sessionId), {
           title: ws.title ?? "",
           turnCount: session.turnCount,
-          learnerState: sessions.getLearnerState(session.sessionId),
+          learnerState: await sessions.getLearnerState(session.sessionId),
           meaningfulScore: false,
         }),
       );
     }
-    ws.state = "Completed";
-    touch(ws);
-  })();
+    await bump(id, { state: "Completed" });
+  });
 
   return true;
 }
 
-export function getReport(id: string) {
+export async function getReport(id: string) {
   return workspaces.getReport(id);
 }
 
@@ -348,12 +361,12 @@ export function getReport(id: string) {
  * round's evaluation so the student now targets the user's real weak spots
  * (§4.3). Only a Completed workspace resumes.
  */
-export function resumeSession(id: string): Workspace | undefined {
-  const ws = workspaces.get(id);
+export async function resumeSession(id: string): Promise<Workspace | undefined> {
+  const ws = await workspaces.get(id);
   if (!ws) return undefined;
   if (ws.state !== "Completed") return ws; // nothing to resume
 
-  const session = requireSession(ws);
+  const session = await requireSession(ws);
   // EVALUATED/ENDED -> TEACHING. Direct move (the service owns workspace state),
   // keeping turnCount and evaluationIds intact.
   session.status = "TEACHING";
@@ -362,57 +375,61 @@ export function resumeSession(id: string): Workspace | undefined {
   // Adaptive seeding (§4.3): re-aim the Learner at the weak spots the last
   // evaluation found, instead of carrying the old static misconceptions — so the
   // next round the student probes what the user actually got wrong/missed.
-  const evaluation = sessions.getLatestEvaluation(session.sessionId);
+  const evaluation = await sessions.getLatestEvaluation(session.sessionId);
   if (evaluation) {
-    sessions.saveLearnerState(
+    await sessions.saveLearnerState(
       seedLearnerStateFromEvaluation(
         session.sessionId,
         evaluation,
-        sessions.getLearnerState(session.sessionId),
+        await sessions.getLearnerState(session.sessionId),
       ),
     );
   }
 
-  sessions.saveSession(session);
+  await sessions.saveSession(session);
   ws.state = "Teaching";
   return touch(ws);
 }
 
 // --- Internals -------------------------------------------------------------
 
+/** Shown in the chat when the session runs out of token budget (§7.3). The
+ * workspace UI has no separate banner, so this speaks in the student's voice. */
+const BUDGET_EXCEEDED_REPLY =
+  "Waduh, sesi ini sudah mencapai batas token untuk babak ini. " +
+  "Yuk akhiri dulu babak ini supaya aku bisa kasih evaluasinya.";
+
 /** Run one teaching turn through the orchestrator, never pausing for confirmation. */
 async function runTeachingTurn(
   ws: Workspace,
   input: { image: string; audio: string | null },
 ): Promise<string> {
-  const session = requireSession(ws);
-  const topic = synthTopic(ws);
-  const orchestrator = getOrchestrator();
+  const session = await requireSession(ws);
+  const topic = await synthTopic(ws);
 
-  let result = await orchestrator.runTeachingTurn(session, topic, {
+  // The workspace UI has no confirmation step, so the planner is told not to
+  // schedule one (§S5): an unsure board reading now gets one directed re-read
+  // and then proceeds on Vision's best guess. This used to be a second full
+  // teaching turn — the whole pipeline run twice for one checkpoint.
+  const result = await getOrchestrator().runTeachingTurn(session, topic, {
     image: input.image,
     audio: input.audio,
     typedText: null,
+    allowConfirmation: false,
   });
 
-  // Low-confidence board reading would normally pause and ask the user, but the
-  // workspace UI has no confirmation step — re-run trusting Vision's best guess.
-  if (result.kind === "confirmation") {
-    const guess = result.interpretation?.transcribedText?.trim() || "The explanation on the whiteboard";
-    result = await orchestrator.runTeachingTurn(session, topic, {
-      image: null,
-      audio: input.audio,
-      typedText: guess,
-    });
-  }
+  // Only one orchestrator call now (the planner absorbed the retry), so one
+  // budget check is enough -- the old second check guarded a retry that no
+  // longer exists.
+  if (result.kind === "budget_exceeded") return BUDGET_EXCEEDED_REPLY;
 
   return result.response?.text ?? "Okay... go on, I'm following.";
 }
 
 /** Drive the Learner persona for a free-text chat message (no teaching turn saved). */
 async function runChatReply(ws: Workspace, content: string): Promise<string> {
-  const session = requireSession(ws);
-  const topic = synthTopic(ws);
+  const session = await requireSession(ws);
+  const topic = await synthTopic(ws);
 
   const interpretation: VisionInterpretation = {
     snapshotId: `chat_${session.sessionId}`,
@@ -423,7 +440,7 @@ async function runChatReply(ws: Workspace, content: string): Promise<string> {
   };
 
   const state =
-    sessions.getLearnerState(session.sessionId) ??
+    (await sessions.getLearnerState(session.sessionId)) ??
     seedLearnerState(session.sessionId, [], { topicTitle: topic.title });
 
   const [response, nextState] = await chatLearner.respond({
@@ -434,30 +451,28 @@ async function runChatReply(ws: Workspace, content: string): Promise<string> {
     state,
     turnIndex: session.turnCount,
   });
-  sessions.saveLearnerState(nextState);
+  await sessions.saveLearnerState(nextState);
   return response.text;
 }
 
 /** End the round and run the Evaluator, then store the mapped debrief report. */
 async function runEvaluation(ws: Workspace): Promise<void> {
-  const session = requireSession(ws);
+  const session = await requireSession(ws);
 
   if (session.status === "TEACHING") session.status = "ENDED";
   session.endedAt = utcNowIso();
-  sessions.saveSession(session);
+  await sessions.saveSession(session);
 
   // Same transcript projection the session REST layer feeds the Evaluator (§5.2).
-  const transcript: TranscriptTurn[] = sessions.listTurns(session.sessionId).map((turn) => {
-    const learner = sessions.getResponse(turn.learnerResponseId);
-    return {
-      turnIndex: turn.turnIndex,
-      boardText: turn.interpretation.transcribedText,
-      speech: turn.speechTranscript?.transcript || undefined,
-      learnerUtterance: learner?.text,
-    };
-  });
+  const rows = await sessions.listTurnsWithResponses(session.sessionId);
+  const transcript: TranscriptTurn[] = rows.map(({ turn, response }) => ({
+    turnIndex: turn.turnIndex,
+    boardText: turn.interpretation.transcribedText,
+    speech: turn.speechTranscript?.transcript || undefined,
+    learnerUtterance: response?.text,
+  }));
 
-  const topic = synthTopic(ws);
+  const topic = await synthTopic(ws);
   const { referenceExcerpts, referenceOutline } = await retrieveReference(
     ws,
     transcript,
@@ -477,22 +492,24 @@ async function runEvaluation(ws: Workspace): Promise<void> {
     },
     newId("ev"),
   );
-  sessions.saveEvaluation(result);
+  await sessions.saveEvaluation(result);
   session.evaluationId = result.evaluationId;
-  session.evaluationIds = sessions.listEvaluations(session.sessionId).map((e) => e.evaluationId);
+  session.evaluationIds = (await sessions.listEvaluations(session.sessionId)).map(
+    (e) => e.evaluationId,
+  );
   session.status = "EVALUATED";
-  sessions.saveSession(session);
+  await sessions.saveSession(session);
 
   // A synthesized workspace Topic has no key concepts, so the deterministic
   // offline evaluator can't produce a meaningful score — only a real LLM can.
   const usedMock = process.env.USE_MOCK_AI === "true" || !config.llmAvailable();
 
-  workspaces.saveReport(
+  await workspaces.saveReport(
     ws.id,
     buildEvaluationReport(result, {
       title: ws.title ?? "",
       turnCount: session.turnCount,
-      learnerState: sessions.getLearnerState(session.sessionId),
+      learnerState: await sessions.getLearnerState(session.sessionId),
       meaningfulScore: !usedMock,
     }),
   );
@@ -513,15 +530,15 @@ async function retrieveReference(
 ): Promise<{ referenceExcerpts: ReferenceExcerpt[]; referenceOutline: string[] }> {
   const empty = { referenceExcerpts: [], referenceOutline: [] };
 
-  const text = workspaces.getReference(ws.id);
+  const text = await workspaces.getReference(ws.id);
   if (!text) return empty;
 
   // The upload indexes in the background; if the user finished before that
   // landed, build it now rather than silently grading against nothing.
-  let index = workspaces.getReferenceIndex(ws.id);
+  let index = await workspaces.getReferenceIndex(ws.id);
   if (!index) {
     index = await buildReferenceIndex(text);
-    workspaces.saveReferenceIndex(ws.id, index);
+    await workspaces.saveReferenceIndex(ws.id, index);
   }
   if (index.size === 0) return empty;
 
@@ -536,40 +553,41 @@ async function retrieveReference(
 }
 
 /** Move a Draft workspace (and its Session) into the teaching loop. */
-function startTeaching(ws: Workspace): void {
+async function startTeaching(ws: Workspace): Promise<void> {
   ws.state = "Teaching";
-  const session = requireSession(ws);
+  const session = await requireSession(ws);
   if (session.status === "SETUP") {
     session.status = "TEACHING";
     session.startedAt = utcNowIso();
-    if (!sessions.getLearnerState(session.sessionId)) {
-      sessions.saveLearnerState(
-        seedLearnerState(session.sessionId, synthTopic(ws).commonMisconceptions, {
-          topicTitle: synthTopic(ws).title,
+    if (!(await sessions.getLearnerState(session.sessionId))) {
+      const topic = await synthTopic(ws);
+      await sessions.saveLearnerState(
+        seedLearnerState(session.sessionId, topic.commonMisconceptions, {
+          topicTitle: topic.title,
         }),
       );
     }
-    sessions.saveSession(session);
+    await sessions.saveSession(session);
   }
 }
 
 /** Build the Topic the agents need from whatever metadata the workspace has. */
-function synthTopic(ws: Workspace): Topic {
+async function synthTopic(ws: Workspace): Promise<Topic> {
   return {
     topicId: ws.id,
     title: ws.title?.trim() || "Untitled session",
     description: ws.description?.trim() || "",
     // Grounding: the uploaded PDF's text becomes the Evaluator's answer key.
-    referenceMaterial: workspaces.getReference(ws.id) ?? "",
+    referenceMaterial: (await workspaces.getReference(ws.id)) ?? "",
     keyConcepts: [],
     commonMisconceptions: [],
     difficulty: "medium",
   };
 }
 
-function requireSession(ws: Workspace): Session {
-  const sessionId = workspaces.sessionId(ws.id);
-  const session = sessionId ? sessions.getSession(sessionId) : undefined;
+async function requireSession(ws: Workspace): Promise<Session> {
+  const sessionId = await workspaces.sessionId(ws.id);
+  const session = sessionId ? await sessions.getSession(sessionId) : undefined;
   if (!session) throw new Error(`No session backing workspace ${ws.id}`);
   return session;
 }
@@ -599,7 +617,7 @@ async function speakLearnerReply(
   if (!speech) return undefined;
 
   const audioId = newId("aud");
-  workspaces.saveAudioClip(workspaceId, audioId, {
+  await workspaces.saveAudioClip(workspaceId, audioId, {
     data: speech.audio,
     mime: speech.mime,
   });
@@ -619,9 +637,48 @@ function emptyEvaluation(sessionId: string) {
   };
 }
 
-function touch(ws: Workspace): Workspace {
+function touch(ws: Workspace): Promise<Workspace> {
   ws.updatedAt = utcNowIso();
   return workspaces.save(ws);
+}
+
+/**
+ * Run the agent work for a request that has already been answered.
+ *
+ * Nothing may escape one of these: the user can delete a workspace while its
+ * teaching turn is still running, and the write that lands afterwards then fails
+ * against a foreign key that no longer resolves. Unhandled, that rejection takes
+ * down the process — so every background job is wrapped and its failure is
+ * logged instead.
+ */
+function inBackground(label: string, job: () => Promise<void>): void {
+  void job().catch((err) => {
+    console.error(`[workspace] ${label} gagal di latar belakang:`, err);
+  });
+}
+
+/**
+ * Whether the workspace is still there before a background job writes to it.
+ * A deleted workspace makes its in-flight turn moot: the reply is dropped rather
+ * than resurrected. This only narrows the window — `inBackground` is what closes
+ * it — but it keeps the ordinary delete-while-thinking case out of the log.
+ */
+async function stillExists(id: string): Promise<boolean> {
+  return Boolean(await workspaces.get(id));
+}
+
+/**
+ * Touch a workspace by id, re-reading it first.
+ *
+ * The background jobs (a teaching turn, a chat reply, an evaluation) finish long
+ * after the request that started them, and the workspace may have been edited in
+ * the meantime. Writing back the copy they captured would silently undo that
+ * edit — so they re-read, apply only their own change, and save.
+ */
+async function bump(id: string, patch: Partial<Workspace> = {}): Promise<void> {
+  const fresh = await workspaces.get(id);
+  if (!fresh) return;
+  await touch({ ...fresh, ...patch });
 }
 
 function dataUrl(mime: string, base64: string): string {

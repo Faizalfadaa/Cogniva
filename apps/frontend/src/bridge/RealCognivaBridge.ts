@@ -3,6 +3,7 @@ import type { WorkspaceDTO } from '../dto/WorkspaceDTO';
 import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
 import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
+import type { TimelineDTO } from '../dto/TimelineDTO';
 
 // ---------------------------------------------------------------------------
 // RealCognivaBridge — talks to the Fastify backend (§7.1) over plain REST.
@@ -146,7 +147,12 @@ export class RealCognivaBridge implements CognivaBridge {
 
   async submitCheckpoint(
     workspaceId: string,
-    payload: { snapshotImage: Blob; whiteboardSnapshot: unknown; audio?: Blob }
+    payload: {
+      snapshotImage: Blob;
+      whiteboardSnapshot: unknown;
+      audio?: Blob;
+      timeline?: TimelineDTO;
+    }
   ): Promise<TeachingCheckpointDTO> {
     const image = await blobToBase64(payload.snapshotImage);
     const audio = payload.audio ? await blobToBase64(payload.audio) : undefined;
@@ -159,6 +165,7 @@ export class RealCognivaBridge implements CognivaBridge {
         whiteboardSnapshot: payload.whiteboardSnapshot,
         audio: audio?.data,
         audioMime: audio?.mime,
+        timeline: payload.timeline,
       }
     );
   }

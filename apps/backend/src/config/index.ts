@@ -12,6 +12,12 @@ function num(value: string | undefined, fallback: number): number {
   return Number.isFinite(n) && value !== undefined && value !== "" ? n : fallback;
 }
 
+function bool(value: string | undefined, fallback: boolean): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return fallback;
+}
+
 // --- LLM wrapper (Architecture Document §3.3, §7.3) ------------------------
 
 /**
@@ -36,6 +42,47 @@ export const LLM_THINKING_BUDGET: number = num(
   process.env.COGNIVA_LLM_THINKING_BUDGET,
   0,
 );
+
+// --- Planner / Orchestrator (§3.3) -----------------------------------------
+
+/**
+ * The Planner decides the order of work for a turn (which agents run, and
+ * whether any can be skipped). It is a small, cheap call on purpose — the fast
+ * model is the right default; a stronger one buys little for a scheduling
+ * decision but is paid on every turn.
+ */
+export const PLANNER_MODEL: string =
+  process.env.COGNIVA_PLANNER_MODEL ?? "gemini-2.5-flash";
+
+/**
+ * A plan is a handful of step names and one-line reasons, so it needs far fewer
+ * tokens than the agents' outputs. Keeping it small also keeps the extra latency
+ * the Planner adds to the teaching loop small.
+ */
+export const PLANNER_MAX_TOKENS: number = num(process.env.COGNIVA_PLANNER_MAX_TOKENS, 512);
+
+/**
+ * "auto" plans with the model when a credential is configured and falls back to
+ * the deterministic rules otherwise. Set COGNIVA_PLANNER_MODE=rules to force the
+ * rule engine even with a key — the same decisions, zero extra latency, which is
+ * what you want for load tests and for reproducible demos.
+ */
+export const PLANNER_MODE: "auto" | "rules" =
+  process.env.COGNIVA_PLANNER_MODE === "rules" ? "rules" : "auto";
+
+/**
+ * Hard ceiling on steps per teaching turn (§S8 budgets). A full turn is
+ * read_board -> verify_board -> transcribe_audio -> ask_learner; the extra slot
+ * is headroom so a re-plan cannot strand a turn before it reaches the student.
+ */
+export const PLANNER_MAX_STEPS: number = num(process.env.COGNIVA_PLANNER_MAX_STEPS, 5);
+
+/**
+ * How many times one turn may ask for a new plan after a step surprises it
+ * (typically: the board came back unreadable). Each re-plan is one extra model
+ * call, so one is usually the right number.
+ */
+export const PLANNER_MAX_REPLANS: number = num(process.env.COGNIVA_PLANNER_MAX_REPLANS, 1);
 
 // --- Vision (§3.4) ---------------------------------------------------------
 
@@ -182,16 +229,35 @@ export const ASR_CONFIDENCE_THRESHOLD: number = num(
   0.6,
 );
 
-// --- Text-to-speech (XTTS v2 sidecar, services/tts) -------------------------
+// --- Token budget (§7.3 cost control) --------------------------------------
+
+/**
+ * Ceiling on the tokens one session may spend across all its turns. Once a
+ * session is at or over this, the orchestrator refuses the turn instead of
+ * calling any model, so a runaway session can't drain the shared quota.
+ */
+export const SESSION_TOKEN_BUDGET: number = num(
+  process.env.COGNIVA_SESSION_TOKEN_BUDGET,
+  50000,
+);
+
+/**
+ * Presentation escape hatch: skip budget ENFORCEMENT so a live demo can't be
+ * cut off mid-sentence. Usage is still measured and recorded either way — we
+ * want to be able to answer "how many tokens did that cost?" afterwards.
+ */
+export const DEMO_MODE: boolean = bool(process.env.COGNIVA_DEMO_MODE, false);
+
+// --- Text-to-speech (voice sidecar, services/tts) ---------------------------
 
 /**
  * Give the Learner a voice. Off by default: the service is a separate Python
  * process that has to be started deliberately, and the app must run end to end
  * without it.
  */
-export const TTS_ENABLED: boolean = process.env.COGNIVA_TTS_ENABLED === "true";
+export const TTS_ENABLED: boolean = bool(process.env.COGNIVA_TTS_ENABLED, false);
 
-/** Base URL of the XTTS service. */
+/** Base URL of the voice service. */
 export const TTS_URL: string = (
   process.env.COGNIVA_TTS_URL ?? "http://localhost:8020"
 ).replace(/\/+$/, "");
@@ -200,17 +266,18 @@ export const TTS_URL: string = (
  * Request timeout in seconds.
  *
  * Deliberately large. Render time on a laptop GPU is far less stable than it
- * first appears — the same sentence has taken 8 s and 68 s on this machine,
- * apparently with thermal state — and 45 s was cutting off renders that would
- * have finished. Nothing on screen waits for this: the reply text is published
- * before synthesis starts, and the voice is attached on a later poll.
+ * looks: the same sentence took 8 s in one run and over three minutes in
+ * another, with the GPU parked at idle clocks rather than overheating. 45 s was
+ * cutting off renders that would have finished. Nothing on screen waits for
+ * this — the reply text is published before synthesis starts and the voice is
+ * attached on a later poll.
  */
 export const TTS_TIMEOUT: number = num(process.env.COGNIVA_TTS_TIMEOUT, 150);
 
 /**
- * Language handed to XTTS. The Learner answers in English
- * (llm/prompts/learner.prompt.ts), and XTTS v2 does not speak Indonesian at all,
- * so "en" is both the correct and the only sensible default here.
+ * Language handed to the voice model. The Learner answers in English
+ * (llm/prompts/learner.prompt.ts), and neither engine speaks Indonesian, so
+ * "en" is both the correct and the only sensible default here.
  */
 export const TTS_LANGUAGE: string = process.env.COGNIVA_TTS_LANGUAGE ?? "en";
 

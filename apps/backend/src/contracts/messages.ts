@@ -56,6 +56,9 @@ export interface ConfirmationRequest {
   type: "confirmation_request";
   snapshotId: string;
   suggestedClarification: string;
+  /** Which channel is unsure -- the board reading or the voice transcript.
+   * Optional so clients written when only the board could pause still work. */
+  source?: "board" | "voice";
 }
 
 export interface LearnerMessage {
@@ -73,10 +76,18 @@ export interface ErrorMessage {
   message: string;
 }
 
+/** The session hit its token ceiling (§7.3) — distinct from `error` so the UI
+ * can explain a budget stop rather than showing it as a failure. */
+export interface BudgetExceeded {
+  type: "budget_exceeded";
+  message: string;
+}
+
 export type ServerMessage =
   | VisionResult
   | SpeechResult
   | ConfirmationRequest
   | LearnerMessage
   | StateUpdate
-  | ErrorMessage;
+  | ErrorMessage
+  | BudgetExceeded;

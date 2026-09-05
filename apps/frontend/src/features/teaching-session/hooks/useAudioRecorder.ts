@@ -9,11 +9,18 @@ interface UseAudioRecorderResult {
   /** Drain all accumulated chunks into one Blob and reset the buffer.
    *  Called by teach() — not by the user directly. */
   flush: () => Blob | undefined
+  /** Wall clock (epoch ms) at which the current, not-yet-flushed batch of audio
+   *  began — i.e. the t=0 of the Blob that flush() will return. null until the
+   *  first successful start (e.g. while mic permission is still denied).
+   *  Deliberately NOT cleared by flush(), so teach() can still read it after
+   *  draining; the next start() re-stamps it for the next batch. */
+  recordingStartedAt: number | null
 }
 
 export function useAudioRecorder(): UseAudioRecorderResult {
   const [isRecording, setIsRecording] = useState(false)
   const [permissionDenied, setPermissionDenied] = useState(false)
+  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   // Chunks persist across start/stop cycles until flush() is called.
@@ -34,6 +41,12 @@ export function useAudioRecorder(): UseAudioRecorderResult {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
       recorder.start()
+
+      // A batch spans every start/stop cycle until flush() drains it, so the
+      // origin is stamped only when the buffer is empty. Toggling the mic
+      // mid-explanation keeps the existing origin, which is what keeps the
+      // board timestamps lined up with the single concatenated Blob.
+      if (chunksRef.current.length === 0) setRecordingStartedAt(Date.now())
 
       recorderRef.current = recorder
       setIsRecording(true)
@@ -78,5 +91,5 @@ export function useAudioRecorder(): UseAudioRecorderResult {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { isRecording, permissionDenied, start, stop, flush }
+  return { isRecording, permissionDenied, start, stop, flush, recordingStartedAt }
 }

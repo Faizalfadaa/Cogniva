@@ -245,11 +245,11 @@
   align-items: flex-start;
   gap: 10px;
   width: 280px;
-  background: var(--cream);
-  border: 1px solid var(--border);
+  background: var(--bubble-learner-bg);
+  border: 1px solid var(--bubble-learner-border);
   border-radius: var(--radius-lg);
   padding: 10px 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.13);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
   animation: notifSlideIn 200ms var(--ease-out) both;
 }
 
@@ -264,7 +264,7 @@
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  background: var(--parchment);
+  background: var(--forest-dark);
 }
 
 .notifBody {
@@ -278,12 +278,12 @@
 .notifName {
   font-size: 11px;
   font-weight: 700;
-  color: var(--text-secondary);
+  color: var(--bubble-learner-name);
 }
 
 .notifText {
   font-size: 13px;
-  color: var(--text-primary);
+  color: var(--bubble-learner-text);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -303,10 +303,13 @@
   border-radius: 50%;
   font-size: 14px;
   line-height: 1;
-  color: var(--text-muted);
+  color: var(--bubble-learner-muted);
   transition: background var(--dur-fast), color var(--dur-fast);
 }
-.notifClose:hover { background: var(--parchment); color: var(--text-primary); }
+.notifClose:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--bubble-learner-text);
+}
 
 /* Legacy aliases — kept so old .responseName/.responseText in sidebar still work */
 .responseName { font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 2px; }
@@ -491,10 +494,12 @@
   line-height: 1.45;
 }
 
+/* The learner ("character") bubble: forest green so it never washes out
+   against the cream chat panel. The user keeps the lime bubble. */
 .chatBubbleLearner {
   align-self: flex-start;
-  background: var(--parchment);
-  color: var(--text-primary);
+  background: var(--bubble-learner-bg);
+  color: var(--bubble-learner-text);
   border-bottom-left-radius: 4px;
 }
 
@@ -567,11 +572,11 @@
   align-items: flex-start;
   gap: 10px;
   width: 280px;
-  background: var(--cream);
-  border: 1px solid var(--border);
+  background: var(--bubble-learner-bg);
+  border: 1px solid var(--bubble-learner-border);
   border-radius: var(--radius-lg);
   padding: 10px 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.13);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
   cursor: pointer;
   opacity: 0;
   transform: translateX(-10px);
@@ -584,8 +589,8 @@
 }
 
 .chatToast:hover {
-  border-color: var(--border-strong);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  border-color: var(--border-lime);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .chatToastAvatar {
@@ -594,7 +599,7 @@
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  background: var(--parchment);
+  background: var(--forest-dark);
 }
 
 .chatToastBody {
@@ -608,12 +613,12 @@
 .chatToastName {
   font-size: 11px;
   font-weight: 700;
-  color: var(--text-secondary);
+  color: var(--bubble-learner-name);
 }
 
 .chatToastText {
   font-size: 13px;
-  color: var(--text-primary);
+  color: var(--bubble-learner-text);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -804,10 +809,14 @@
   .chatSidebarInput { padding: 10px 14px; font-size: 16px; }
   .chatSidebarSend { width: 38px; height: 38px; }
 
-  /* ── Toasts: never wider than the screen ── */
+  /* ── Toasts: keep the right edge of the canvas clear ──
+     Both whiteboard engines dock a vertical tool strip against the right edge
+     on phones (Excalidraw's is ~37px wide, starting ~80px below the canvas
+     top). A full-width toast covered it and — being pointer-events:all — also
+     swallowed the taps. Reserve that gutter instead of spanning the viewport. */
   .notifStack,
   .chatToastsContainer {
-    max-width: calc(100vw - 16px);
+    max-width: min(300px, calc(100vw - 76px));
   }
   .notifToast,
   .chatToast {

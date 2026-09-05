@@ -27,6 +27,12 @@ export type RunLearnerOptions = {
    * (§2.3). Absent -> the student responds in a single step (original behavior).
    */
   tools?: LearnerTools;
+  /**
+   * Reports each LLM call's token cost back to the orchestrator (§7.3). The
+   * agent loop can call the model more than once per turn, so this may fire
+   * several times for one runLearnerTurn.
+   */
+  onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void;
 };
 
 /** Max tool uses per turn — bounds latency/cost; the student then must respond. */
@@ -57,7 +63,7 @@ export async function runLearnerTurn(
     let raw: LearnerLLMOutput | undefined;
     for (let step = 0; step <= MAX_TOOL_STEPS; step++) {
       const turnInput: LearnerAgentInput = { ...input, availableTools, observations };
-      raw = useMockAI ? mockLearnerAI(turnInput) : await callRealAI(turnInput);
+      raw = useMockAI ? mockLearnerAI(turnInput) : await callRealAI(turnInput, options);
 
       const action = normalizeAction(raw.action);
       // Terminal response, no tools to use, or budget spent -> finalize.
@@ -120,7 +126,8 @@ async function runTool(
 
 /** Real LLM path — routed through the project's centralized Gemini wrapper. */
 async function callRealAI(
-  input: LearnerAgentInput
+  input: LearnerAgentInput,
+  options: RunLearnerOptions
 ): Promise<LearnerLLMOutput> {
   const messages = buildLearnerMessages(input);
   const system = messages.find((m) => m.role === "system")?.content ?? "";
@@ -137,5 +144,7 @@ async function callRealAI(
     user,
     schema: LEARNER_LLM_OUTPUT_SCHEMA
   });
+
+  if (options.onUsage && llm.lastUsage) options.onUsage(llm.lastUsage);
   return data as unknown as LearnerLLMOutput;
 }

@@ -53,6 +53,12 @@ export interface GenAILike {
     }): Promise<{
       text?: string;
       promptFeedback?: { blockReason?: string } | null;
+      /** Token accounting for the call. Every field is optional in the SDK, so
+       * callers must treat a missing count as zero. */
+      usageMetadata?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+      };
     }>;
     /**
      * Optional so a stub that only implements generateContent still satisfies
@@ -79,6 +85,12 @@ export interface LLMClientOptions {
 export class LLMClient implements LLM {
   /** Public so tests can swap in a stub (mirrors the previous backend). */
   client: GenAILike;
+  /**
+   * Token cost of the most recent successful structured() call, or null if no
+   * call has landed yet. Reported out-of-band rather than through the return
+   * value so every existing caller keeps its current signature (§7.3).
+   */
+  lastUsage: { inputTokens: number; outputTokens: number } | null = null;
   readonly model: string;
   readonly maxTokens: number;
   readonly thinkingBudget: number;
@@ -101,7 +113,7 @@ export class LLMClient implements LLM {
    * caller can fall back gracefully.
    */
   async structured({ system, user, schema, image, audio }: StructuredArgs): Promise<Record<string, unknown>> {
-    let response: { text?: string; promptFeedback?: { blockReason?: string } | null };
+    let response: Awaited<ReturnType<GenAILike["models"]["generateContent"]>>;
     try {
       // Text-only agents (Learner, Evaluator) keep passing `user` as a plain
       // string, unchanged. Multimodal agents attach inline-data parts -- Vision
@@ -129,6 +141,14 @@ export class LLMClient implements LLM {
     } catch (err) {
       throw new LLMError(`LLM request failed: ${errMsg(err)}`);
     }
+
+    // Record usage the moment the call returns, BEFORE the block check and the
+    // JSON parse below: those tokens were spent and billed no matter how
+    // unusable the payload turns out to be.
+    this.lastUsage = {
+      inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
+      outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+    };
 
     // A safety block (or other non-STOP finish) yields no usable text.
     const blockReason = response.promptFeedback?.blockReason;

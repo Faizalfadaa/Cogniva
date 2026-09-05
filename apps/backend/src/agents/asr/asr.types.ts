@@ -2,10 +2,10 @@ import type { SpeechTranscript } from "../../contracts/speech.js";
 
 /**
  * The richer shape requested from the model -- transcript, confidence, detected
- * language code, and explicit ambiguities. More detailed than the official
- * SpeechTranscript (see GAPS_ASR.md): the official contract has no ambiguities/
- * needsConfirmation field, so the "some part is unclear" signal only survives
- * through the lowered confidence when mapped to the contract.
+ * language code, and explicit ambiguities. Still more detailed than the official
+ * SpeechTranscript: the contract has no `ambiguities` list, so the individual
+ * reasons are folded into a single suggestedClarification when mapped
+ * (see toSpeechTranscript in asr.guard.ts).
  */
 export type AsrLLMOutput = {
   transcript: string;
@@ -49,6 +49,11 @@ export type AsrAgentInput = {
 export type RunAsrOptions = {
   /** Force mock mode (used by tests and offline demos). */
   useMock?: boolean;
+  /**
+   * Reports this turn's token cost back to the orchestrator (§7.3). Optional:
+   * agents run exactly as before when nobody is counting.
+   */
+  onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void;
 };
 
 export { type SpeechTranscript };

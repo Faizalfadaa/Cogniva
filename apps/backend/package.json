@@ -3,8 +3,9 @@
   "private": true,
   "version": "0.1.0-m1",
   "type": "module",
-  "description": "Cogniva backend — Learning-by-Teaching platform (TypeScript + Fastify)",
+  "description": "Cogniva backend \u2014 Learning-by-Teaching platform (TypeScript + Fastify)",
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
     "demo:learner": "tsx tests/learner.demo.ts",
@@ -14,20 +15,28 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:db": "vitest run --config vitest.db.config.ts",
+    "db:migrate": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
     "@fastify/websocket": "^11.0.1",
     "@google/genai": "^1.0.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "dotenv": "^16.4.5",
     "fastify": "^5.1.0",
+    "pg": "^8.23.0",
     "unpdf": "^1.6.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",
     "@types/ws": "^8.5.12",
+    "prisma": "^7.10.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2",
     "vitest": "^2.1.1",

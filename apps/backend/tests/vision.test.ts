@@ -14,7 +14,7 @@ import {
   normalizeVisionLLMOutput,
   toVisionInterpretation,
 } from "../src/agents/vision/vision.guard.js";
-import type { BoardSnapshot } from "../src/contracts/board.js";
+import type { BoardSnapshot, Element } from "../src/contracts/board.js";
 
 function snapshot(image = ""): BoardSnapshot {
   return {
@@ -51,6 +51,44 @@ describe("VisionAgent.interpret (typed-text fallback, §5.3)", () => {
 
     expect(result.snapshotId).toBe("snap_1");
     expect(result.needsConfirmation).toBe(false);
+    expect(result.elements.length).toBeGreaterThan(0);
+  });
+
+  it("accepts the previous turn's elements as continuity context (§3.4)", async () => {
+    const vision = new VisionAgent({ confidenceThreshold: 0.6, useMock: true });
+    const previousElements: Element[] = [
+      { type: "text", content: "Fotosintesis", confidence: 0.9 },
+      { type: "arrow", content: "cahaya -> kloroplas", confidence: 0.8 },
+    ];
+
+    const withContext = await vision.interpret(
+      snapshot("ZmFrZS1iYXNlNjQ="),
+      undefined,
+      "Fotosintesis",
+      previousElements,
+    );
+    const without = await vision.interpret(
+      snapshot("ZmFrZS1iYXNlNjQ="),
+      undefined,
+      "Fotosintesis",
+    );
+
+    // The context only enriches the prompt; the mock ignores it, so the shape
+    // of the result must be unchanged either way.
+    expect(withContext).toEqual(without);
+    expect(withContext.needsConfirmation).toBe(false);
+  });
+
+  it("still reads the board when there is no previous turn to carry over", async () => {
+    const vision = new VisionAgent({ confidenceThreshold: 0.6, useMock: true });
+
+    const result = await vision.interpret(
+      snapshot("ZmFrZS1iYXNlNjQ="),
+      undefined,
+      "Fotosintesis",
+      undefined,
+    );
+
     expect(result.elements.length).toBeGreaterThan(0);
   });
 });
@@ -101,5 +139,26 @@ describe("vision.guard mapping (kontrak resmi)", () => {
     const result = createFallbackInterpretation("snap_x");
     expect(result.needsConfirmation).toBe(true);
     expect(result.confidence).toBe(0);
+  });
+
+  it("carries each element's own confidence into the official contract", () => {
+    const raw = normalizeVisionLLMOutput({
+      transcript: "Papan tentang fotosintesis...",
+      elements: [
+        { kind: "text", content: "Fotosintesis", confidence: 0.98, location: "atas" },
+        { kind: "unknown", content: "coretan tidak jelas", confidence: 0.3, location: "kiri bawah" },
+      ],
+      overallConfidence: 0.9,
+      ambiguities: [],
+      needsConfirmation: false,
+    });
+
+    const interpretation = toVisionInterpretation(raw, "snap_conf", 0.6);
+
+    // This field used to be dropped during mapping. Keeping it means a smudged
+    // element stays distinguishable from a clean one even when the board as a
+    // whole reads with high confidence.
+    expect(interpretation.elements[0].confidence).toBeCloseTo(0.98);
+    expect(interpretation.elements[1].confidence).toBeCloseTo(0.3);
   });
 });

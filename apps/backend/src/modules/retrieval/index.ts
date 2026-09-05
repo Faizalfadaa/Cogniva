@@ -26,7 +26,7 @@ import { ReferenceIndex, type ScoredChunk } from "./referenceIndex.js";
 export { chunkText, chunkLabel } from "./chunker.js";
 export type { ReferenceChunk } from "./chunker.js";
 export { ReferenceIndex, tokenize } from "./referenceIndex.js";
-export type { ScoredChunk } from "./referenceIndex.js";
+export type { ScoredChunk, SerializedReferenceIndex } from "./referenceIndex.js";
 
 /** One retrieved passage, in the shape the Evaluator agent consumes. */
 export interface ReferenceExcerpt {
