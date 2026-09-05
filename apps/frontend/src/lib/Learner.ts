@@ -8,7 +8,7 @@ export interface LearnerCharacter extends Omit<LearnerDTO, 'firstMessage' | 'int
   introImageUrl: string;
 }
 
-const LEARNERS: LearnerCharacter[] = [
+export const LEARNERS: readonly LearnerCharacter[] = [
   {
     id: 'yuzuki',
     name: 'Yuzuki Akatsuki',
@@ -64,6 +64,51 @@ export function deriveLearner(workspaceId: string): LearnerCharacter {
     hash = (hash * 31 + workspaceId.charCodeAt(i)) >>> 0;
   }
   return LEARNERS[hash % LEARNERS.length];
+}
+
+// ── Chosen character, per workspace ────────────────────────────────────────
+// Stored per browser like the intro flag (see useIntroSeen) rather than on the
+// backend: no contract carries "who the learner is", and the choice is a UI
+// preference, not session data the Evaluator or orchestrator ever reads.
+
+function storageKey(workspaceId: string): string {
+  return `cogniva:learner:${workspaceId}`;
+}
+
+/** The learner the user picked for this workspace, or null if they never did. */
+export function getStoredLearnerId(workspaceId: string): string | null {
+  if (!workspaceId) return null;
+  try {
+    return localStorage.getItem(storageKey(workspaceId));
+  } catch {
+    // Private mode / storage disabled — treated as "no choice recorded", which
+    // falls back to deriveLearner below rather than breaking anything.
+    return null;
+  }
+}
+
+export function setStoredLearnerId(workspaceId: string, learnerId: string): void {
+  if (!workspaceId) return;
+  try {
+    localStorage.setItem(storageKey(workspaceId), learnerId);
+  } catch {
+    // Losing the preference is a cosmetic regression, not worth interrupting.
+  }
+}
+
+/**
+ * The learner to show for a workspace: the user's pick when there is one,
+ * otherwise the original hash-derived character.
+ *
+ * The fallback is what keeps existing workspaces stable — every workspace
+ * opened before this feature has no stored id, and must keep the character it
+ * has always shown. An unknown stored id (a character since removed) falls
+ * back the same way rather than throwing.
+ */
+export function resolveLearner(workspaceId: string): LearnerCharacter {
+  const storedId = getStoredLearnerId(workspaceId);
+  const chosen = storedId ? LEARNERS.find((l) => l.id === storedId) : undefined;
+  return chosen ?? deriveLearner(workspaceId);
 }
 
 /**

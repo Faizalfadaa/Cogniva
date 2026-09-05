@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import type { WorkspaceDTO } from '../../dto/WorkspaceDTO'
 import type { EvaluationReportDTO } from '../../dto/EvaluationReportDTO'
-import { deriveLearner } from '../../lib/Learner'
+import { resolveLearner } from '../../lib/Learner'
 import { EvaluationProcessing } from '../../features/evaluation/components/EvaluationProcessing'
 import { LetterFromLearner } from '../../features/evaluation/components/LetterFromLearner'
 import { Notebook } from '../../features/evaluation/components/Notebook'
@@ -23,7 +23,10 @@ export default function EvaluationPage() {
   const [resuming, setResuming] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const learner = useMemo(() => deriveLearner(id ?? ''), [id])
+  // Same resolution as Workspace.tsx: the user's pick when there is one, the
+  // hash-derived default otherwise — so the debrief comes from the student they
+  // actually taught.
+  const learner = useMemo(() => resolveLearner(id ?? ''), [id])
 
   // Initial load
   useEffect(() => {

@@ -10,12 +10,18 @@ import { ChatSidebar } from '../../features/teaching-session/components/ChatSide
 import { ChatToasts } from '../../features/teaching-session/components/ChatToasts'
 import { ChatLauncher } from '../../features/teaching-session/components/ChatLauncher'
 import { ErrorBanner } from '../../features/teaching-session/components/ErrorBanner'
+import { LearnerSelect } from '../../features/teaching-session/components/LearnerSelect'
 import { useTeachingSession } from '../../features/teaching-session/state/useTeachingSession'
 import { useWorkspaceTitleAutosave } from '../../features/teaching-session/hooks/useWorkspaceTitleAutosave'
 import { useIntroSeen } from '../../features/teaching-session/hooks/useIntroSeen'
 import { useWorkspaceChat } from '../../features/teaching-session/hooks/useWorkspaceChat'
 import { useUserStore } from '../../state/UserStore'
-import { deriveLearner, resolveFirstMessages } from '../../lib/Learner'
+import {
+  getStoredLearnerId,
+  resolveFirstMessages,
+  resolveLearner,
+  setStoredLearnerId,
+} from '../../lib/Learner'
 import styles from '../../styles/TeachingSession.module.css'
 
 export default function WorkspacePage() {
@@ -46,9 +52,16 @@ export default function WorkspacePage() {
   )
 
   const session = useTeachingSession(id ?? '', bridge, whiteboardRef)
-  const learner = useMemo(() => deriveLearner(id ?? ''), [id])
+
+  // The picked id is state, not just a localStorage read, so choosing a student
+  // re-renders with the new one instead of keeping the memoised old character.
+  const [chosenLearnerId, setChosenLearnerId] = useState<string | null>(() =>
+    getStoredLearnerId(id ?? '')
+  )
+  const learner = useMemo(() => resolveLearner(id ?? ''), [id, chosenLearnerId])
   const titleField = useWorkspaceTitleAutosave(id ?? '', workspace?.title, bridge)
   const intro = useIntroSeen(id ?? '')
+  const tour = useAppTour('workspace')
   const { userName } = useUserStore()
   const navigate = useNavigate()
   const [finishingSession, setFinishingSession] = useState(false)
@@ -96,6 +109,29 @@ export default function WorkspacePage() {
   const chat = useWorkspaceChat(id ?? '', bridge, learner.name, learner.avatarUrl, {
     seedMessages,
   })
+
+  /**
+   * Ask only on a workspace nobody has started yet.
+   *
+   * `state === 'Draft'` is the "never used" signal: the backend leaves Draft on
+   * the first checkpoint AND on the first whiteboard autosave, so anything that
+   * has ever been drawn in or taught in is already past it. That is broader
+   * than "has checkpoints" and deliberately so — erring towards NOT asking
+   * keeps an existing workspace's character from changing under the user.
+   * `intro.seen` covers the same ground from the other side: if they have
+   * already met a student here, the choice was effectively made.
+   */
+  const needsLearnerPick =
+    !chosenLearnerId && workspace?.state === 'Draft' && !intro.seen
+
+  const handleSelectLearner = useCallback(
+    (learnerId: string) => {
+      if (!id) return
+      setStoredLearnerId(id, learnerId)
+      setChosenLearnerId(learnerId)
+    },
+    [id]
+  )
 
   // One banner, two sources. Teaching errors win: the user just pressed Teach
   // and is waiting on that, whereas a chat poll fails quietly in the background.
@@ -147,7 +183,11 @@ export default function WorkspacePage() {
             checkpointId={session.latestCheckpoint?.id}
           />
 
-          {!intro.seen && (
+          {/* Pick first, then meet them: the intro is held back until a student
+              exists, otherwise it would introduce the character being replaced. */}
+          {needsLearnerPick && <LearnerSelect onSelect={handleSelectLearner} />}
+
+          {!needsLearnerPick && !intro.seen && (
             <LearnerIntro learner={learner} userName={userName ?? ''} onDone={intro.markSeen} />
           )}
 

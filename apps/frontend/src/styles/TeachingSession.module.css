@@ -778,6 +778,98 @@
 ═══════════════════════════════════════════════════════════ */
 
 /* Full-canvas dim overlay */
+/* ── Learner picker ──
+   Same overlay language as .introOverlay below (dark scrim + blur, forest card,
+   portrait art) so choosing a character and then meeting them read as one flow
+   rather than two different screens. Sits above the intro's z-index because it
+   comes first. */
+.selectOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 910;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 18, 10, 0.62);
+  backdrop-filter: blur(3px);
+  padding: 24px;
+}
+
+.selectPanel {
+  background: var(--forest-dark);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  padding: 28px 28px 32px;
+  max-width: 860px;
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  text-align: center;
+}
+
+.selectTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-on-dark);
+}
+
+.selectSubtitle {
+  margin: 6px 0 22px;
+  font-size: 13px;
+  color: var(--text-on-dark-muted);
+}
+
+.selectGrid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+}
+
+.selectCard {
+  flex: 0 1 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  background: var(--forest-mid);
+  border: 2px solid transparent;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.selectCard:hover {
+  transform: translateY(-4px);
+  border-color: var(--lime);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.4);
+}
+
+.selectCard:focus-visible {
+  outline: none;
+  border-color: var(--lime);
+  box-shadow: 0 0 0 3px rgba(216, 255, 41, 0.35);
+}
+
+.selectCardImage {
+  width: 100%;
+  height: 260px;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+}
+
+.selectCardName {
+  padding: 12px 10px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-on-dark);
+}
+
 .introOverlay {
   position: absolute;
   inset: 0;
