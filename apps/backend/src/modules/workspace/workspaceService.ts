@@ -365,24 +365,17 @@ async function runTeachingTurn(
 ): Promise<string> {
   const session = requireSession(ws);
   const topic = synthTopic(ws);
-  const orchestrator = getOrchestrator();
 
-  let result = await orchestrator.runTeachingTurn(session, topic, {
+  // The workspace UI has no confirmation step, so the planner is told not to
+  // schedule one (§S5): an unsure board reading now gets one directed re-read
+  // and then proceeds on Vision's best guess. This used to be a second full
+  // teaching turn — the whole pipeline run twice for one checkpoint.
+  const result = await getOrchestrator().runTeachingTurn(session, topic, {
     image: input.image,
     audio: input.audio,
     typedText: null,
+    allowConfirmation: false,
   });
-
-  // Low-confidence board reading would normally pause and ask the user, but the
-  // workspace UI has no confirmation step — re-run trusting Vision's best guess.
-  if (result.kind === "confirmation") {
-    const guess = result.interpretation?.transcribedText?.trim() || "The explanation on the whiteboard";
-    result = await orchestrator.runTeachingTurn(session, topic, {
-      image: null,
-      audio: input.audio,
-      typedText: guess,
-    });
-  }
 
   return result.response?.text ?? "Okay... go on, I'm following.";
 }
