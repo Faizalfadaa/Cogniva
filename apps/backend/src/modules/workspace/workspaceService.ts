@@ -26,6 +26,7 @@ import * as config from "../../config/index.js";
 import type { VisionInterpretation } from "../../contracts/board.js";
 import { utcNowIso } from "../../contracts/common.js";
 import type { Session } from "../../contracts/session.js";
+import type { Timeline } from "../../contracts/timeline.js";
 import type { Topic } from "../../contracts/topic.js";
 import type {
   ChatMessage,
@@ -74,6 +75,7 @@ export function createWorkspace(ownerId: string = ANON_OWNER): Workspace {
     status: "SETUP",
     createdAt: now,
     turnCount: 0,
+    tokensUsed: 0,
     evaluationIds: [],
   };
   sessions.saveSession(session);
@@ -194,6 +196,7 @@ export function submitCheckpoint(
     whiteboardSnapshot?: unknown;
     audio?: string;
     audioMime?: string;
+    timeline?: Timeline;
   },
 ): TeachingCheckpoint | undefined {
   const ws = workspaces.get(id);
@@ -210,6 +213,9 @@ export function submitCheckpoint(
       ? dataUrl(payload.audioMime ?? "audio/webm", payload.audio)
       : undefined,
     learnerResponse: undefined,
+    // Phase 1: stored alongside whiteboardSnapshot and deliberately NOT passed
+    // to runTeachingTurn -- wiring it into Vision/Learner is Phase 2.
+    timeline: payload.timeline,
     createdAt: utcNowIso(),
   };
   workspaces.addCheckpoint(id, checkpoint);
@@ -358,6 +364,12 @@ export function resumeSession(id: string): Workspace | undefined {
 
 // --- Internals -------------------------------------------------------------
 
+/** Shown in the chat when the session runs out of token budget (§7.3). The
+ * workspace UI has no separate banner, so this speaks in the student's voice. */
+const BUDGET_EXCEEDED_REPLY =
+  "Waduh, sesi ini sudah mencapai batas token untuk babak ini. " +
+  "Yuk akhiri dulu babak ini supaya aku bisa kasih evaluasinya.";
+
 /** Run one teaching turn through the orchestrator, never pausing for confirmation. */
 async function runTeachingTurn(
   ws: Workspace,
@@ -376,6 +388,11 @@ async function runTeachingTurn(
     typedText: null,
     allowConfirmation: false,
   });
+
+  // Only one orchestrator call now (the planner absorbed the retry), so one
+  // budget check is enough -- the old second check guarded a retry that no
+  // longer exists.
+  if (result.kind === "budget_exceeded") return BUDGET_EXCEEDED_REPLY;
 
   return result.response?.text ?? "Okay... go on, I'm following.";
 }

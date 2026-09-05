@@ -17,6 +17,13 @@
  * with no audio never touches ASR, and a low-confidence reading gets a directed
  * second look before the user is interrupted.
  *
+ * If EITHER the board reading or the voice transcript needs confirmation (low
+ * confidence or flagged ambiguity, §5.3), the turn pauses and asks the user
+ * instead of running the Learner. `source` says which channel asked.
+ *
+ * Every turn also meters its own token spend onto the session, and refuses to
+ * start once the session is over its budget (§7.3).
+ *
  * Two invariants survive the change unchanged:
  *   - agents still never call each other (§2.3) — the Orchestrator remains the
  *     single owner of coordination, and the Planner only names steps;
@@ -47,8 +54,9 @@ import {
   type TurnSituation,
 } from "../agents/index.js";
 import type { AudioClip } from "../agents/asr/asr.types.js";
+import { focusInterpretation } from "../agents/vision/vision.focus.js";
 import * as config from "../config/index.js";
-import type { BoardSnapshot, VisionInterpretation } from "../contracts/board.js";
+import type { BoardSnapshot, Element, VisionInterpretation } from "../contracts/board.js";
 import { utcNowIso } from "../contracts/common.js";
 import type { LearnerResponse, LearnerState } from "../contracts/learner.js";
 import type { Session } from "../contracts/session.js";
@@ -62,12 +70,21 @@ export interface Learner {
   respond(args: RespondArgs): Promise<[LearnerResponse, LearnerState]>;
 }
 
+/** Reports one LLM call's token cost back to the orchestrator (§7.3). */
+export type UsageReporter = (usage: {
+  inputTokens: number;
+  outputTokens: number;
+}) => void;
+
 /** A vision agent the orchestrator can drive (real stub or a test fake). */
 export interface Vision {
   interpret(
     snapshot: BoardSnapshot,
     typedText: string | null | undefined,
     topic?: string,
+    /** What the board showed at the end of the previous turn (§3.4). */
+    previousElements?: Element[],
+    onUsage?: UsageReporter,
   ): Promise<VisionInterpretation>;
 }
 
@@ -77,6 +94,7 @@ export interface Asr {
     clip: AudioClip,
     typedText: string | null | undefined,
     topic?: string,
+    onUsage?: UsageReporter,
   ): Promise<SpeechTranscript>;
 }
 
@@ -87,12 +105,14 @@ export interface Planner {
 
 /** Outcome of one teaching turn the orchestrator hands back to the API layer. */
 export interface TurnResult {
-  kind: "learner" | "confirmation";
+  kind: "learner" | "confirmation" | "budget_exceeded";
   interpretation?: VisionInterpretation;
   speech?: SpeechTranscript;
   response?: LearnerResponse;
   snapshotId?: string;
   suggestedClarification?: string;
+  /** Which channel caused a "confirmation" pause. Only set for that kind. */
+  source?: "board" | "voice";
   /** The steps that actually ran, in order (§S8 tracing). */
   plan?: PlanTraceEntry[];
 }
@@ -131,6 +151,10 @@ interface StepArgs {
   previousTurn: TeachingTurn | undefined;
   allowConfirmation: boolean;
   ctx: TurnContext;
+  /** Every agent call reports its token cost here (§7.3). */
+  onUsage: UsageReporter;
+  /** Commit this turn's metered tokens onto the session. Call on every exit. */
+  recordUsage: () => void;
 }
 
 export class Orchestrator {
@@ -163,7 +187,24 @@ export class Orchestrator {
     topic: Topic,
     { image, audio, typedText, allowConfirmation = true }: TeachingInput,
   ): Promise<TurnResult> {
+    // Budget gate (§7.3), before anything else: once a session is out of
+    // tokens we refuse the turn without calling Vision, ASR or the Learner.
+    // DEMO_MODE skips only the ENFORCEMENT -- measurement below still runs.
+    if (!config.DEMO_MODE && session.tokensUsed >= config.SESSION_TOKEN_BUDGET) {
+      return { kind: "budget_exceeded" };
+    }
+
     const turnIndex = session.turnCount;
+
+    // Every agent reports its token cost here; the total lands on the session
+    // via recordUsage() on the way out, whichever exit this turn takes.
+    let turnTokens = 0;
+    const onUsage: UsageReporter = (usage): void => {
+      turnTokens += usage.inputTokens + usage.outputTokens;
+    };
+    const recordUsage = (): void => {
+      sessions.addTokenUsage(session.sessionId, turnTokens);
+    };
 
     const snapshot: BoardSnapshot = {
       snapshotId: newId("snap"),
@@ -188,6 +229,8 @@ export class Orchestrator {
       previousTurn,
       allowConfirmation,
       ctx,
+      onUsage,
+      recordUsage,
     };
 
     const situationNow = (): TurnSituation =>
@@ -254,7 +297,15 @@ export class Orchestrator {
 
     switch (step.kind) {
       case "read_board":
-        ctx.interpretation = await this.vision.interpret(snapshot, args.typedText, topic.title);
+        // Continuity between turns (§3.4): the board is drawn incrementally, so
+        // Vision is told what the previous completed turn read.
+        ctx.interpretation = await this.vision.interpret(
+          snapshot,
+          args.typedText,
+          topic.title,
+          args.previousTurn?.interpretation.elements,
+          args.onUsage,
+        );
         return null;
 
       case "reuse_board":
@@ -262,7 +313,13 @@ export class Orchestrator {
         // snapshot id, and skip the Vision call entirely.
         ctx.interpretation = args.previousTurn
           ? { ...args.previousTurn.interpretation, snapshotId: snapshot.snapshotId }
-          : await this.vision.interpret(snapshot, args.typedText, topic.title);
+          : await this.vision.interpret(
+              snapshot,
+              args.typedText,
+              topic.title,
+              undefined,
+              args.onUsage,
+            );
         return null;
 
       case "verify_board": {
@@ -277,6 +334,8 @@ export class Orchestrator {
             snapshot,
             null,
             `${topic.title} — verifikasi baca ulang: ${focus}`,
+            ctx.interpretation?.elements,
+            args.onUsage,
           );
           ctx.interpretation = betterReading(ctx.interpretation, second);
         } catch (err) {
@@ -297,18 +356,36 @@ export class Orchestrator {
         };
         // typedText is the board-channel fallback, so it is NOT fed to ASR (that
         // would duplicate the same text into both channels).
-        ctx.speech = await this.asr.transcribe(clip, null, topic.title);
+        ctx.speech = await this.asr.transcribe(clip, null, topic.title, args.onUsage);
         sessions.saveTranscript(ctx.speech);
+
+        if (ctx.speech.needsConfirmation && args.allowConfirmation) {
+          // Same pause as an unreadable board (§5.3), for the voice channel:
+          // handing a probably-wrong transcript to the Learner teaches it the
+          // wrong thing. Suppressed when the caller can't show a prompt --
+          // the workspace UI passes allowConfirmation: false.
+          args.recordUsage();
+          return {
+            kind: "confirmation",
+            speech: ctx.speech,
+            snapshotId: snapshot.snapshotId,
+            suggestedClarification: ctx.speech.suggestedClarification,
+            source: "voice",
+          };
+        }
         return null;
       }
 
       case "ask_confirmation":
-        // Pause the turn and ask the user to confirm/correct (§5.3).
+        // Pause the turn and ask the user to confirm/correct (§5.3). Vision
+        // already ran, so its tokens count even though the turn didn't finish.
+        args.recordUsage();
         return {
           kind: "confirmation",
           interpretation: ctx.interpretation ?? undefined,
           snapshotId: snapshot.snapshotId,
           suggestedClarification: ctx.interpretation?.suggestedClarification,
+          source: "board",
         };
 
       case "ask_learner":
@@ -328,6 +405,8 @@ export class Orchestrator {
     turnIndex,
     allowConfirmation,
     ctx,
+    onUsage,
+    recordUsage,
   }: StepArgs): Promise<TurnResult> {
     const interpretation = bestGuess(
       ctx.interpretation ?? blankInterpretation(snapshot.snapshotId),
@@ -345,21 +424,12 @@ export class Orchestrator {
     // orchestrator owns the cross-agent calls (§2.3): the Learner only declares
     // intent ("re-read this", "recall that") and these closures execute it.
     const tools: LearnerTools = {
-      rereadBoard: async (focus) => {
-        try {
-          const focused = await this.vision.interpret(
-            snapshot,
-            null,
-            `${topic.title} — fokus baca ulang: ${focus}`,
-          );
-          return (
-            focused.transcribedText?.trim() ||
-            "(no additional detail could be read in that part)"
-          );
-        } catch {
-          return "(failed to re-read the board)";
-        }
-      },
+      // The board is a static image we already read once this turn, so a
+      // "re-read" is a lookup in that existing interpretation -- not a second
+      // multimodal call costing thousands of tokens and a round trip (§7.3).
+      // No network, so nothing here can fail.
+      rereadBoard: (focus) =>
+        Promise.resolve(focusInterpretation(interpretation, focus)),
       recallEarlier: (query) =>
         Promise.resolve(recallFromTranscript(session.sessionId, query)),
     };
@@ -372,6 +442,7 @@ export class Orchestrator {
       state,
       turnIndex,
       tools,
+      onUsage,
     });
 
     sessions.saveResponse(response);
@@ -389,6 +460,7 @@ export class Orchestrator {
 
     session.turnCount = turnIndex + 1;
     sessions.saveSession(session);
+    recordUsage();
 
     return { kind: "learner", interpretation, speech: speech ?? undefined, response };
   }

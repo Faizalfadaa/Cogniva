@@ -110,5 +110,53 @@ describe("asr.guard mapping (kontrak resmi)", () => {
     const result = createFallbackTranscript(input());
     expect(result.transcript).toBe("");
     expect(result.confidence).toBe(0);
+    // The turn isn't dropped, but it isn't trusted either — it asks (§5.3).
+    expect(result.needsConfirmation).toBe(true);
+    expect(result.suggestedClarification).toBeTruthy();
+  });
+});
+
+describe("asr.guard confirmation signal", () => {
+  it("asks for confirmation when the model reports low confidence", () => {
+    const raw = normalizeAsrLLMOutput({
+      transcript: "agak pelan suaranya",
+      confidence: 0.3,
+      language: "id-ID",
+      ambiguities: [],
+    });
+
+    const result = toSpeechTranscript(raw, input());
+
+    expect(result.needsConfirmation).toBe(true);
+    expect(result.suggestedClarification).toBeTruthy();
+  });
+
+  it("asks for confirmation on flagged ambiguity even when confidence starts high", () => {
+    const raw = normalizeAsrLLMOutput({
+      transcript: "bagian ini ... (tidak jelas)",
+      confidence: 0.95,
+      language: "id-ID",
+      ambiguities: ["kata terakhir tidak terdengar jelas"],
+    });
+
+    const result = toSpeechTranscript(raw, input());
+
+    expect(result.needsConfirmation).toBe(true);
+    // The model's own reason is quoted back, not swallowed by the generic text.
+    expect(result.suggestedClarification).toContain("kata terakhir tidak terdengar jelas");
+  });
+
+  it("stays quiet on a clear, high-confidence transcript", () => {
+    const raw = normalizeAsrLLMOutput({
+      transcript: "Fotosintesis mengubah cahaya jadi energi kimia",
+      confidence: 0.95,
+      language: "id-ID",
+      ambiguities: [],
+    });
+
+    const result = toSpeechTranscript(raw, input());
+
+    expect(result.needsConfirmation).toBe(false);
+    expect(result.suggestedClarification).toBeUndefined();
   });
 });

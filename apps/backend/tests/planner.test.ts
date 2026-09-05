@@ -82,6 +82,7 @@ class FakeAsr implements Asr {
       sessionId: clip.sessionId,
       turnIndex: clip.turnIndex,
       transcript: "spoken explanation",
+      needsConfirmation: false,
       confidence: 0.9,
       language: "id-ID",
       capturedAt: clip.capturedAt,
@@ -122,6 +123,7 @@ function newSession(): Session {
     status: "TEACHING",
     createdAt: utcNowIso(),
     turnCount: 0,
+    tokensUsed: 0,
     evaluationIds: [],
   });
 }
