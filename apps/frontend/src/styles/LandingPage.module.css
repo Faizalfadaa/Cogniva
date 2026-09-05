@@ -48,7 +48,9 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  overflow-x: hidden;
+  /* Same reason as html/body in globals.css: `hidden` here would make .page a
+     scroll container and stop the sticky nav from sticking. */
+  overflow-x: clip;
   background: var(--page-bg);
   font-family: var(--font-body);
 }
