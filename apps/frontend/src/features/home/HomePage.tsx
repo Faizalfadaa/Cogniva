@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import { useUserStore } from '../../state/UserStore'
+import Onboarding from './Onboarding'
 import type { WorkspaceDTO, WorkspaceState } from '../../dto/WorkspaceDTO'
 import styles from '../../styles/HomePage.module.css'
 
@@ -23,6 +24,16 @@ function timeAgo(iso: string): string {
   if (hours < 24) return `${hours} hr ago`
   const days = Math.floor(hours / 24)
   return `${days} day${days === 1 ? '' : 's'} ago`
+}
+
+/** A drawn plus. A text "+" centres its line box rather than the glyph, which
+ *  leaves it visibly low inside a fixed-size tile or beside a label. */
+function IconPlus({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
 }
 
 // ─── Badge ───────────────────────────────────────────────────────────────────
@@ -117,7 +128,7 @@ function NewWorkspaceCard({ onClick, loading }: { onClick: () => void; loading: 
               <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="32" strokeDashoffset="12" />
             </svg>
           ) : (
-            <span>+</span>
+            <IconPlus size={16} />
           )}
         </div>
         <p className={styles.newCardLabel}>{loading ? 'Creating workspace...' : 'New workspace'}</p>
@@ -156,51 +167,6 @@ function EmptyState({ filter, onNew, loading }: { filter: ViewFilter; onNew: () 
           </button>
         </>
       )}
-    </div>
-  )
-}
-
-// ─── Name Setup Modal ────────────────────────────────────────────────────────
-
-function NameModal({ onConfirm }: { onConfirm: (name: string) => void }) {
-  const [name, setName] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => { inputRef.current?.focus() }, [])
-
-  function handleSubmit() {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    onConfirm(trimmed)
-  }
-
-  return (
-    <div className={styles.modalOverlay}>
-      <div className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <div className={styles.modalMark}>✦</div>
-        <h2 id="modal-title" className={styles.modalTitle}>Hey, what's your name?</h2>
-        <p className={styles.modalBody}>
-          Your AI student will call you by this name throughout the session.
-        </p>
-        <input
-          ref={inputRef}
-          className={styles.modalInput}
-          type="text"
-          placeholder="Your name..."
-          value={name}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          maxLength={40}
-          aria-label="Your name"
-        />
-        <button
-          className={styles.modalBtn}
-          onClick={handleSubmit}
-          disabled={!name.trim()}
-        >
-          Enter Cogniva →
-        </button>
-      </div>
     </div>
   )
 }
@@ -244,6 +210,85 @@ function DeleteConfirmModal({
   )
 }
 
+// ─── Profile Modal ────────────────────────────────────────────────────────────
+// Opened from the sidebar profile button. The name is the only thing stored
+// about a user today, so this is where it gets changed.
+
+function ProfileModal({
+  userName,
+  onSave,
+  onClose,
+}: {
+  userName: string
+  onSave: (name: string) => void
+  onClose: () => void
+}) {
+  const [name, setName] = useState(userName)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const trimmed = name.trim()
+  const canSave = trimmed.length > 0 && trimmed !== userName
+
+  function handleSave() {
+    if (!canSave) return
+    onSave(trimmed)
+    onClose()
+  }
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div
+        className={styles.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-modal-title"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={styles.profileAvatarLg} aria-hidden="true">
+          {userName.charAt(0).toUpperCase() || '?'}
+        </div>
+        <h2 id="profile-modal-title" className={styles.modalTitle}>Your profile</h2>
+        <p className={styles.modalBody}>
+          Your AI student calls you by this name during a session.
+        </p>
+
+        <span className={styles.profileFieldLabel}>Display name</span>
+        <input
+          ref={inputRef}
+          className={styles.modalInput}
+          type="text"
+          value={name}
+          placeholder="Your name..."
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSave()}
+          maxLength={40}
+          aria-label="Your name"
+        />
+
+        <button className={styles.modalBtn} onClick={handleSave} disabled={!canSave}>
+          Save changes
+        </button>
+        <button className={styles.modalBtnGhost} onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Filter tabs ─────────────────────────────────────────────────────────────
 
 const FILTER_OPTIONS: Array<{ label: string; value: ViewFilter }> = [
@@ -267,6 +312,7 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<WorkspaceDTO | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   const loadWorkspaces = useCallback(() => {
     setLoading(true)
@@ -343,7 +389,8 @@ export default function HomePage() {
 
   const hasAny = workspaces.length > 0
 
-  if (needsNameSetup) return <NameModal onConfirm={setUserName} />
+  // First visit: short intro explaining what Cogniva is, ending with the name step.
+  if (needsNameSetup) return <Onboarding onDone={setUserName} />
 
   return (
     <div className={styles.layout}>
@@ -361,7 +408,9 @@ export default function HomePage() {
             disabled={creating}
             aria-label="Create a new workspace"
           >
-            <span className={styles.newBtnPlus}>{creating ? '…' : '+'}</span>
+            <span className={styles.newBtnPlus}>
+              {creating ? '…' : <IconPlus size={14} />}
+            </span>
             <span>New workspace</span>
           </button>
         </div>
@@ -383,12 +432,19 @@ export default function HomePage() {
         </nav>
 
         <div className={styles.sidebarBottom}>
-          <div className={styles.userChip}>
+          <button
+            className={styles.userChip}
+            onClick={() => setProfileOpen(true)}
+            aria-haspopup="dialog"
+            aria-label={`Open profile settings for ${userName ?? 'you'}`}
+            title="Profile"
+          >
             <div className={styles.userAvatar}>
               {userName?.charAt(0).toUpperCase() ?? '?'}
             </div>
             <span className={styles.userName}>{userName}</span>
-          </div>
+            <span className={styles.userChipCaret} aria-hidden="true">▲</span>
+          </button>
         </div>
       </aside>
 
@@ -468,6 +524,14 @@ export default function HomePage() {
           )}
         </div>
       </main>
+
+      {profileOpen && (
+        <ProfileModal
+          userName={userName ?? ''}
+          onSave={setUserName}
+          onClose={() => setProfileOpen(false)}
+        />
+      )}
 
       {deleteTarget && (
         <DeleteConfirmModal

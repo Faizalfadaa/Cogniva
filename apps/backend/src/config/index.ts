@@ -43,6 +43,47 @@ export const LLM_THINKING_BUDGET: number = num(
   0,
 );
 
+// --- Planner / Orchestrator (§3.3) -----------------------------------------
+
+/**
+ * The Planner decides the order of work for a turn (which agents run, and
+ * whether any can be skipped). It is a small, cheap call on purpose — the fast
+ * model is the right default; a stronger one buys little for a scheduling
+ * decision but is paid on every turn.
+ */
+export const PLANNER_MODEL: string =
+  process.env.COGNIVA_PLANNER_MODEL ?? "gemini-2.5-flash";
+
+/**
+ * A plan is a handful of step names and one-line reasons, so it needs far fewer
+ * tokens than the agents' outputs. Keeping it small also keeps the extra latency
+ * the Planner adds to the teaching loop small.
+ */
+export const PLANNER_MAX_TOKENS: number = num(process.env.COGNIVA_PLANNER_MAX_TOKENS, 512);
+
+/**
+ * "auto" plans with the model when a credential is configured and falls back to
+ * the deterministic rules otherwise. Set COGNIVA_PLANNER_MODE=rules to force the
+ * rule engine even with a key — the same decisions, zero extra latency, which is
+ * what you want for load tests and for reproducible demos.
+ */
+export const PLANNER_MODE: "auto" | "rules" =
+  process.env.COGNIVA_PLANNER_MODE === "rules" ? "rules" : "auto";
+
+/**
+ * Hard ceiling on steps per teaching turn (§S8 budgets). A full turn is
+ * read_board -> verify_board -> transcribe_audio -> ask_learner; the extra slot
+ * is headroom so a re-plan cannot strand a turn before it reaches the student.
+ */
+export const PLANNER_MAX_STEPS: number = num(process.env.COGNIVA_PLANNER_MAX_STEPS, 5);
+
+/**
+ * How many times one turn may ask for a new plan after a step surprises it
+ * (typically: the board came back unreadable). Each re-plan is one extra model
+ * call, so one is usually the right number.
+ */
+export const PLANNER_MAX_REPLANS: number = num(process.env.COGNIVA_PLANNER_MAX_REPLANS, 1);
+
 // --- Vision (§3.4) ---------------------------------------------------------
 
 /**
@@ -85,6 +126,79 @@ export const VISION_CONFIDENCE_THRESHOLD: number = num(
  */
 export const EVALUATOR_MODEL: string =
   process.env.COGNIVA_EVALUATOR_MODEL ?? "gemini-2.5-flash";
+
+// --- Retrieval / RAG for the Evaluator (§3.7) ------------------------------
+
+/**
+ * Embedding model used to index the reference material and to embed retrieval
+ * queries. `gemini-embedding-001` is the current model; older ids such as
+ * `text-embedding-004` are no longer served on v1beta.
+ */
+export const EMBEDDING_MODEL: string =
+  process.env.COGNIVA_EMBEDDING_MODEL ?? "gemini-embedding-001";
+
+/**
+ * Output dimensionality requested from the embedding model. The model's native
+ * size is 3072; asking for fewer truncates the vector, which keeps the in-memory
+ * index small. Truncated vectors are NOT unit-length, so the client re-normalizes
+ * them — cosine similarity then reduces to a plain dot product.
+ */
+export const EMBEDDING_DIMENSIONS: number = num(
+  process.env.COGNIVA_EMBEDDING_DIMENSIONS,
+  768,
+);
+
+/** How many texts go in one embedContent call. Keeps requests well under limits. */
+export const EMBEDDING_BATCH_SIZE: number = num(
+  process.env.COGNIVA_EMBEDDING_BATCH_SIZE,
+  32,
+);
+
+/** Target size of one reference chunk, in characters. */
+export const RAG_CHUNK_SIZE: number = num(process.env.COGNIVA_RAG_CHUNK_SIZE, 900);
+
+/**
+ * Characters of the preceding text carried into each chunk. Overlap keeps a
+ * sentence that straddles a chunk boundary readable in at least one chunk.
+ */
+export const RAG_CHUNK_OVERLAP: number = num(
+  process.env.COGNIVA_RAG_CHUNK_OVERLAP,
+  150,
+);
+
+/** Chunks retrieved per query before the results of all queries are merged. */
+export const RAG_TOP_K: number = num(process.env.COGNIVA_RAG_TOP_K, 3);
+
+/** Upper bound on the merged excerpt set handed to the Evaluator prompt. */
+export const RAG_MAX_CHUNKS: number = num(process.env.COGNIVA_RAG_MAX_CHUNKS, 8);
+
+/** Upper bound on how many queries one evaluation may embed (cost guard). */
+export const RAG_MAX_QUERIES: number = num(process.env.COGNIVA_RAG_MAX_QUERIES, 12);
+
+/**
+ * Weight of the keyword score when blending with vector similarity (0..1).
+ * Vectors capture meaning; keywords catch exact tokens a paraphrase would miss —
+ * formulas, symbols, and names such as "ATP", "NADPH", "C6H12O6".
+ */
+export const RAG_KEYWORD_WEIGHT: number = num(
+  process.env.COGNIVA_RAG_KEYWORD_WEIGHT,
+  0.3,
+);
+
+/** Entries in the outline of the whole document sent alongside the excerpts. */
+export const RAG_MAX_OUTLINE_ENTRIES: number = num(
+  process.env.COGNIVA_RAG_MAX_OUTLINE_ENTRIES,
+  60,
+);
+
+/**
+ * Sanity bound on extracted reference text. Chunking replaced the old 20k
+ * truncation, so this only guards against a pathologically large upload.
+ */
+export const RAG_MAX_REFERENCE_CHARS: number = num(
+  process.env.COGNIVA_RAG_MAX_REFERENCE_CHARS,
+  400_000,
+);
 
 // --- ASR (§3.5) ------------------------------------------------------------
 

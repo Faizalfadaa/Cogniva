@@ -37,13 +37,13 @@ Cogniva/
 |-- apps/
 |   |-- backend/
 |   |   |-- src/
-|   |   |   |-- agents/          # Learner, vision, ASR, evaluator agents
+|   |   |   |-- agents/          # Planner, learner, vision, ASR, evaluator agents
 |   |   |   |-- api/             # REST and WebSocket endpoints
 |   |   |   |-- config/          # Environment-based runtime config
 |   |   |   |-- contracts/       # Zod schemas and shared backend types
 |   |   |   |-- llm/             # Gemini client and prompts
 |   |   |   |-- modules/         # Workspace, session, topic, and storage logic
-|   |   |   |-- orchestrator/    # Teaching turn orchestration
+|   |   |   |-- orchestrator/    # Teaching turn supervision (executes the planner's steps)
 |   |   |   |-- app.ts           # Fastify app factory
 |   |   |   `-- main.ts          # Backend entrypoint
 |   |   |-- tests/               # Backend tests and demos

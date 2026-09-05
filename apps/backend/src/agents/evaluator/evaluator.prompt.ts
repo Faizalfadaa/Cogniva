@@ -90,8 +90,7 @@ function buildEvaluatorUserPrompt(input: EvaluatorInput): string {
     : "(No teaching turns were recorded.)";
 
   return `
-# Reference Material (source of truth)
-${input.referenceMaterial || "(empty)"}
+${renderReference(input)}
 
 # Key Concepts That Should Ideally Be Conveyed
 ${input.keyConcepts.length ? input.keyConcepts.map((c) => `- ${c}`).join("\n") : "(none)"}
@@ -108,6 +107,38 @@ Return JSON matching the schema: score (0..100), summary, strengths[],
 improvements[], and findings[] with category CORRECT/WRONG/MISSED/CONFUSING plus
 evidenceTurnIndex.
 `.trim();
+}
+
+/**
+ * Render the reference section, in whichever of the two forms the caller sent.
+ *
+ * On the RAG path the model gets retrieved excerpts plus an outline of the whole
+ * document. The outline is not decoration: excerpts are retrieved using what the
+ * user said, so on their own they could never expose a concept the user never
+ * mentioned — and MISSED is exactly that kind of finding. The outline restores
+ * the document's full scope at a fraction of its length.
+ */
+function renderReference(input: EvaluatorInput): string {
+  const excerpts = input.referenceExcerpts ?? [];
+  if (excerpts.length === 0) {
+    return `# Reference Material (source of truth)\n${input.referenceMaterial || "(empty)"}`;
+  }
+
+  const outline = input.referenceOutline ?? [];
+  const outlineBlock = outline.length
+    ? `# Reference Material — Outline of the FULL document
+Every section of the reference, one line each. Use this to judge coverage: a
+concept listed here that never appears in the transcript is a MISSED finding.
+${outline.map((line) => `- ${line}`).join("\n")}
+
+`
+    : "";
+
+  return `${outlineBlock}# Reference Material — Retrieved Excerpts (source of truth)
+These are the passages of the reference most relevant to what the user taught.
+They are verbatim; quote and reason from them. Passages not shown are summarised
+in the outline above — do not assume they contradict the user.
+${excerpts.map((excerpt) => `\n[${excerpt.label}]\n${excerpt.text}`).join("\n")}`;
 }
 
 function renderTurn(turn: EvaluatorInput["turns"][number]): string {

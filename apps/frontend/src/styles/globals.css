@@ -21,6 +21,15 @@
   --text-on-dark: #e8e5d8;
   --text-on-dark-muted: #8a9278;
 
+  /* Chat bubbles — a learner ("character") message must read as a distinct
+     surface. Cream-on-parchment made it blend into the panel/canvas behind it,
+     so the learner speaks on forest green while the user keeps the lime. */
+  --bubble-learner-bg: #2d3a1a;
+  --bubble-learner-border: rgba(255, 255, 255, 0.12);
+  --bubble-learner-text: #eef0e4;
+  --bubble-learner-name: #d8ff29;
+  --bubble-learner-muted: rgba(238, 240, 228, 0.6);
+
   /* Borders */
   --border: rgba(30, 25, 10, 0.1);
   --border-strong: rgba(30, 25, 10, 0.18);

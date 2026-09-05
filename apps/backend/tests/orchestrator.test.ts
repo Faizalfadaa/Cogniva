@@ -197,8 +197,12 @@ describe("orchestrator board continuity", () => {
     const firstElements = first.interpretation?.elements ?? [];
     expect(firstElements.length).toBeGreaterThan(0);
 
+    // Turn 2 must carry a DIFFERENT image: an identical board makes the planner
+    // pick reuse_board and skip Vision entirely, so there would be no second
+    // reading to hand the context to. Continuity matters exactly when the board
+    // changed -- that is when knowing what was already there pays off.
     await orch.runTeachingTurn(session, topic, {
-      image: "base64data",
+      image: "base64data-with-one-more-arrow",
       typedText: null,
     });
 
@@ -272,7 +276,10 @@ describe("orchestrator token budget", () => {
     });
 
     expect(result.kind).toBe("confirmation");
-    expect(sessions.getSession(session.sessionId)?.tokensUsed).toBe(100);
+    // 200, not 100: an unsure reading makes the planner take a directed second
+    // look (verify_board) before interrupting the user, and that second Vision
+    // call is metered too. Both were spent before the turn paused.
+    expect(sessions.getSession(session.sessionId)?.tokensUsed).toBe(200);
   });
 
   it("refuses the turn once the session is at its budget, spending nothing", async () => {
