@@ -19,10 +19,40 @@ services:
       # Optional — without it the Learner uses a deterministic mock.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       COGNIVA_LEARNER_MODEL: ${COGNIVA_LEARNER_MODEL:-gemini-2.5-flash}
+      # Learner voice. Only has an effect when the `voice` profile is running.
+      COGNIVA_TTS_ENABLED: ${COGNIVA_TTS_ENABLED:-false}
+      COGNIVA_TTS_URL: http://tts:8020
       PORT: "8000"
       NODE_ENV: production
     expose:
       - "8000"
+    networks:
+      - cogniva
+
+  # Learner voice (XTTS v2). Opt-in: it adds a ~2 GB model download and, on CPU,
+  # 10-30s per reply. Start it explicitly with a profile:
+  #
+  #   docker compose --profile voice up -d --build
+  #
+  # The backend degrades to silence when it is absent, so the default stack is
+  # unaffected. XTTS v2 is licensed for NON-COMMERCIAL use only (CPML).
+  tts:
+    profiles: ["voice"]
+    build:
+      context: ./services/tts
+    image: cogniva-tts:latest
+    restart: unless-stopped
+    environment:
+      TTS_DEVICE: ${TTS_DEVICE:-cpu}
+      TTS_DEFAULT_LANGUAGE: ${TTS_DEFAULT_LANGUAGE:-en}
+    volumes:
+      # Reference recordings stay on the host — personal data, never in an image.
+      - ./services/tts/voices:/app/voices:ro
+      - tts_cache:/app/.cache
+      # Model weights survive a rebuild instead of downloading again.
+      - tts_models:/root/.local/share/tts
+    expose:
+      - "8020"
     networks:
       - cogniva
 
@@ -63,6 +93,8 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  tts_cache:
+  tts_models:
 
 networks:
   cogniva:

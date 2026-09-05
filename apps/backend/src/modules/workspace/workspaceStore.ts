@@ -34,6 +34,9 @@ export class WorkspaceStore {
   /** Chunked + embedded reference, built once per upload and searched at
    * evaluation time (§3.7 retrieval). Volatile like everything else here. */
   private referenceIndexes = new Map<string, ReferenceIndex>();
+  /** Synthesized learner speech, keyed by audio id and served by URL so the
+   * polled checkpoint/message lists stay small. */
+  private audioClips = new Map<string, StoredBlob>();
   // Per-device ownership: which client (x-client-id) created each workspace, so
   // one device only ever sees/touches its own. There's no user accounts in the
   // skeleton — a device id stands in for "who". (§8 placeholder isolation.)
@@ -76,6 +79,7 @@ export class WorkspaceStore {
     this.pdfs.delete(id);
     this.references.delete(id);
     this.referenceIndexes.delete(id);
+    this.deleteAudioClips(id);
     this.owners.delete(id);
   }
 
@@ -119,6 +123,21 @@ export class WorkspaceStore {
     const list = this.messages.get(workspaceId) ?? [];
     list.push(message);
     this.messages.set(workspaceId, list);
+    return message;
+  }
+
+  /**
+   * Patch a message after it was published — used to attach the learner's
+   * synthesized voice, which arrives seconds after the text (§TTS).
+   */
+  updateMessage(
+    workspaceId: string,
+    messageId: string,
+    patch: Partial<ChatMessage>,
+  ): ChatMessage | undefined {
+    const message = this.messages.get(workspaceId)?.find((m) => m.id === messageId);
+    if (!message) return undefined;
+    Object.assign(message, patch);
     return message;
   }
 
@@ -167,6 +186,30 @@ export class WorkspaceStore {
   getReferenceIndex(workspaceId: string): ReferenceIndex | undefined {
     return this.referenceIndexes.get(workspaceId);
   }
+
+  // --- Synthesized learner speech (§TTS) ---------------------------------
+
+  /** Store one rendered clip and return the id it is served under. */
+  saveAudioClip(workspaceId: string, audioId: string, blob: StoredBlob): void {
+    this.audioClips.set(audioKey(workspaceId, audioId), blob);
+  }
+
+  getAudioClip(workspaceId: string, audioId: string): StoredBlob | undefined {
+    return this.audioClips.get(audioKey(workspaceId, audioId));
+  }
+
+  /** Drop every clip belonging to a workspace (called on delete). */
+  private deleteAudioClips(workspaceId: string): void {
+    const prefix = `${workspaceId}:`;
+    for (const key of this.audioClips.keys()) {
+      if (key.startsWith(prefix)) this.audioClips.delete(key);
+    }
+  }
+}
+
+/** Clips are namespaced by workspace so one device can never read another's. */
+function audioKey(workspaceId: string, audioId: string): string {
+  return `${workspaceId}:${audioId}`;
 }
 
 /** Generate a workspace id, e.g. "ws_1a2b3c4d". */

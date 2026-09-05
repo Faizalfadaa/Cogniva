@@ -1,0 +1,25 @@
+# Voice service dependencies.
+#
+# REQUIRES PYTHON 3.10-3.12. Neither engine builds on 3.13, which is the only
+# interpreter on many fresh Windows installs -- see README.md.
+
+# Default engine: Resemble AI Chatterbox. MIT licensed, so usable commercially.
+chatterbox-tts==0.1.7
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+
+# Torch is pulled in by chatterbox-tts. For NVIDIA GPUs install the CUDA build
+# FIRST, or pip resolves the CPU-only wheel:
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# --- Optional: the XTTS engine (TTS_ENGINE=xtts) ---------------------------
+#
+# NOT installable alongside Chatterbox. coqui-tts pins transformers<=4.46.2
+# while chatterbox-tts needs 5.x, so the two cannot share one virtualenv.
+# To use XTTS instead, create a second venv with:
+#
+#   pip install coqui-tts==0.25.1 fastapi uvicorn[standard] pydantic
+#
+# XTTS v2 is licensed under the Coqui Public Model License: NON-COMMERCIAL ONLY.

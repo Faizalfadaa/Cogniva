@@ -827,3 +827,354 @@
 @media (max-width: 420px) {
   .micBtnLabel { display: none; }
 }
+/* ─── Learner voice (XTTS) ─── */
+
+/* Mute toggle in the header, sized to match the mic button beside it. */
+.voiceBtn,
+.voiceBtnMuted {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 32px;
+  font-size: 15px;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  transition: background var(--dur-fast) var(--ease-out),
+              opacity var(--dur-fast) var(--ease-out);
+}
+
+.voiceBtn:hover,
+.voiceBtnMuted:hover {
+  background: var(--parchment);
+}
+
+/* Muted reads as switched off rather than broken: dimmed, not coloured. */
+.voiceBtnMuted {
+  opacity: 0.55;
+}
+
+/* Play/stop control on a learner chat bubble. Sits inline after the text. */
+.chatBubbleSpeak {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  vertical-align: middle;
+  font-size: 9px;
+  color: var(--text-secondary);
+  border-radius: var(--radius-pill);
+  background: rgba(30, 25, 10, 0.06);
+  transition: background var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out);
+}
+
+.chatBubbleSpeak:hover {
+  background: var(--lime);
+  color: var(--lime-text);
+}
+
+/* Replay control in the floating response card, next to the learner's name. */
+.notifSpeak {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  vertical-align: middle;
+  font-size: 8px;
+  color: var(--text-secondary);
+  border-radius: var(--radius-pill);
+  background: rgba(30, 25, 10, 0.07);
+  transition: background var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out);
+}
+
+.notifSpeak:hover {
+  background: var(--lime);
+  color: var(--lime-text);
+}
+
+/* ─── Learner stage: the avatar moves with its own voice ─── */
+/*
+   Every transform below is a function of --voice-level, which useVoiceLevel
+   writes each animation frame (0 = silent, 1 = loud). No keyframes drive the
+   speaking motion, so the character is genuinely in sync with the audio rather
+   than looping an animation that happens to run at the same time.
+*/
+
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: 100%;
+  background: var(--cream);
+  border-left: 1px solid var(--border);
+}
+
+.stageHandle {
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 2;
+}
+
+.stageHandle:hover {
+  background: var(--border-lime);
+}
+
+.stageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.stageName {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stageHeaderActions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.stageIconBtn,
+.stageIconBtnOn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.stageIconBtn:hover,
+.stageIconBtnOn:hover {
+  background: var(--parchment);
+}
+
+.stageIconBtnOn {
+  background: var(--lime);
+  color: var(--lime-text);
+}
+
+/* --- the stage itself --- */
+
+.stageBody {
+  --voice-level: 0;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% 100%, var(--lime-tint) 0%, transparent 60%),
+    var(--cream);
+}
+
+/* Aura behind the character. Scale and opacity ride the amplitude, which reads
+   as breath and presence without needing a second piece of artwork. */
+.stageGlow {
+  position: absolute;
+  bottom: 6%;
+  left: 50%;
+  width: 68%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--lime) 0%, transparent 68%);
+  opacity: calc(0.1 + var(--voice-level) * 0.42);
+  transform: translateX(-50%) scale(calc(0.82 + var(--voice-level) * 0.3));
+  /* Short transition only: it smooths the per-frame steps without adding lag
+     that would visibly trail the voice. */
+  transition: opacity 70ms linear, transform 70ms linear;
+}
+
+/*
+   The character. A loud syllable lifts and grows it very slightly — the numbers
+   are deliberately small, because a static illustration that moves too much
+   stops reading as a person and starts reading as a bouncing image.
+*/
+.stageAvatar {
+  position: relative;
+  max-height: 92%;
+  max-width: 88%;
+  object-fit: contain;
+  transform-origin: 50% 100%;
+  transform:
+    translateY(calc(var(--voice-level) * -6px))
+    scale(calc(1 + var(--voice-level) * 0.022));
+  transition: transform 70ms linear;
+  user-select: none;
+}
+
+/* Idle: a slow breath so the character is never completely dead on screen.
+   Suppressed while speaking, where the voice drives the motion instead. */
+.stageBody:not(.stageBodySpeaking) .stageAvatar {
+  animation: stageBreathe 4.5s var(--ease-out) infinite;
+}
+
+@keyframes stageBreathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-3px) scale(1.006); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stageBody:not(.stageBodySpeaking) .stageAvatar { animation: none; }
+  .stageAvatar,
+  .stageGlow { transition: none; }
+}
+
+/* Level meter, so the reaction is legible even at a glance. Bars are staggered
+   so the middle ones react first, the way a real meter behaves. */
+.stageMeter {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 18px;
+  opacity: calc(0.25 + var(--voice-level) * 0.75);
+}
+
+.stageMeterBar {
+  width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--forest-mid);
+  height: calc(3px + var(--voice-level) * 15px);
+  transition: height 70ms linear;
+}
+
+.stageMeterBar[data-bar="0"],
+.stageMeterBar[data-bar="4"] { height: calc(3px + var(--voice-level) * 7px); }
+.stageMeterBar[data-bar="1"],
+.stageMeterBar[data-bar="3"] { height: calc(3px + var(--voice-level) * 11px); }
+
+/* --- current line --- */
+
+.stageLine {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--card-bg);
+}
+
+.stageLineText {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.stageReplay {
+  margin-top: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--parchment);
+  border-radius: var(--radius-pill);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.stageReplay:hover {
+  background: var(--lime);
+  color: var(--lime-text);
+}
+
+.stageIdle {
+  padding: 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  border-top: 1px solid var(--border);
+}
+
+.stageTranscript {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 40%;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--parchment);
+}
+
+/*
+   Speaking motion, driven by CSS alone.
+
+   The amplitude path (--voice-level) is the nicer one: it moves the character
+   in time with the actual waveform. But it depends on Web Audio being able to
+   read the stream, which can fail silently in ways that are invisible from the
+   outside — and an avatar that never moves is worse than one that moves
+   approximately. So the `speaking` class, which only needs playback to have
+   started, carries the motion on its own.
+
+   These animations are additive to the --voice-level transforms above: where
+   amplitude data is available it dominates, and where it is not, this still
+   reads as a character talking.
+*/
+
+.stageBodySpeaking .stageAvatar {
+  animation: stageTalk 620ms var(--ease-out) infinite;
+}
+
+@keyframes stageTalk {
+  0%   { transform: translateY(0)      scale(1); }
+  22%  { transform: translateY(-5px)   scale(1.014); }
+  46%  { transform: translateY(-1.5px) scale(1.004); }
+  70%  { transform: translateY(-4px)   scale(1.011); }
+  100% { transform: translateY(0)      scale(1); }
+}
+
+.stageBodySpeaking .stageGlow {
+  animation: stagePulse 620ms var(--ease-out) infinite;
+}
+
+@keyframes stagePulse {
+  0%, 100% { opacity: 0.16; transform: translateX(-50%) scale(0.86); }
+  35%      { opacity: 0.46; transform: translateX(-50%) scale(1.04); }
+}
+
+/* The meter is the clearest "there is sound" cue, so it animates per bar with
+   staggered delays — a flat row of bars would read as broken. */
+.stageBodySpeaking .stageMeterBar {
+  animation: stageBars 560ms var(--ease-out) infinite;
+}
+
+.stageBodySpeaking .stageMeterBar[data-bar="0"] { animation-delay: 0ms; }
+.stageBodySpeaking .stageMeterBar[data-bar="1"] { animation-delay: 90ms; }
+.stageBodySpeaking .stageMeterBar[data-bar="2"] { animation-delay: 45ms; }
+.stageBodySpeaking .stageMeterBar[data-bar="3"] { animation-delay: 150ms; }
+.stageBodySpeaking .stageMeterBar[data-bar="4"] { animation-delay: 200ms; }
+
+@keyframes stageBars {
+  0%, 100% { height: 4px; }
+  50%      { height: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stageBodySpeaking .stageAvatar,
+  .stageBodySpeaking .stageGlow,
+  .stageBodySpeaking .stageMeterBar { animation: none; }
+}

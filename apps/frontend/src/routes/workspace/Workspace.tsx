@@ -6,7 +6,7 @@ import { Whiteboard, type WhiteboardHandle } from '../../features/teaching-sessi
 import { WorkspaceHeader } from '../../features/teaching-session/components/WorkspaceHeader'
 import { LearnerResponseBubble } from '../../features/teaching-session/components/LearnerResponseBubble'
 import { LearnerIntro } from '../../features/teaching-session/components/LearnerIntro'
-import { ChatSidebar } from '../../features/teaching-session/components/ChatSidebar'
+import { LearnerStage } from '../../features/teaching-session/components/LearnerStage'
 import { ChatToasts } from '../../features/teaching-session/components/ChatToasts'
 import { useTeachingSession } from '../../features/teaching-session/state/useTeachingSession'
 import { useWorkspaceTitleAutosave } from '../../features/teaching-session/hooks/useWorkspaceTitleAutosave'
@@ -137,6 +137,7 @@ export default function WorkspacePage() {
             text={session.latestCheckpoint?.learnerResponse}
             pending={session.pending}
             checkpointId={session.latestCheckpoint?.id}
+            audioUrl={session.latestCheckpoint?.learnerAudioUrl}
           />
 
           {!intro.seen && (
@@ -153,9 +154,9 @@ export default function WorkspacePage() {
           )}
         </div>
 
-        {/* Chat sidebar — flex sibling so it pushes the canvas, not overlaps it */}
+        {/* Learner stage — flex sibling so it pushes the canvas, not overlaps it */}
         {intro.seen && (
-          <ChatSidebar
+          <LearnerStage
             learner={learner}
             messages={chat.messages}
             isOpen={chat.isOpen}

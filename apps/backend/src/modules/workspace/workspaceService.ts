@@ -41,6 +41,7 @@ import {
   type ReferenceExcerpt,
 } from "../retrieval/index.js";
 import { newId, sessions } from "../storage/sessionStore.js";
+import { synthesizeSpeech, ttsVoiceForWorkspace } from "../tts/index.js";
 import { buildEvaluationReport } from "./evaluationReport.js";
 import { newWorkspaceId, workspaces } from "./workspaceStore.js";
 
@@ -228,9 +229,23 @@ export function submitCheckpoint(
       console.error("[workspace] teaching turn failed:", err);
       reply = "Hmm, I'm a little confused about this one... could you walk me through it again slowly?";
     }
+    // Publish the text immediately; the voice is attached when it is ready.
+    //
+    // Speech used to be rendered first so both landed on the same poll. That
+    // only held while a render took a few seconds — one measured at 68 s, well
+    // past the client timeout, and the reply would have been held back that
+    // long for audio that never arrived. Text is the part the user is waiting
+    // for; the voice can catch up on a later poll.
     workspaces.updateCheckpoint(id, checkpoint.id, { learnerResponse: reply });
-    workspaces.addMessage(id, learnerMessage(reply));
+    const message = workspaces.addMessage(id, learnerMessage(reply));
     touch(ws);
+
+    const learnerAudioUrl = await speakLearnerReply(id, reply);
+    if (learnerAudioUrl) {
+      workspaces.updateCheckpoint(id, checkpoint.id, { learnerAudioUrl });
+      workspaces.updateMessage(id, message.id, { learnerAudioUrl });
+      touch(ws);
+    }
   })();
 
   return checkpoint;
@@ -266,8 +281,15 @@ export function sendChatMessage(id: string, content: string): ChatMessage | unde
       console.error("[workspace] chat reply failed:", err);
       reply = "Oh, sorry, I blanked for a second there... could you say that again?";
     }
-    workspaces.addMessage(id, learnerMessage(reply));
+    const message = workspaces.addMessage(id, learnerMessage(reply));
     touch(ws);
+
+    // Same as the checkpoint path: the text does not wait on the voice.
+    const learnerAudioUrl = await speakLearnerReply(id, reply);
+    if (learnerAudioUrl) {
+      workspaces.updateMessage(id, message.id, { learnerAudioUrl });
+      touch(ws);
+    }
   })();
 
   return userMsg;
@@ -552,8 +574,36 @@ function requireSession(ws: Workspace): Session {
   return session;
 }
 
-function learnerMessage(content: string): ChatMessage {
-  return { id: newId("msg"), sender: "learner", content, createdAt: utcNowIso() };
+function learnerMessage(content: string, learnerAudioUrl?: string): ChatMessage {
+  return {
+    id: newId("msg"),
+    sender: "learner",
+    content,
+    learnerAudioUrl,
+    createdAt: utcNowIso(),
+  };
+}
+
+/**
+ * Render a learner reply to speech and store it, returning the URL the UI can
+ * play — or undefined when speech is off or the voice service is unavailable.
+ *
+ * The character is derived from the workspace id exactly as the frontend does,
+ * so the voice always matches the face on screen.
+ */
+async function speakLearnerReply(
+  workspaceId: string,
+  text: string,
+): Promise<string | undefined> {
+  const speech = await synthesizeSpeech(text, ttsVoiceForWorkspace(workspaceId));
+  if (!speech) return undefined;
+
+  const audioId = newId("aud");
+  workspaces.saveAudioClip(workspaceId, audioId, {
+    data: speech.audio,
+    mime: speech.mime,
+  });
+  return `/api/workspaces/${workspaceId}/audio/${audioId}`;
 }
 
 function emptyEvaluation(sessionId: string) {

@@ -54,6 +54,14 @@ export interface TeachingCheckpoint {
   audioUrl?: string;
   /** The Learner's reaction; absent while the turn is still processing. */
   learnerResponse?: string;
+  /**
+   * Spoken version of `learnerResponse`, as an endpoint URL (§TTS).
+   *
+   * A URL rather than an inline data URL because the UI polls this list every
+   * second — embedding hundreds of kilobytes of audio per checkpoint in every
+   * poll would swamp the response. Absent when speech is off or unavailable.
+   */
+  learnerAudioUrl?: string;
   createdAt: string;
 }
 
@@ -64,6 +72,8 @@ export interface ChatMessage {
   id: string;
   sender: ChatSender;
   content: string;
+  /** Spoken version of a learner bubble, as an endpoint URL. See above. */
+  learnerAudioUrl?: string;
   createdAt: string;
 }
 

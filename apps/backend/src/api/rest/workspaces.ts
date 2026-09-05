@@ -22,13 +22,16 @@ import { workspaces } from "../../modules/workspace/workspaceStore.js";
 
 export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
   // Per-device isolation: every /workspaces/:id route must belong to the calling
-  // device (x-client-id). The collection routes (no :id) and the PDF GET — which
-  // the browser loads via <img>/<iframe> and so can't carry a custom header — are
-  // exempt. Runs only for routes registered in this plugin.
+  // device (x-client-id). The collection routes (no :id) are exempt, as are the
+  // two binary GETs the browser fetches through an element — <iframe> for the
+  // PDF and <audio> for learner speech — which cannot carry a custom header.
+  // Both are addressed by unguessable random ids, matching the posture the PDF
+  // route already had.
   app.addHook("preHandler", async (req, reply) => {
     const id = (req.params as { id?: string })?.id;
     if (!id) return; // /workspaces collection
-    if (req.method === "GET" && req.url.split("?")[0].endsWith("/pdf")) return;
+    const path = req.url.split("?")[0];
+    if (req.method === "GET" && (path.endsWith("/pdf") || path.includes("/audio/"))) return;
     if (!service.isOwner(id, clientOf(req))) return notFound(reply);
   });
 
@@ -83,6 +86,21 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     const blob = workspaces.getPdf(idOf(req.params));
     if (!blob) return notFound(reply);
     return reply.type(blob.mime).send(blob.data);
+  });
+
+  // Synthesized learner speech (§TTS). Served by URL rather than inlined into
+  // the polled checkpoint/message lists, which would otherwise carry hundreds
+  // of kilobytes of audio on every poll.
+  app.get("/workspaces/:id/audio/:audioId", async (req, reply) => {
+    const { id, audioId } = req.params as { id: string; audioId: string };
+    const blob = workspaces.getAudioClip(id, audioId);
+    if (!blob) return notFound(reply);
+    // Immutable: a clip's id is unique to its rendered content, so the browser
+    // can keep it for the life of the session and replay it without refetching.
+    return reply
+      .type(blob.mime)
+      .header("Cache-Control", "private, max-age=86400, immutable")
+      .send(blob.data);
   });
 
   // --- Teaching checkpoints ----------------------------------------------

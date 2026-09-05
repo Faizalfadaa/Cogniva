@@ -2,6 +2,7 @@ import { type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TeachButton } from './TeachButton'
 import type { TitleSaveStatus } from '../hooks/useWorkspaceTitleAutosave'
+import { useLearnerVoice } from '../hooks/useLearnerVoice'
 import styles from '../../../styles/TeachingSession.module.css'
 
 interface WorkspaceHeaderProps {
@@ -87,6 +88,7 @@ export function WorkspaceHeader({
   onToggleChat,
 }: WorkspaceHeaderProps) {
   const navigate = useNavigate()
+  const voice = useLearnerVoice()
 
   return (
     <header className={styles.header}>
@@ -142,6 +144,18 @@ export function WorkspaceHeader({
       </div>
 
       <div className={styles.headerRight}>
+        {/* Mute the learner's synthesized voice. Reads its state from the shared
+            player, so no prop drilling is needed. */}
+        <button
+          className={voice.muted ? styles.voiceBtnMuted : styles.voiceBtn}
+          onClick={voice.toggleMuted}
+          aria-label={voice.muted ? "Unmute learner's voice" : "Mute learner's voice"}
+          aria-pressed={voice.muted}
+          title={voice.muted ? 'Voice off' : 'Voice on'}
+        >
+          {voice.muted ? '🔇' : '🔊'}
+        </button>
+
         {!micPermissionDenied && (
           <button
             className={isRecording ? styles.micBtnActive : styles.micBtnIdle}

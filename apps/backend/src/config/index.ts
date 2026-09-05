@@ -182,6 +182,38 @@ export const ASR_CONFIDENCE_THRESHOLD: number = num(
   0.6,
 );
 
+// --- Text-to-speech (XTTS v2 sidecar, services/tts) -------------------------
+
+/**
+ * Give the Learner a voice. Off by default: the service is a separate Python
+ * process that has to be started deliberately, and the app must run end to end
+ * without it.
+ */
+export const TTS_ENABLED: boolean = process.env.COGNIVA_TTS_ENABLED === "true";
+
+/** Base URL of the XTTS service. */
+export const TTS_URL: string = (
+  process.env.COGNIVA_TTS_URL ?? "http://localhost:8020"
+).replace(/\/+$/, "");
+
+/**
+ * Request timeout in seconds.
+ *
+ * Deliberately large. Render time on a laptop GPU is far less stable than it
+ * first appears — the same sentence has taken 8 s and 68 s on this machine,
+ * apparently with thermal state — and 45 s was cutting off renders that would
+ * have finished. Nothing on screen waits for this: the reply text is published
+ * before synthesis starts, and the voice is attached on a later poll.
+ */
+export const TTS_TIMEOUT: number = num(process.env.COGNIVA_TTS_TIMEOUT, 150);
+
+/**
+ * Language handed to XTTS. The Learner answers in English
+ * (llm/prompts/learner.prompt.ts), and XTTS v2 does not speak Indonesian at all,
+ * so "en" is both the correct and the only sensible default here.
+ */
+export const TTS_LANGUAGE: string = process.env.COGNIVA_TTS_LANGUAGE ?? "en";
+
 // --- Server ----------------------------------------------------------------
 
 /** HTTP/WebSocket port. The frontend expects 8000 by default. */

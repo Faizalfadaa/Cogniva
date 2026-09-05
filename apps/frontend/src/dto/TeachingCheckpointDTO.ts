@@ -8,5 +8,7 @@ export interface TeachingCheckpointDTO {
   audioUrl?: string;
   /** Respon learner setelah Vision + agent memproses snapshot. Kosong selagi diproses. */
   learnerResponse?: string;
+  /** Endpoint URL of the spoken learner response (XTTS). Absent when voice is off. */
+  learnerAudioUrl?: string;
   createdAt: string;
 }
