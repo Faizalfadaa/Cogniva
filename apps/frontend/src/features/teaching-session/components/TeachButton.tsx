@@ -10,7 +10,7 @@ interface TeachButtonProps {
 export function TeachButton({ mode, pending, onTeach, onContinueEditing }: TeachButtonProps) {
   if (mode === 'editing') {
     return (
-      <button className={styles.teachBtn} onClick={onTeach}>
+      <button data-tour="teach-button" className={styles.teachBtn} onClick={onTeach}>
         Teach ↗
       </button>
     )
@@ -18,14 +18,14 @@ export function TeachButton({ mode, pending, onTeach, onContinueEditing }: Teach
 
   if (pending) {
     return (
-      <button className={styles.teachBtn} disabled>
+      <button data-tour="teach-button" className={styles.teachBtn} disabled>
         Thinking...
       </button>
     )
   }
 
   return (
-    <button className={styles.outlineBtn} onClick={onContinueEditing}>
+    <button data-tour="teach-button" className={styles.outlineBtn} onClick={onContinueEditing}>
       Continue editing
     </button>
   )

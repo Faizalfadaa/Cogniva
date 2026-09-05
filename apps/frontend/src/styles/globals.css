@@ -30,6 +30,24 @@
   --bubble-learner-name: #d8ff29;
   --bubble-learner-muted: rgba(238, 240, 228, 0.6);
 
+  /* On forest-dark surfaces the landing page needs a brighter body text than
+     --text-on-dark, and a green-tinted muted tone rather than a grey one. */
+  --text-on-forest: #f4f2e6;
+  --text-on-forest-muted: #b9c49a;
+  --text-on-forest-faint: #6d7a4d;
+
+  /* Warm, opaque borders/dividers. --border is translucent, which stacks
+     unevenly over the landing page's layered cream sections. */
+  --border-warm: #ece5d5;
+  --border-cream: #efe6cd;
+  --border-sand: #ddd5c0;
+  --divider-warm: #f2ece0;
+
+  /* Accents */
+  --lime-edge: #b6d81f;       /* 2px bottom edge under lime buttons */
+  --green-accent: #7fa03a;    /* small "live"/section markers */
+  --green-deep: #3a4d12;      /* link colour on light surfaces */
+
   /* Borders */
   --border: rgba(30, 25, 10, 0.1);
   --border-strong: rgba(30, 25, 10, 0.18);
@@ -48,6 +66,7 @@
   /* Typography */
   --font-display: 'Syne', sans-serif;
   --font-body: 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   /* Radius */
   --radius-sm: 8px;
@@ -71,6 +90,7 @@
 }
 
 html {
+  scroll-behavior: smooth;
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

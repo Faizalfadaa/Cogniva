@@ -224,16 +224,18 @@
    Learner response bubble  (top-right of canvas)
 ═══════════════════════════════════════════════════════════ */
 /* ── Shared notification stack (intro toasts + teach response + chat toasts) ──
-   Anchored top-left, just below the tldraw style panel (~68px from canvas top). */
+   Anchored bottom-right, stacking upward from just above the chat launcher.
+   The 90px bottom offset clears .chatLauncher (24px offset + 56px tall) with
+   room to spare, so a toast never sits on top of the button that opens chat. */
 .notifStack {
   position: absolute;
-  top: 76px;
-  left: 8px;
+  bottom: 90px;
+  right: 24px;
   z-index: 950;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: flex-start;
+  align-items: flex-end;
   pointer-events: none;
   max-width: 300px;
 }
@@ -253,8 +255,9 @@
   animation: notifSlideIn 200ms var(--ease-out) both;
 }
 
+/* Slides in from the right edge now that the stack lives bottom-right. */
 @keyframes notifSlideIn {
-  from { opacity: 0; transform: translateX(-10px); }
+  from { opacity: 0; transform: translateX(10px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 
@@ -549,18 +552,162 @@
 .chatSidebarSend:disabled { opacity: 0.5; cursor: default; }
 
 /* ═══════════════════════════════════════════════════════════
+   Error banner — top-centre of the canvas
+═══════════════════════════════════════════════════════════ */
+/* Deliberately top-centre. The whole bottom-right corner is taken: .notifStack
+   (intro toasts AND the learner response bubble), .chatToastsContainer, and
+   .chatLauncher all live there. Top-right is .introSkip's during the intro.
+   Centre-top is the only clear band, and it is where a system-level problem
+   belongs anyway -- it is about the session, not about one message. */
+.errorBanner {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 980; /* above toasts (950) and the launcher (960) */
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: min(520px, calc(100% - 32px));
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background: var(--card-bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  animation: errorBannerIn 200ms var(--ease-out) both;
+}
+
+@keyframes errorBannerIn {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Variants differ by severity, not decoration: red = the turn failed, amber =
+   the connection dropped and will come back, neutral = a limit we planned for. */
+.errorBannerNetwork { border-left: 4px solid #d98324; }
+.errorBannerAi { border-left: 4px solid #c0392b; }
+.errorBannerBudget { border-left: 4px solid var(--forest-mid); }
+
+.errorBannerIcon {
+  flex: none;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.errorBannerBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.errorBannerTitle {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.errorBannerText {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+/* The raw error string — useful when someone reports a bug, muted so it never
+   competes with the sentence above it. */
+.errorBannerDetail {
+  margin: 6px 0 0;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+.errorBannerClose {
+  flex: none;
+  border: none;
+  background: none;
+  padding: 0 2px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.errorBannerClose:hover { color: var(--text-primary); }
+
+/* ═══════════════════════════════════════════════════════════
+   Chat launcher — floating button, bottom-right of the canvas
+═══════════════════════════════════════════════════════════ */
+/* Lives inside .canvasArea (not the header), so when the sidebar opens as a
+   flex sibling the launcher travels left with the shrinking canvas instead of
+   ending up underneath the panel. Nothing else is anchored bottom-right --
+   .sidebarTrigger (right/middle) is unused CSS, .introSkip is top-right. */
+.chatLauncher {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 960; /* above .notifStack (950) so a tall stack never buries it */
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--lime, #b8d94a);
+  color: var(--text-primary, #2e2b22);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.24);
+  transition: transform 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
+}
+
+.chatLauncher:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+}
+
+.chatLauncher:active { transform: translateY(0); }
+
+.chatLauncher:focus-visible {
+  outline: 2px solid var(--text-primary, #2e2b22);
+  outline-offset: 3px;
+}
+
+.chatLauncherIcon {
+  width: 26px;
+  height: 26px;
+  display: block;
+  pointer-events: none;
+}
+
+/* Secondary: who you are talking to. Small on purpose -- the chat glyph is the
+   thing that has to read at a glance, the face is a supporting detail. */
+.chatLauncherAvatar {
+  position: absolute;
+  left: -2px;
+  bottom: -2px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--lime, #b8d94a);
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
    Chat toast notifications — use shared .notifStack / .notifToast above
 ═══════════════════════════════════════════════════════════ */
 /* ChatToasts renders a .notifStack wrapper; aliases below keep ChatToasts.tsx compiling */
 .chatToastsContainer {
   position: absolute;
-  top: 76px;
-  left: 8px;
+  bottom: 90px;
+  right: 24px;
   z-index: 950;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: flex-start;
+  align-items: flex-end;
   pointer-events: none;
   max-width: 300px;
 }
@@ -579,7 +726,7 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
   cursor: pointer;
   opacity: 0;
-  transform: translateX(-10px);
+  transform: translateX(10px);
   transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
 }
 
@@ -631,6 +778,98 @@
 ═══════════════════════════════════════════════════════════ */
 
 /* Full-canvas dim overlay */
+/* ── Learner picker ──
+   Same overlay language as .introOverlay below (dark scrim + blur, forest card,
+   portrait art) so choosing a character and then meeting them read as one flow
+   rather than two different screens. Sits above the intro's z-index because it
+   comes first. */
+.selectOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 910;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 18, 10, 0.62);
+  backdrop-filter: blur(3px);
+  padding: 24px;
+}
+
+.selectPanel {
+  background: var(--forest-dark);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  padding: 28px 28px 32px;
+  max-width: 860px;
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  text-align: center;
+}
+
+.selectTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-on-dark);
+}
+
+.selectSubtitle {
+  margin: 6px 0 22px;
+  font-size: 13px;
+  color: var(--text-on-dark-muted);
+}
+
+.selectGrid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+}
+
+.selectCard {
+  flex: 0 1 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  background: var(--forest-mid);
+  border: 2px solid transparent;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.selectCard:hover {
+  transform: translateY(-4px);
+  border-color: var(--lime);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.4);
+}
+
+.selectCard:focus-visible {
+  outline: none;
+  border-color: var(--lime);
+  box-shadow: 0 0 0 3px rgba(216, 255, 41, 0.35);
+}
+
+.selectCardImage {
+  width: 100%;
+  height: 260px;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+}
+
+.selectCardName {
+  padding: 12px 10px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-on-dark);
+}
+
 .introOverlay {
   position: absolute;
   inset: 0;

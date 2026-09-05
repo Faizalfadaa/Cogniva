@@ -5,6 +5,9 @@ import { useUserStore } from '../../state/UserStore'
 import Onboarding from './Onboarding'
 import type { WorkspaceDTO, WorkspaceState } from '../../dto/WorkspaceDTO'
 import styles from '../../styles/HomePage.module.css'
+import { ProductTour } from '../tour/ProductTour'
+import { HOME_TOUR_STEPS } from '../tour/tourSteps'
+import { useAppTour } from '../tour/useAppTour'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -214,6 +217,106 @@ function DeleteConfirmModal({
 // Opened from the sidebar profile button. The name is the only thing stored
 // about a user today, so this is where it gets changed.
 
+function LoginScreen({
+  onLogin,
+  onRegister,
+  onGuest,
+}: {
+  onLogin: (username: string, password: string) => Promise<void>
+  onRegister: (username: string, password: string) => Promise<void>
+  onGuest: () => void
+}) {
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit() {
+    if (submitting) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      if (mode === 'login') {
+        await onLogin(username, password)
+      } else {
+        await onRegister(username, password)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Authentication failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const canSubmit = username.trim().length > 0 && password.length > 0
+
+  return (
+    <div className={styles.modalOverlay}>
+      <div
+        className={styles.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="login-title"
+      >
+        <div className={styles.loginLogo}>
+          <img src="/cogniva_logo.png" alt="" />
+        </div>
+        <h2 id="login-title" className={styles.modalTitle}>
+          {mode === 'login' ? 'Sign in to Cogniva' : 'Create your account'}
+        </h2>
+        <p className={styles.modalBody}>
+          Keep your teaching workspaces attached to your username.
+        </p>
+
+        <input
+          className={styles.modalInput}
+          type="text"
+          value={username}
+          placeholder="Username"
+          autoComplete="username"
+          onChange={e => setUsername(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+          maxLength={24}
+          aria-label="Username"
+        />
+        <input
+          className={styles.modalInput}
+          type="password"
+          value={password}
+          placeholder="Password"
+          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+          onChange={e => setPassword(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+          aria-label="Password"
+        />
+        {error && <p className={styles.authError}>{error}</p>}
+
+        <button className={styles.modalBtn} onClick={handleSubmit} disabled={!canSubmit || submitting}>
+          {submitting
+            ? 'Please wait...'
+            : mode === 'login'
+              ? 'Sign in'
+              : 'Create account'}
+        </button>
+        <button
+          className={styles.modalBtnGhost}
+          onClick={() => {
+            setMode(mode === 'login' ? 'register' : 'login')
+            setError(null)
+          }}
+          disabled={submitting}
+        >
+          {mode === 'login' ? 'Create a new account' : 'I already have an account'}
+        </button>
+        <button className={styles.guestBtn} onClick={onGuest} disabled={submitting}>
+          Continue as guest
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function ProfileModal({
   userName,
   onSave,
@@ -302,7 +405,18 @@ const FILTER_OPTIONS: Array<{ label: string; value: ViewFilter }> = [
 export default function HomePage() {
   const bridge = useBridge()
   const navigate = useNavigate()
-  const { userName, needsNameSetup, setUserName } = useUserStore()
+  const {
+    user,
+    userName,
+    authLoading,
+    needsNameSetup,
+    fetchMe,
+    login,
+    register,
+    continueAsGuest,
+    logout,
+    setUserName,
+  } = useUserStore()
 
   const [workspaces, setWorkspaces] = useState<WorkspaceDTO[]>([])
   const [loading, setLoading] = useState(true)
@@ -313,6 +427,10 @@ export default function HomePage() {
   const [deleteTarget, setDeleteTarget] = useState<WorkspaceDTO | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+
+  useEffect(() => {
+    void fetchMe()
+  }, [fetchMe])
 
   const loadWorkspaces = useCallback(() => {
     setLoading(true)
@@ -332,9 +450,9 @@ export default function HomePage() {
   }, [bridge])
 
   useEffect(() => {
-    if (needsNameSetup) return
+    if (authLoading || !user || needsNameSetup) return
     loadWorkspaces()
-  }, [needsNameSetup, loadWorkspaces])
+  }, [authLoading, user, needsNameSetup, loadWorkspaces])
 
   async function handleCreateWorkspace() {
     if (creating) return
@@ -389,6 +507,25 @@ export default function HomePage() {
 
   const hasAny = workspaces.length > 0
 
+  const tour = useAppTour('home')
+  if (authLoading) {
+    return (
+      <div className={styles.layout}>
+        <main className={styles.main}>
+          <div className={styles.content}>
+            <div className={styles.loadingGrid}>
+              {[1, 2, 3].map(i => (
+                <div key={i} className={styles.skeleton} aria-hidden="true" />
+              ))}
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (!user) return <LoginScreen onLogin={login} onRegister={register} onGuest={continueAsGuest} />
+
   // First visit: short intro explaining what Cogniva is, ending with the name step.
   if (needsNameSetup) return <Onboarding onDone={setUserName} />
 
@@ -403,6 +540,7 @@ export default function HomePage() {
           </div>
 
           <button
+            data-tour="new-workspace"
             className={styles.newBtn}
             onClick={handleCreateWorkspace}
             disabled={creating}
@@ -415,7 +553,11 @@ export default function HomePage() {
           </button>
         </div>
 
-        <nav className={styles.sidebarNav} aria-label="Filter workspaces">
+        <nav
+          className={styles.sidebarNav}
+          data-tour="workspace-filters"
+          aria-label="Filter workspaces"
+        >
           {FILTER_OPTIONS.map(opt => (
             <button
               key={opt.value}
@@ -432,12 +574,19 @@ export default function HomePage() {
         </nav>
 
         <div className={styles.sidebarBottom}>
+          <button className={styles.logoutBtn} onClick={logout}>
+            {user.isGuest ? 'Exit guest' : 'Sign out'}
+          </button>
           <button
+            data-tour="profile"
             className={styles.userChip}
-            onClick={() => setProfileOpen(true)}
+            onClick={() => {
+              if (!user.isGuest) setProfileOpen(true)
+            }}
+            disabled={user.isGuest}
             aria-haspopup="dialog"
             aria-label={`Open profile settings for ${userName ?? 'you'}`}
-            title="Profile"
+            title={user.isGuest ? 'Guest session' : 'Profile'}
           >
             <div className={styles.userAvatar}>
               {userName?.charAt(0).toUpperCase() ?? '?'}
@@ -507,7 +656,7 @@ export default function HomePage() {
               </button>
             </div>
           ) : (
-            <div className={styles.grid}>
+            <div className={styles.grid} data-tour="workspace-list">
               {filtered.map(ws => (
                 <WorkspaceCard
                   key={ws.id}
@@ -525,7 +674,7 @@ export default function HomePage() {
         </div>
       </main>
 
-      {profileOpen && (
+      {profileOpen && !user.isGuest && (
         <ProfileModal
           userName={userName ?? ''}
           onSave={setUserName}
@@ -539,6 +688,20 @@ export default function HomePage() {
           deleting={deleting}
           onConfirm={handleConfirmDelete}
           onCancel={() => !deleting && setDeleteTarget(null)}
+        />
+      )}
+
+      {/* First leg of the app tour. It cannot start before this point: the
+          name-setup Onboarding returns early above, so none of these targets
+          exist yet while that is on screen. */}
+      {tour.active && (
+        <ProductTour
+          steps={HOME_TOUR_STEPS}
+          index={tour.index}
+          onIndexChange={tour.setIndex}
+          onFinish={tour.advance}
+          onSkip={tour.skipAll}
+          finishLabel="Got it"
         />
       )}
     </div>

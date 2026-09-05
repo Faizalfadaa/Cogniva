@@ -17,6 +17,7 @@ import {
   updateMetaSchema,
   uploadPdfSchema,
 } from "../../contracts/workspace.js";
+import { getCurrentUser } from "../../modules/auth/authService.js";
 import * as service from "../../modules/workspace/workspaceService.js";
 import { workspaces } from "../../modules/workspace/workspaceStore.js";
 
@@ -32,16 +33,16 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     if (!id) return; // /workspaces collection
     const path = req.url.split("?")[0];
     if (req.method === "GET" && (path.endsWith("/pdf") || path.includes("/audio/"))) return;
-    if (!(await service.isOwner(id, clientOf(req)))) return notFound(reply);
+    if (!(await service.isOwner(id, await ownerOf(req)))) return notFound(reply);
   });
 
   // --- Home ---------------------------------------------------------------
 
-  app.get("/workspaces", async (req) => service.listWorkspaces(clientOf(req)));
+  app.get("/workspaces", async (req) => service.listWorkspaces(await ownerOf(req)));
 
   app.post("/workspaces", async (req, reply) => {
     reply.code(201);
-    return service.createWorkspace(clientOf(req));
+    return service.createWorkspace(await ownerOf(req));
   });
 
   // --- Workspace meta -----------------------------------------------------
@@ -164,6 +165,11 @@ function idOf(params: unknown): string {
 }
 
 /** The calling device's id (x-client-id header); "anonymous" when absent. */
+async function ownerOf(req: FastifyRequest): Promise<string> {
+  const user = await getCurrentUser(req);
+  return user?.id ?? clientOf(req);
+}
+
 function clientOf(req: FastifyRequest): string {
   const h = req.headers["x-client-id"];
   const value = Array.isArray(h) ? h[0] : h;

@@ -53,7 +53,7 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 function getJson<T>(path: string): Promise<T> {
-  return fetch(`${BASE}${path}`, { headers: clientHeaders() }).then(json<T>);
+  return fetch(`${BASE}${path}`, { headers: clientHeaders(), credentials: 'include' }).then(json<T>);
 }
 
 function sendJson<T>(path: string, method: string, body?: unknown): Promise<T> {
@@ -66,6 +66,7 @@ function sendJson<T>(path: string, method: string, body?: unknown): Promise<T> {
     init.headers = { ...init.headers, 'Content-Type': 'application/json' };
     init.body = JSON.stringify(body);
   }
+  init.credentials = 'include';
   return fetch(`${BASE}${path}`, init).then(json<T>);
 }
 
@@ -104,6 +105,7 @@ export class RealCognivaBridge implements CognivaBridge {
     const res = await fetch(`${BASE}/api/workspaces/${workspaceId}`, {
       method: 'DELETE',
       headers: clientHeaders(),
+      credentials: 'include',
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
@@ -192,6 +194,7 @@ export class RealCognivaBridge implements CognivaBridge {
     const res = await fetch(`${BASE}/api/workspaces/${workspaceId}/finish`, {
       method: 'POST',
       headers: clientHeaders(),
+      credentials: 'include',
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');

@@ -27,9 +27,9 @@ datasource db {
 model users {
   id_user       String   @id
   username      String   @unique
-  password_hash String
+  password_hash String?
   email         String   @unique
-  profile_photo String
+  profile_photo String?
   created_at    DateTime @default(now())
 
   workspace workspace[]
@@ -199,6 +199,8 @@ model checkpoint {
   /// Endpoint URL of the spoken learner_response, attached once synthesis
   /// finishes — minutes after the text on a slow GPU (§TTS).
   learner_audio_url   String?
+  /// Non-exceptional turn outcome (e.g. "budget_exceeded"); null on a normal reply.
+  error_kind          String?
   /// Board-change timeline (Phase 1: stored only).
   timeline            Json?
   created_at          DateTime

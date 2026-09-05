@@ -154,6 +154,12 @@ describe("workspace persistence", () => {
     await workspaces.updateCheckpoint(ws.id, `chk_${RUN}_1`, {
       learnerResponse: "Kenapa begitu?",
     });
+    // errorKind rides the same patch path and must survive the round trip --
+    // without its own column it would be silently dropped here.
+    await workspaces.updateCheckpoint(ws.id, `chk_${RUN}_2`, {
+      learnerResponse: "Batas token tercapai.",
+      errorKind: "budget_exceeded",
+    });
     // A checkpoint from another workspace must not be reachable through this one.
     const other = await makeWorkspace();
     await workspaces.updateCheckpoint(other.id, `chk_${RUN}_0`, {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CognivaBridge } from '../../../bridge/CognivaBridge'
 import type { ChatMessageDTO } from '../../../dto/ChatMessageDTO'
+import type { SessionError } from '../components/errorTypes'
 
 const POLL_INTERVAL_MS = 2000
 
@@ -34,6 +35,10 @@ function loadReadCount(workspaceId: string): number {
   }
 }
 
+// The four storage helpers below swallow deliberately: localStorage/
+// sessionStorage throw in private mode or when the quota is full, and losing a
+// read-count or a cached transcript is a cosmetic regression, not something to
+// interrupt the user over. Only the network paths raise a SessionError.
 function saveReadCount(workspaceId: string, count: number) {
   try {
     localStorage.setItem(readCountKey(workspaceId), String(count))
@@ -88,6 +93,7 @@ export function useWorkspaceChat(
 
   const [isOpen, setIsOpen] = useState(false)
   const [toasts, setToasts] = useState<ChatToast[]>([])
+  const [error, setError] = useState<SessionError | null>(null)
 
   const isOpenRef = useRef(isOpen)
   isOpenRef.current = isOpen
@@ -118,6 +124,8 @@ export function useWorkspaceChat(
         const merged = mergeMessages(seedRef.current, fetched)
         setMessages(merged)
         saveSessionMsgs(workspaceId, merged)
+        // A poll that lands clears whatever the previous one complained about.
+        setError(null)
 
         const learnerMsgs = merged.filter((m) => m.sender === 'learner')
         const learnerCount = learnerMsgs.length
@@ -145,8 +153,18 @@ export function useWorkspaceChat(
           }
           prevLearnerCountRef.current = learnerCount
         }
-      } catch {
-        // Retry on next cycle
+      } catch (err) {
+        if (!active) return
+        // Polling runs every 2s, so this fires repeatedly while the backend is
+        // down; setting the same shape each time keeps it to one banner rather
+        // than a stream. Offline is reported as such -- the poll failing is the
+        // symptom, not the cause.
+        console.error('[useWorkspaceChat] getChatMessages failed', err)
+        setError(
+          navigator.onLine
+            ? { kind: 'ai_unavailable', detail: err instanceof Error ? err.message : String(err) }
+            : { kind: 'network' }
+        )
       }
     }
 
@@ -166,13 +184,26 @@ export function useWorkspaceChat(
     async (content: string) => {
       const trimmed = content.trim()
       if (!trimmed) return
-      const sent = await bridge.sendChatMessage(workspaceId, trimmed)
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === sent.id)) return prev
-        const next = [...prev, sent]
-        saveSessionMsgs(workspaceId, next)
-        return next
-      })
+      try {
+        const sent = await bridge.sendChatMessage(workspaceId, trimmed)
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === sent.id)) return prev
+          const next = [...prev, sent]
+          saveSessionMsgs(workspaceId, next)
+          return next
+        })
+        setError(null)
+      } catch (err) {
+        // This one had no catch at all before: a failed send became an unhandled
+        // rejection and the message just vanished from the UI with no
+        // explanation.
+        console.error('[useWorkspaceChat] sendChatMessage failed', err)
+        setError(
+          navigator.onLine
+            ? { kind: 'ai_unavailable', detail: err instanceof Error ? err.message : String(err) }
+            : { kind: 'network' }
+        )
+      }
     },
     [bridge, workspaceId]
   )
@@ -210,5 +241,19 @@ export function useWorkspaceChat(
     messages.filter((m) => m.sender === 'learner').length - readLearnerCountRef.current
   )
 
-  return { messages, isOpen, unreadCount, toasts, dismissToast, sendMessage, open, close, toggle }
+  const dismissError = useCallback(() => setError(null), [])
+
+  return {
+    messages,
+    isOpen,
+    unreadCount,
+    toasts,
+    dismissToast,
+    sendMessage,
+    open,
+    close,
+    toggle,
+    error,
+    dismissError,
+  }
 }

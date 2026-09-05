@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
 import type {
   ChatMessage,
   ChatSender,
+  CheckpointErrorKind,
   EvaluationReport,
   TeachingCheckpoint,
   Workspace,
@@ -117,6 +118,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
         audio_url: checkpoint.audioUrl ?? null,
         learner_response: checkpoint.learnerResponse ?? null,
         learner_audio_url: checkpoint.learnerAudioUrl ?? null,
+        error_kind: checkpoint.errorKind ?? null,
         timeline: toJson(checkpoint.timeline),
         created_at: new Date(checkpoint.createdAt),
       },
@@ -136,6 +138,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
       audioUrl: row.audio_url ?? undefined,
       learnerResponse: row.learner_response ?? undefined,
       learnerAudioUrl: row.learner_audio_url ?? undefined,
+      errorKind: (row.error_kind as CheckpointErrorKind | null) ?? undefined,
       timeline: (row.timeline as Timeline | null) ?? undefined,
       createdAt: row.created_at.toISOString(),
     }));
@@ -152,6 +155,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
     if ("audioUrl" in patch) data.audio_url = patch.audioUrl ?? null;
     if ("learnerResponse" in patch) data.learner_response = patch.learnerResponse ?? null;
     if ("learnerAudioUrl" in patch) data.learner_audio_url = patch.learnerAudioUrl ?? null;
+    if ("errorKind" in patch) data.error_kind = patch.errorKind ?? null;
     if ("timeline" in patch) data.timeline = toJson(patch.timeline);
     if (patch.createdAt !== undefined) data.created_at = new Date(patch.createdAt);
     if (Object.keys(data).length === 0) return;
@@ -378,8 +382,8 @@ async function ensureOwner(ownerId: string): Promise<void> {
       id_user: ownerId,
       username: ownerId,
       email: `${ownerId}@device.cogniva.local`,
-      password_hash: "",
-      profile_photo: "",
+      password_hash: null,
+      profile_photo: null,
     },
     update: {},
   });
