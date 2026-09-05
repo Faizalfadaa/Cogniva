@@ -1,5 +1,5 @@
 import { type CSSProperties } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { TeachButton } from './TeachButton'
 import type { TitleSaveStatus } from '../hooks/useWorkspaceTitleAutosave'
 import styles from '../../../styles/TeachingSession.module.css'
@@ -80,9 +80,16 @@ export function WorkspaceHeader({
   return (
     <header className={styles.header}>
       <div className={styles.headerLeft}>
-        <button className={styles.backBtn} onClick={() => navigate('/home')} aria-label="Back to Home">
+        <button className={styles.backBtn} onClick={() => navigate('/home')} aria-label="Back to dashboard">
           ←
         </button>
+
+        {/* Separate from the arrow above: that one goes to the dashboard, this
+            one leaves the app entirely for the public site. */}
+        <Link to="/" className={styles.landingLink} title="Back to the Cogniva home page">
+          <img src="/cogniva_logo.png" alt="" aria-hidden="true" className={styles.landingLinkLogo} />
+          <span>Home</span>
+        </Link>
 
         {/* "Untitled Document" is only a placeholder - the value stays the real
             (possibly empty) title, not written into value, so it isn't saved as a
