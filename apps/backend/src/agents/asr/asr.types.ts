@@ -49,6 +49,11 @@ export type AsrAgentInput = {
 export type RunAsrOptions = {
   /** Force mock mode (used by tests and offline demos). */
   useMock?: boolean;
+  /**
+   * Reports this turn's token cost back to the orchestrator (§7.3). Optional:
+   * agents run exactly as before when nobody is counting.
+   */
+  onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void;
 };
 
 export { type SpeechTranscript };

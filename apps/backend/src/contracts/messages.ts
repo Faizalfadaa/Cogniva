@@ -76,10 +76,18 @@ export interface ErrorMessage {
   message: string;
 }
 
+/** The session hit its token ceiling (§7.3) — distinct from `error` so the UI
+ * can explain a budget stop rather than showing it as a failure. */
+export interface BudgetExceeded {
+  type: "budget_exceeded";
+  message: string;
+}
+
 export type ServerMessage =
   | VisionResult
   | SpeechResult
   | ConfirmationRequest
   | LearnerMessage
   | StateUpdate
-  | ErrorMessage;
+  | ErrorMessage
+  | BudgetExceeded;

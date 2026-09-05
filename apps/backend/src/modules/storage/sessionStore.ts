@@ -44,6 +44,18 @@ export class SessionStore {
     return this.sessions.get(sessionId);
   }
 
+  /**
+   * Add one turn's token spend to the session's running total. A missing
+   * session is a no-op on purpose: usage accounting must never be the thing
+   * that breaks a turn (§7.3).
+   */
+  addTokenUsage(sessionId: string, tokens: number): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    session.tokensUsed += tokens;
+    this.saveSession(session);
+  }
+
   deleteSession(sessionId: string): void {
     this.sessions.delete(sessionId);
     const evalIds = this.evaluationIdsBySession.get(sessionId) ?? [];

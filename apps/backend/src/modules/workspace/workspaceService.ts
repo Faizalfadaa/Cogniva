@@ -67,6 +67,7 @@ export function createWorkspace(ownerId: string = ANON_OWNER): Workspace {
     status: "SETUP",
     createdAt: now,
     turnCount: 0,
+    tokensUsed: 0,
     evaluationIds: [],
   };
   sessions.saveSession(session);
@@ -324,6 +325,12 @@ export function resumeSession(id: string): Workspace | undefined {
 
 // --- Internals -------------------------------------------------------------
 
+/** Shown in the chat when the session runs out of token budget (§7.3). The
+ * workspace UI has no separate banner, so this speaks in the student's voice. */
+const BUDGET_EXCEEDED_REPLY =
+  "Waduh, sesi ini sudah mencapai batas token untuk babak ini. " +
+  "Yuk akhiri dulu babak ini supaya aku bisa kasih evaluasinya.";
+
 /** Run one teaching turn through the orchestrator, never pausing for confirmation. */
 async function runTeachingTurn(
   ws: Workspace,
@@ -339,6 +346,8 @@ async function runTeachingTurn(
     typedText: null,
   });
 
+  if (result.kind === "budget_exceeded") return BUDGET_EXCEEDED_REPLY;
+
   // Low-confidence board reading would normally pause and ask the user, but the
   // workspace UI has no confirmation step — re-run trusting Vision's best guess.
   if (result.kind === "confirmation") {
@@ -348,6 +357,8 @@ async function runTeachingTurn(
       audio: input.audio,
       typedText: guess,
     });
+    // The retry spends tokens too, so it can be the call that trips the cap.
+    if (result.kind === "budget_exceeded") return BUDGET_EXCEEDED_REPLY;
   }
 
   return result.response?.text ?? "Okay... go on, I'm following.";

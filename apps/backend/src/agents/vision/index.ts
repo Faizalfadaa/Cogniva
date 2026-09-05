@@ -32,6 +32,7 @@ export class VisionAgent {
     snapshot: BoardSnapshot,
     typedText: string | null | undefined,
     topic = "",
+    onUsage?: RunVisionOptions["onUsage"],
   ): Promise<VisionInterpretation> {
     // Typed-text fallback (§5.3, §6.6 typedInput) — unchanged from the M1
     // stub. No model call: the user already gave us clean text.
@@ -65,7 +66,7 @@ export class VisionAgent {
         imageBase64: snapshot.image,
         mimeType: `image/${snapshot.format || "png"}`,
       },
-      this.options,
+      { ...this.options, onUsage },
     );
   }
 }

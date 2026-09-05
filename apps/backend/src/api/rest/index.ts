@@ -62,6 +62,7 @@ export async function restRoutes(app: FastifyInstance): Promise<void> {
       status: "SETUP",
       createdAt: utcNowIso(),
       turnCount: 0,
+      tokensUsed: 0,
       evaluationIds: [],
     };
     reply.code(201);

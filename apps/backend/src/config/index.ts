@@ -12,6 +12,12 @@ function num(value: string | undefined, fallback: number): number {
   return Number.isFinite(n) && value !== undefined && value !== "" ? n : fallback;
 }
 
+function bool(value: string | undefined, fallback: boolean): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return fallback;
+}
+
 // --- LLM wrapper (Architecture Document §3.3, §7.3) ------------------------
 
 /**
@@ -108,6 +114,25 @@ export const ASR_CONFIDENCE_THRESHOLD: number = num(
   process.env.COGNIVA_ASR_CONFIDENCE_THRESHOLD,
   0.6,
 );
+
+// --- Token budget (§7.3 cost control) --------------------------------------
+
+/**
+ * Ceiling on the tokens one session may spend across all its turns. Once a
+ * session is at or over this, the orchestrator refuses the turn instead of
+ * calling any model, so a runaway session can't drain the shared quota.
+ */
+export const SESSION_TOKEN_BUDGET: number = num(
+  process.env.COGNIVA_SESSION_TOKEN_BUDGET,
+  50000,
+);
+
+/**
+ * Presentation escape hatch: skip budget ENFORCEMENT so a live demo can't be
+ * cut off mid-sentence. Usage is still measured and recorded either way — we
+ * want to be able to answer "how many tokens did that cost?" afterwards.
+ */
+export const DEMO_MODE: boolean = bool(process.env.COGNIVA_DEMO_MODE, false);
 
 // --- Server ----------------------------------------------------------------
 

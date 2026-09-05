@@ -31,7 +31,7 @@ export async function runAsrTurn(
 
     const rawOutput: AsrLLMOutput = useMockAI
       ? mockAsrAI(input)
-      : normalizeAsrLLMOutput(await callRealAI(input));
+      : normalizeAsrLLMOutput(await callRealAI(input, options));
 
     return toSpeechTranscript(rawOutput, input);
   } catch (error) {
@@ -45,7 +45,10 @@ export async function runAsrTurn(
  * the `audio` field in StructuredArgs (same additive pattern as Vision's `image`;
  * see GAPS_ASR.md). gemini-2.5-flash accepts inline audio directly.
  */
-async function callRealAI(input: AsrAgentInput): Promise<Record<string, unknown>> {
+async function callRealAI(
+  input: AsrAgentInput,
+  options: RunAsrOptions,
+): Promise<Record<string, unknown>> {
   const messages = buildAsrMessages(input);
   const system = messages.find((m) => m.role === "system")?.content ?? "";
   const user = messages.find((m) => m.role === "user")?.content ?? "";
@@ -57,10 +60,13 @@ async function callRealAI(input: AsrAgentInput): Promise<Record<string, unknown>
     thinkingBudget: config.LLM_THINKING_BUDGET,
   });
 
-  return llm.structured({
+  const data = await llm.structured({
     system,
     user,
     schema: ASR_LLM_OUTPUT_SCHEMA,
     audio: { data: input.audioBase64, mimeType: input.mimeType },
   });
+
+  if (options.onUsage && llm.lastUsage) options.onUsage(llm.lastUsage);
+  return data;
 }

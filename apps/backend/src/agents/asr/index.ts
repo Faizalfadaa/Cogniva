@@ -30,6 +30,7 @@ export class AsrAgent {
     clip: AudioClip,
     typedText: string | null | undefined,
     topic = "",
+    onUsage?: RunAsrOptions["onUsage"],
   ): Promise<SpeechTranscript> {
     // Typed-text fallback (§5.3) — no model call: the user already gave us
     // clean text, so transcription is unnecessary.
@@ -77,7 +78,7 @@ export class AsrAgent {
         capturedAt: clip.capturedAt,
         audioRef: clip.audioRef,
       },
-      this.options,
+      { ...this.options, onUsage },
     );
   }
 }

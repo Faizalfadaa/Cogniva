@@ -34,6 +34,8 @@ export interface RespondArgs {
   turnIndex: number;
   /** Tools the orchestrator injects so the student can investigate (§2.3). */
   tools?: LearnerTools;
+  /** Reports the turn's token cost back to the orchestrator (§7.3). */
+  onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void;
 }
 
 /**
@@ -143,6 +145,7 @@ export class LearnerAgent {
     state,
     turnIndex,
     tools,
+    onUsage,
   }: RespondArgs): Promise<[LearnerResponse, LearnerState]> {
     const teachingText = [interpretation.transcribedText, speech?.transcript]
       .filter((text): text is string => Boolean(text && text.trim()))
@@ -150,7 +153,7 @@ export class LearnerAgent {
 
     const output = await runLearnerTurn(
       { sessionId: state.sessionId, turnIndex, teachingText, currentState: state },
-      { useMock: this.options.forceMock, tools },
+      { useMock: this.options.forceMock, tools, onUsage },
     );
 
     const response: LearnerResponse = {
