@@ -40,6 +40,8 @@ export function LearnerSelect({ onSelect }: LearnerSelectProps) {
                 className={styles.selectCardImage}
               />
               <span className={styles.selectCardName}>{learner.name}</span>
+              <span className={styles.selectCardTraits}>{learner.traits}</span>
+              <span className={styles.selectCardDesc}>{learner.description}</span>
             </button>
           ))}
         </div>
