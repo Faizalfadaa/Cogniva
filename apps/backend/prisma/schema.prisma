@@ -166,6 +166,10 @@ model workspace {
   pdf_mime            String?
   /// Text extracted from that PDF — the Evaluator's answer key (§1.4, §3.7).
   reference_text      String?
+  /// Where reference_text came from when it was not an upload: the web source
+  /// the Referencer found and the user picked ({ url, title, source }). Null for
+  /// an uploaded PDF, whose provenance is pdf_data itself.
+  reference_source    Json?
   /// Chunked (and where possible embedded) form of reference_text, so the index
   /// survives a restart instead of being rebuilt at evaluation time.
   reference_index     Json?

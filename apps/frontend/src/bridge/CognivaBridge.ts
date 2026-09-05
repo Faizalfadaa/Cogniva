@@ -3,6 +3,11 @@ import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
 import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
 import type { TimelineDTO } from '../dto/TimelineDTO';
+import type {
+  ReferenceSuggestionsDTO,
+  SaveReferenceTextResultDTO,
+  UseReferenceResultDTO,
+} from '../dto/ReferenceDTO';
 
 export interface CognivaBridge {
   // Home
@@ -17,6 +22,21 @@ export interface CognivaBridge {
     meta: { title?: string; description?: string }
   ): Promise<WorkspaceDTO>;
   uploadWorkspacePdf(workspaceId: string, file: File): Promise<WorkspaceDTO>;
+
+  // Reference material the user writes or pastes in — the third way in, beside
+  // an uploaded PDF and a source the agent found. Replaces whatever was there.
+  saveReferenceText(workspaceId: string, text: string): Promise<SaveReferenceTextResultDTO>;
+
+  // Reference sourcing — for a user who has no material of their own. Both of
+  // these answer when the work is done rather than returning early to be polled:
+  // the user is waiting in a dialog, and a search takes seconds, not minutes.
+  suggestReferences(workspaceId: string, hint?: string): Promise<ReferenceSuggestionsDTO>;
+  // A source that cannot be read resolves with ok:false — that is an outcome the
+  // user acts on (pick another), not an error to throw at them.
+  useReference(
+    workspaceId: string,
+    choice: { url: string; title?: string; source?: string }
+  ): Promise<UseReferenceResultDTO>;
   // Autosaves the draft whiteboard during the Editing state - called periodically
   // (debounced), separate from submitCheckpoint which only runs when the Teach
   // button is pressed. The (optional) thumbnail is used as a small preview on the Home card.

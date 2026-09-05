@@ -4,6 +4,11 @@ import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
 import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
 import type { TimelineDTO } from '../dto/TimelineDTO';
+import type {
+  ReferenceSuggestionsDTO,
+  SaveReferenceTextResultDTO,
+  UseReferenceResultDTO,
+} from '../dto/ReferenceDTO';
 
 // ---------------------------------------------------------------------------
 // RealCognivaBridge — talks to the Fastify backend (§7.1) over plain REST.
@@ -132,6 +137,39 @@ export class RealCognivaBridge implements CognivaBridge {
       data,
       mime: mime === 'application/octet-stream' ? 'application/pdf' : mime,
     });
+  }
+
+  saveReferenceText(workspaceId: string, text: string): Promise<SaveReferenceTextResultDTO> {
+    return sendJson<SaveReferenceTextResultDTO>(
+      `/api/workspaces/${workspaceId}/reference-text`,
+      'POST',
+      { text },
+    );
+  }
+
+  suggestReferences(workspaceId: string, hint?: string): Promise<ReferenceSuggestionsDTO> {
+    return sendJson<ReferenceSuggestionsDTO>(
+      `/api/workspaces/${workspaceId}/references/suggest`,
+      'POST',
+      { hint },
+    );
+  }
+
+  async useReference(
+    workspaceId: string,
+    choice: { url: string; title?: string; source?: string }
+  ): Promise<UseReferenceResultDTO> {
+    const res = await fetch(`${BASE}/api/workspaces/${workspaceId}/references/use`, {
+      method: 'POST',
+      headers: { ...clientHeaders(), 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(choice),
+    });
+    // 422 is the documented "this source could not be read" answer and carries a
+    // usable body, so it is unwrapped rather than thrown — unlike a 404 or a 500,
+    // which are still failures the caller should see as such.
+    if (res.status === 422) return res.json() as Promise<UseReferenceResultDTO>;
+    return json<UseReferenceResultDTO>(res);
   }
 
   async saveWhiteboardDraft(

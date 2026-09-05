@@ -11,6 +11,7 @@ import { randomUUID } from "node:crypto";
 import type {
   ChatMessage,
   EvaluationReport,
+  ReferenceSource,
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
@@ -35,6 +36,7 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
   private reports = new Map<string, EvaluationReport>();
   private pdfs = new Map<string, StoredBlob>();
   private references = new Map<string, string>();
+  private referenceSources = new Map<string, ReferenceSource>();
   private referenceIndexes = new Map<string, ReferenceIndex>();
   /** Synthesized learner speech, keyed by audio id and served by URL so the
    * polled checkpoint/message lists stay small. */
@@ -170,6 +172,18 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
 
   async getReference(workspaceId: string): Promise<string | undefined> {
     return this.references.get(workspaceId);
+  }
+
+  async saveReferenceSource(
+    workspaceId: string,
+    source: ReferenceSource | undefined,
+  ): Promise<void> {
+    if (source) this.referenceSources.set(workspaceId, source);
+    else this.referenceSources.delete(workspaceId);
+  }
+
+  async getReferenceSource(workspaceId: string): Promise<ReferenceSource | undefined> {
+    return this.referenceSources.get(workspaceId);
   }
 
   // --- Reference index --------------------------------------------------

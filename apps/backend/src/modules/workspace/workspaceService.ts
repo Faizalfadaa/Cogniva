@@ -17,9 +17,11 @@
 
 import {
   LearnerAgent,
+  ReferencerAgent,
   getEvaluator,
   seedLearnerState,
   seedLearnerStateFromEvaluation,
+  type ReferenceSuggestions,
   type TranscriptTurn,
 } from "../../agents/index.js";
 import * as config from "../../config/index.js";
@@ -31,6 +33,7 @@ import type { Topic } from "../../contracts/topic.js";
 import type {
   ChatMessage,
   CheckpointErrorKind,
+  ReferenceSource,
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
@@ -134,6 +137,12 @@ export async function setPdf(
   await workspaces.savePdf(id, { data, mime });
   ws.pdfUrl = `/api/workspaces/${id}/pdf`;
 
+  // An upload replaces whatever the Referencer had found: there is one answer
+  // key per session, and leaving the old provenance would label this PDF with
+  // someone else's URL.
+  await workspaces.saveReferenceSource(id, undefined);
+  ws.referenceSource = undefined;
+
   // Extract the text and keep it as this session's reference material — the
   // answer key the Evaluator grades against (§3.7). It flows ONLY to the
   // Evaluator, never to the Learner (§1.4). Extraction failures (e.g. a
@@ -150,6 +159,36 @@ export async function setPdf(
   return touch(ws);
 }
 
+/**
+ * Store reference material the user typed or pasted in themselves.
+ *
+ * The third source, beside an uploaded PDF (setPdf) and a page the Referencer
+ * found (useReference), and the only one that needs no extraction step — the
+ * text is already text. It lands in the same place as the other two and is read
+ * by the Evaluator alone (§1.4).
+ */
+export async function setReferenceText(
+  id: string,
+  raw: string,
+): Promise<{ workspace: Workspace; chars: number } | undefined> {
+  const ws = await workspaces.get(id);
+  if (!ws) return undefined;
+
+  const text = raw
+    .replace(/\r\n?/g, "\n")
+    .trim()
+    .slice(0, config.RAG_MAX_REFERENCE_CHARS);
+  await workspaces.saveReference(id, text);
+
+  // Pasted text has no provenance to show, and any previous chip would now be
+  // pointing at material that is no longer in use.
+  await workspaces.saveReferenceSource(id, undefined);
+  ws.referenceSource = undefined;
+
+  void indexReference(id, text);
+  return { workspace: await touch(ws), chars: text.length };
+}
+
 /** Build (or rebuild) the retrieval index for a workspace's reference text. */
 async function indexReference(id: string, text: string): Promise<void> {
   try {
@@ -163,6 +202,96 @@ async function indexReference(id: string, text: string): Promise<void> {
     // here means chunking itself failed, and the Evaluator falls back to the
     // full-text path.
     console.error("[workspace] reference indexing failed:", err);
+  }
+}
+
+// --- Reference sourcing (§3.7) ---------------------------------------------
+
+/**
+ * A single Referencer instance, matching how the chat Learner is held. Stateless
+ * between calls; it exists so tests have a seam and so the offline default is
+ * decided in one place.
+ */
+const referencer = new ReferencerAgent();
+
+/**
+ * Offer reading material for a workspace whose user has none.
+ *
+ * Synchronous on purpose, unlike the teaching-turn calls. Those return early
+ * because the UI polls a list that fills in later; this one answers a modal the
+ * user is sitting in front of, and there is nothing for them to do until the
+ * options arrive. Nothing is stored — the user hands back the option they chose.
+ */
+export async function suggestReferences(
+  id: string,
+  hint?: string,
+): Promise<ReferenceSuggestions | undefined> {
+  const ws = await workspaces.get(id);
+  if (!ws) return undefined;
+
+  return referencer.suggest({
+    topic: topicNameOf(ws),
+    description: ws.description,
+    hint,
+  });
+}
+
+/** The outcome of adopting a suggested source. */
+export interface UseReferenceResult {
+  ok: boolean;
+  /** Empty when ok; otherwise why the source could not be used, in Indonesian. */
+  problem: string;
+  /** How much reference text was extracted. Useful signal for the UI. */
+  chars: number;
+  workspace?: Workspace;
+}
+
+/**
+ * Adopt one suggested source as this session's reference material.
+ *
+ * Same destination as a PDF upload — reference text plus a retrieval index, read
+ * by the Evaluator alone (§1.4). The difference is only where the text came
+ * from, which is recorded so the UI can show it after a reload.
+ */
+export async function useReference(
+  id: string,
+  choice: { url: string; title?: string; source?: string },
+): Promise<UseReferenceResult | undefined> {
+  const ws = await workspaces.get(id);
+  if (!ws) return undefined;
+
+  const fetched = await referencer.read(choice.url, topicNameOf(ws));
+  if (!fetched.ok) return { ok: false, problem: fetched.problem, chars: 0 };
+
+  const text = fetched.text.slice(0, config.RAG_MAX_REFERENCE_CHARS);
+  await workspaces.saveReference(id, text);
+
+  const provenance: ReferenceSource = {
+    url: choice.url,
+    title: choice.title?.trim() || fetched.title,
+    source: choice.source?.trim() || hostLabel(choice.url),
+  };
+  await workspaces.saveReferenceSource(id, provenance);
+  ws.referenceSource = provenance;
+
+  // Same background indexing as an upload: the response stays fast, and
+  // evaluation rebuilds the index synchronously if it is somehow still missing.
+  void indexReference(id, text);
+
+  return { ok: true, problem: "", chars: text.length, workspace: await touch(ws) };
+}
+
+/** What the session is about, as the Referencer should search for it. */
+function topicNameOf(ws: Workspace): string {
+  return ws.title?.trim() || ws.description?.trim().slice(0, 120) || "";
+}
+
+/** "khanacademy.org" from a URL — the fallback publisher label. */
+function hostLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
   }
 }
 

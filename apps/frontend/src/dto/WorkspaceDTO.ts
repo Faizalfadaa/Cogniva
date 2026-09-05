@@ -1,10 +1,18 @@
 export type WorkspaceState = 'Draft' | 'Teaching' | 'Evaluating' | 'Completed';
 
+import type { ReferenceSourceDTO } from './ReferenceDTO';
+
 export interface WorkspaceDTO {
   id: string;
   title?: string;
   description?: string;
   pdfUrl?: string;
+  /**
+   * Set when the reference material came from a web source the Referencer found
+   * instead of an uploaded PDF. The two are mutually exclusive — uploading a PDF
+   * clears this.
+   */
+  referenceSource?: ReferenceSourceDTO;
   state: WorkspaceState;
   /**
    * Snapshot di-autosave selama state Editing.

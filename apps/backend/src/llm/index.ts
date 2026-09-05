@@ -10,4 +10,7 @@ export type {
   Embedder,
   EmbeddingClientOptions,
   EmbeddingTask,
+  GroundedArgs,
+  GroundedResult,
+  GroundedSource,
 } from "./providers/gemini.js";

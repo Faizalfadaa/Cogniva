@@ -10,6 +10,8 @@ import { LearnerStage } from '../../features/teaching-session/components/Learner
 import { ChatToasts } from '../../features/teaching-session/components/ChatToasts'
 import { ChatLauncher } from '../../features/teaching-session/components/ChatLauncher'
 import { ErrorBanner } from '../../features/teaching-session/components/ErrorBanner'
+import { ReferenceFinder } from '../../features/teaching-session/components/ReferenceFinder'
+import { SessionSetup } from '../../features/teaching-session/components/SessionSetup'
 import { ProductTour } from '../../features/tour/ProductTour'
 import { WORKSPACE_TOUR_STEPS } from '../../features/tour/tourSteps'
 import { useAppTour } from '../../features/tour/useAppTour'
@@ -17,6 +19,7 @@ import { LearnerSelect } from '../../features/teaching-session/components/Learne
 import { useTeachingSession } from '../../features/teaching-session/state/useTeachingSession'
 import { useWorkspaceTitleAutosave } from '../../features/teaching-session/hooks/useWorkspaceTitleAutosave'
 import { useIntroSeen } from '../../features/teaching-session/hooks/useIntroSeen'
+import { useSessionSetup } from '../../features/teaching-session/hooks/useSessionSetup'
 import { useWorkspaceChat } from '../../features/teaching-session/hooks/useWorkspaceChat'
 import { useUserStore } from '../../state/UserStore'
 import {
@@ -64,11 +67,13 @@ export default function WorkspacePage() {
   const learner = useMemo(() => resolveLearner(id ?? ''), [id, chosenLearnerId])
   const titleField = useWorkspaceTitleAutosave(id ?? '', workspace?.title, bridge)
   const intro = useIntroSeen(id ?? '')
+  const setup = useSessionSetup(id ?? '')
   const tour = useAppTour('workspace')
   const { userName } = useUserStore()
   const navigate = useNavigate()
   const [finishingSession, setFinishingSession] = useState(false)
   const [uploadingPdf, setUploadingPdf] = useState(false)
+  const [findingReference, setFindingReference] = useState(false)
 
   const handleFinishSession = useCallback(async () => {
     if (!id) return
@@ -97,6 +102,18 @@ export default function WorkspacePage() {
     },
     [bridge, id]
   )
+
+  // Adopting a source changes the workspace server-side (reference text, and the
+  // provenance chip in the header), so the local copy is refetched rather than
+  // patched — the dialog only knows what it chose, not what the server stored.
+  const handleReferenceAdopted = useCallback(async () => {
+    if (!id) return
+    try {
+      setWorkspace(await bridge.getWorkspace(id))
+    } catch (err) {
+      console.error('[Workspace] getWorkspace after reference failed', err)
+    }
+  }, [bridge, id])
 
   // Resolve first messages with userName substitution — stable across renders
   const seedMessages = useMemo(
@@ -137,11 +154,23 @@ export default function WorkspacePage() {
   )
 
   /**
-   * Second leg of the app tour, resumed from the dashboard. Held until the
-   * greeting is over: LearnerIntro owns the screen with its own overlay, and
-   * two dimmed layers at once would be a mess.
+   * Ask what the session is about, once, after the student has introduced
+   * themselves — the topic is what the Learner reacts to and what the Evaluator
+   * grades, so it is worth having before the first explanation rather than
+   * after it.
+   *
+   * Only on a Draft: a workspace already being taught has answered the question
+   * by existing, and interrupting a resumed session with a form would be absurd.
    */
-  const showTour = tour.active && intro.seen && !needsLearnerPick
+  const needsSetup =
+    intro.seen && !needsLearnerPick && !setup.done && workspace?.state === 'Draft'
+
+  /**
+   * Second leg of the app tour, resumed from the dashboard. Held until the
+   * greeting is over and the setup panel is gone: those own the screen with
+   * their own overlays, and two dimmed layers at once would be a mess.
+   */
+  const showTour = tour.active && intro.seen && !needsLearnerPick && !needsSetup
 
   // One banner, two sources. Teaching errors win: the user just pressed Teach
   // and is waiting on that, whereas a chat poll fails quietly in the background.
@@ -170,7 +199,18 @@ export default function WorkspacePage() {
         onUploadPdf={handleUploadPdf}
         pdfUrl={workspace?.pdfUrl}
         uploadingPdf={uploadingPdf}
+        onFindReference={() => setFindingReference(true)}
+        referenceSource={workspace?.referenceSource}
       />
+
+      {findingReference && (
+        <ReferenceFinder
+          workspaceId={id}
+          topic={titleField.title}
+          onClose={() => setFindingReference(false)}
+          onAdopted={handleReferenceAdopted}
+        />
+      )}
 
       <div className={styles.workspaceBody}>
         {/* Canvas takes remaining space; sidebar is a flex sibling */}
@@ -205,8 +245,20 @@ export default function WorkspacePage() {
             <LearnerIntro learner={learner} userName={userName ?? ''} onDone={intro.markSeen} />
           )}
 
+          {/* Last beat of the opening sequence: the student is here, now say
+              what you will teach them. */}
+          {needsSetup && (
+            <SessionSetup
+              workspaceId={id}
+              learner={learner}
+              workspace={workspace}
+              onWorkspaceChange={setWorkspace}
+              onDone={setup.markDone}
+            />
+          )}
+
           {/* Toast notifications — float over canvas, only when sidebar is closed */}
-          {intro.seen && !chat.isOpen && (
+          {intro.seen && !needsSetup && !chat.isOpen && (
             <ChatToasts
               toasts={chat.toasts}
               onDismiss={chat.dismissToast}
@@ -227,7 +279,7 @@ export default function WorkspacePage() {
           {/* Chat entry point, bottom-right. Gated on intro.seen for the same
               reason ChatSidebar is: before the intro is done the sidebar is not
               mounted, so a toggle would flip state with nothing to show. */}
-          {intro.seen && (
+          {intro.seen && !needsSetup && (
             <ChatLauncher
               chatOpen={chat.isOpen}
               chatUnread={chat.unreadCount}

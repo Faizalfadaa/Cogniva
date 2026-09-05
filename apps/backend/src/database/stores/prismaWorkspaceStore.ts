@@ -15,6 +15,7 @@ import type {
   ChatSender,
   CheckpointErrorKind,
   EvaluationReport,
+  ReferenceSource,
   TeachingCheckpoint,
   Workspace,
   WorkspaceState,
@@ -320,6 +321,24 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
     return row?.reference_text ?? undefined;
   }
 
+  async saveReferenceSource(
+    workspaceId: string,
+    source: ReferenceSource | undefined,
+  ): Promise<void> {
+    await prisma.workspace.updateMany({
+      where: { id_workspace: workspaceId },
+      data: { reference_source: toJson(source) },
+    });
+  }
+
+  async getReferenceSource(workspaceId: string): Promise<ReferenceSource | undefined> {
+    const row = await prisma.workspace.findUnique({
+      where: { id_workspace: workspaceId },
+      select: { reference_source: true },
+    });
+    return readReferenceSource(row?.reference_source);
+  }
+
   // --- Reference index --------------------------------------------------
 
   async saveReferenceIndex(workspaceId: string, index: ReferenceIndex): Promise<void> {
@@ -396,6 +415,7 @@ function toWorkspace(row: WorkspaceRow): Workspace {
     description: row.description ?? undefined,
     // Rebuilt rather than stored: it is a route on this server, not data.
     pdfUrl: row.pdf_mime ? `/api/workspaces/${row.id_workspace}/pdf` : undefined,
+    referenceSource: readReferenceSource(row.reference_source),
     state: row.state as WorkspaceState,
     currentWhiteboardSnapshot: row.whiteboard_snapshot ?? undefined,
     thumbnailUrl: row.thumbnail_url ?? undefined,
@@ -412,4 +432,22 @@ function toWorkspace(row: WorkspaceRow): Workspace {
 function toJson(value: unknown): Prisma.InputJsonValue | typeof Prisma.DbNull {
   if (value === undefined || value === null) return Prisma.DbNull;
   return value as Prisma.InputJsonValue;
+}
+/**
+ * Read the reference_source Json column back into a typed value.
+ *
+ * The column is opaque to Postgres, so a row written by an older build (or by
+ * hand) can hold anything. Anything that is not the expected shape is treated as
+ * absent rather than surfaced half-filled.
+ */
+function readReferenceSource(value: unknown): ReferenceSource | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const url = typeof record.url === "string" ? record.url : "";
+  if (!url) return undefined;
+  return {
+    url,
+    title: typeof record.title === "string" ? record.title : "",
+    source: typeof record.source === "string" ? record.source : "",
+  };
 }

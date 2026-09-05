@@ -4,6 +4,11 @@ import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
 import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
 import type { TimelineDTO } from '../dto/TimelineDTO';
+import type {
+  ReferenceSuggestionsDTO,
+  SaveReferenceTextResultDTO,
+  UseReferenceResultDTO,
+} from '../dto/ReferenceDTO';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -184,9 +189,93 @@ export class MockCognivaBridge implements CognivaBridge {
     const ws = store.workspaces.get(workspaceId);
     if (!ws) throw new Error(`[Mock] Workspace not found: ${workspaceId}`);
     const pdfUrl = URL.createObjectURL(file);
-    const updated: WorkspaceDTO = { ...ws, pdfUrl, updatedAt: now() };
+    // One answer key per session: an upload replaces whatever was found before.
+    const updated: WorkspaceDTO = { ...ws, pdfUrl, referenceSource: undefined, updatedAt: now() };
     store.workspaces.set(workspaceId, updated);
     return { ...updated };
+  }
+
+  async saveReferenceText(
+    workspaceId: string,
+    text: string
+  ): Promise<SaveReferenceTextResultDTO> {
+    await delay(300);
+    const ws = store.workspaces.get(workspaceId);
+    if (!ws) throw new Error(`[Mock] Workspace not found: ${workspaceId}`);
+    // Pasted text carries no provenance, so any chip from an earlier source goes.
+    const updated: WorkspaceDTO = { ...ws, referenceSource: undefined, updatedAt: now() };
+    store.workspaces.set(workspaceId, updated);
+    return { workspace: { ...updated }, chars: text.trim().length };
+  }
+
+  // Mirrors the backend's offline fallback: entry points into open libraries,
+  // pre-filtered to the topic, never an invented document title. Same honesty
+  // rule as the server — a fabricated link looks authoritative and leads nowhere.
+  async suggestReferences(workspaceId: string, hint?: string): Promise<ReferenceSuggestionsDTO> {
+    await delay(900);
+    const ws = store.workspaces.get(workspaceId);
+    const topic = ws?.title?.trim() || 'topik ini';
+    const query = encodeURIComponent([topic, hint].filter(Boolean).join(' ').trim());
+
+    return {
+      topic,
+      source: 'offline',
+      notice:
+        'Mode mock: ini pintu masuk ke perpustakaan terbuka, bukan judul dokumen tertentu.',
+      options: [
+        {
+          id: 'wikipedia-1',
+          title: `Wikipedia: ${topic}`,
+          url: `https://en.wikipedia.org/wiki/Special:Search?search=${query}&go=Go`,
+          source: 'Wikipedia',
+          kind: 'article',
+          summary: 'Ringkasan ensiklopedis dengan definisi dan daftar rujukan.',
+          whyRelevant: 'Cakupan luas, cocok sebagai kerangka awal.',
+          verified: false,
+        },
+        {
+          id: 'khan-academy-2',
+          title: `Khan Academy — materi tentang ${topic}`,
+          url: `https://www.khanacademy.org/search?page_search_query=${query}`,
+          source: 'Khan Academy',
+          kind: 'course',
+          summary: 'Pelajaran singkat dan latihan bertingkat untuk pelajar.',
+          whyRelevant: 'Bahasanya dekat dengan cara menjelaskan ke pemula.',
+          verified: false,
+        },
+        {
+          id: 'openstax-3',
+          title: `OpenStax — buku teks terbuka tentang ${topic}`,
+          url: `https://openstax.org/search?q=${query}`,
+          source: 'OpenStax',
+          kind: 'pdf',
+          summary: 'Buku teks kuliah gratis, tersedia sebagai PDF per bab.',
+          whyRelevant: 'Pilihan terbaik kalau butuh PDF yang bisa diunduh.',
+          verified: false,
+        },
+      ],
+    };
+  }
+
+  async useReference(
+    workspaceId: string,
+    choice: { url: string; title?: string; source?: string }
+  ): Promise<UseReferenceResultDTO> {
+    await delay(1200);
+    const ws = store.workspaces.get(workspaceId);
+    if (!ws) throw new Error(`[Mock] Workspace not found: ${workspaceId}`);
+
+    const text = `Catatan referensi tiruan dari ${choice.url}`;
+    store.workspaces.set(workspaceId, {
+      ...ws,
+      referenceSource: {
+        url: choice.url,
+        title: choice.title ?? 'Referensi',
+        source: choice.source ?? 'mock',
+      },
+      updatedAt: now(),
+    });
+    return { ok: true, problem: '', chars: text.length };
   }
 
   async saveWhiteboardDraft(

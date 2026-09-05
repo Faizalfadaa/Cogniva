@@ -35,6 +35,12 @@ export interface Workspace {
   description?: string;
   /** Endpoint URL for an uploaded reference PDF, if any. */
   pdfUrl?: string;
+  /**
+   * Where the reference material came from when it was not an upload — a web
+   * source the Referencer found and the user chose. Absent for an uploaded PDF
+   * (that one is `pdfUrl`) and when the session has no reference at all.
+   */
+  referenceSource?: ReferenceSource;
   state: WorkspaceState;
   /** Latest autosaved tldraw document, so the canvas restores on reopen. */
   currentWhiteboardSnapshot?: unknown;
@@ -42,6 +48,14 @@ export interface Workspace {
   thumbnailUrl?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Provenance of web-sourced reference material (§1.4: Evaluator-side only). */
+export interface ReferenceSource {
+  url: string;
+  title: string;
+  /** Publisher/site, e.g. "Khan Academy". */
+  source: string;
 }
 
 /** One teaching checkpoint — produced each time the user presses "Teach". */
@@ -143,4 +157,29 @@ export const uploadPdfSchema = z.object({
   /** Raw base64 (no data-URL prefix) of the PDF. */
   data: z.string(),
   mime: z.string().default("application/pdf"),
+});
+
+/**
+ * Reference material typed or pasted by the user — the third way in, beside an
+ * uploaded PDF and a source the Referencer found. Bounded here rather than only
+ * in the service so an oversized paste is rejected at the edge.
+ */
+export const saveReferenceTextSchema = z.object({
+  text: z.string().min(1).max(400_000),
+});
+
+/**
+ * Ask the Referencer for reading material. Everything about the topic comes from
+ * the workspace itself; `hint` is the user's own steer ("for high school", "in
+ * Indonesian"), which is why it is the only field.
+ */
+export const suggestReferencesSchema = z.object({
+  hint: z.string().max(300).optional(),
+});
+
+/** Adopt one suggested source as this session's reference material. */
+export const useReferenceSchema = z.object({
+  url: z.string().url(),
+  title: z.string().max(200).optional(),
+  source: z.string().max(80).optional(),
 });

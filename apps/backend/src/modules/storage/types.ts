@@ -20,6 +20,7 @@ import type { TeachingTurn } from "../../contracts/teaching.js";
 import type {
   ChatMessage,
   EvaluationReport,
+  ReferenceSource,
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
@@ -136,6 +137,12 @@ export interface WorkspaceStore {
   // Read only by the Evaluator as the answer key (§1.4); never by the Learner.
   saveReference(workspaceId: string, text: string): Promise<void>;
   getReference(workspaceId: string): Promise<string | undefined>;
+
+  // --- Where that reference came from, when it was not an upload ---------
+  // Set by the Referencer flow; `undefined` clears it (e.g. a later PDF upload
+  // replaces a web source).
+  saveReferenceSource(workspaceId: string, source: ReferenceSource | undefined): Promise<void>;
+  getReferenceSource(workspaceId: string): Promise<ReferenceSource | undefined>;
 
   // --- Reference index (chunked/embedded reference, §3.7 retrieval) -------
   saveReferenceIndex(workspaceId: string, index: ReferenceIndex): Promise<void>;

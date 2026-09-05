@@ -200,6 +200,51 @@ export const RAG_MAX_REFERENCE_CHARS: number = num(
   400_000,
 );
 
+// --- Referencer (§3.7, reference sourcing) ---------------------------------
+
+/**
+ * The Referencer proposes reading material when the user has none of their own.
+ * It runs with a grounding tool (Google Search / URL context) rather than from
+ * the model's memory, because a model asked for sources from memory invents
+ * plausible-looking URLs that lead nowhere.
+ */
+export const REFERENCER_MODEL: string =
+  process.env.COGNIVA_REFERENCER_MODEL ?? "gemini-2.5-flash";
+
+/**
+ * The grounded pass writes a short candidate list, and a second, tool-free pass
+ * turns it into JSON. Both are small; the ceiling is here to stop a runaway
+ * search summary, not to fit a document.
+ */
+export const REFERENCER_MAX_TOKENS: number = num(
+  process.env.COGNIVA_REFERENCER_MAX_TOKENS,
+  2048,
+);
+
+/** How many options the user is offered. Enough to choose from, few enough to read. */
+export const REFERENCER_OPTIONS: number = num(process.env.COGNIVA_REFERENCER_OPTIONS, 4);
+
+/**
+ * Output ceiling for the read pass, which is far larger than the search pass:
+ * that one writes four short entries, this one writes notes covering a whole
+ * article. Gemini stops at MAX_TOKENS rather than failing, so a page longer than
+ * this yields notes that end early instead of no notes at all.
+ */
+export const REFERENCER_READ_MAX_TOKENS: number = num(
+  process.env.COGNIVA_REFERENCER_READ_MAX_TOKENS,
+  16_384,
+);
+
+/**
+ * Sanity bound on the text pulled out of a chosen source. Larger than a typical
+ * article so nothing useful is lost, far below RAG_MAX_REFERENCE_CHARS because a
+ * fetched page is not an uploaded textbook.
+ */
+export const REFERENCER_MAX_FETCH_CHARS: number = num(
+  process.env.COGNIVA_REFERENCER_MAX_FETCH_CHARS,
+  60_000,
+);
+
 // --- ASR (§3.5) ------------------------------------------------------------
 
 /**

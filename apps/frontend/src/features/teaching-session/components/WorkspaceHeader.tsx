@@ -22,6 +22,10 @@ interface WorkspaceHeaderProps {
   onUploadPdf: (file: File) => void
   pdfUrl?: string
   uploadingPdf?: boolean
+  /** Opens the Referencer dialog, for a user with no material of their own. */
+  onFindReference: () => void
+  /** Set when the reference came from the web instead of an upload. */
+  referenceSource?: { url: string; title: string; source: string }
 }
 
 /** The backend returns a relative /api path; mock/blobs are already absolute. */
@@ -75,6 +79,8 @@ export function WorkspaceHeader({
   onUploadPdf,
   pdfUrl,
   uploadingPdf = false,
+  onFindReference,
+  referenceSource,
 }: WorkspaceHeaderProps) {
   const navigate = useNavigate()
   const voice = useLearnerVoice()
@@ -115,6 +121,24 @@ export function WorkspaceHeader({
               📄 Reference attached
             </a>
           )}
+
+          {/* A web source and an upload are mutually exclusive, so only one of
+              these two chips is ever on screen. */}
+          {!pdfUrl && referenceSource && (
+            <a
+              href={referenceSource.url}
+              target="_blank"
+              rel="noreferrer"
+              style={{ ...pdfBtnStyle, textDecoration: 'none', maxWidth: '220px' }}
+              title={`${referenceSource.title} — ${referenceSource.source}`}
+            >
+              <span
+                style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                🔗 {referenceSource.title || referenceSource.source}
+              </span>
+            </a>
+          )}
           <label
             data-tour="pdf-upload"
             style={{ ...pdfBtnStyle, opacity: uploadingPdf ? 0.6 : 1 }}
@@ -133,6 +157,18 @@ export function WorkspaceHeader({
               }}
             />
           </label>
+
+          {/* The way out for a user who has nothing to upload: an agent looks
+              material up and offers options to choose from. */}
+          <button
+            type="button"
+            data-tour="reference-finder"
+            onClick={onFindReference}
+            style={{ ...pdfBtnStyle }}
+            title="Find reference material for this topic"
+          >
+            🔎 Find reference
+          </button>
         </div>
       </div>
 
