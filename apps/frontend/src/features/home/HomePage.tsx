@@ -220,9 +220,11 @@ function DeleteConfirmModal({
 function LoginScreen({
   onLogin,
   onRegister,
+  onGuest,
 }: {
   onLogin: (username: string, password: string) => Promise<void>
   onRegister: (username: string, password: string) => Promise<void>
+  onGuest: () => void
 }) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
@@ -306,6 +308,9 @@ function LoginScreen({
           disabled={submitting}
         >
           {mode === 'login' ? 'Create a new account' : 'I already have an account'}
+        </button>
+        <button className={styles.guestBtn} onClick={onGuest} disabled={submitting}>
+          Continue as guest
         </button>
       </div>
     </div>
@@ -408,6 +413,7 @@ export default function HomePage() {
     fetchMe,
     login,
     register,
+    continueAsGuest,
     logout,
     setUserName,
   } = useUserStore()
@@ -518,7 +524,7 @@ export default function HomePage() {
     )
   }
 
-  if (!user) return <LoginScreen onLogin={login} onRegister={register} />
+  if (!user) return <LoginScreen onLogin={login} onRegister={register} onGuest={continueAsGuest} />
 
   // First visit: short intro explaining what Cogniva is, ending with the name step.
   if (needsNameSetup) return <Onboarding onDone={setUserName} />
@@ -569,15 +575,18 @@ export default function HomePage() {
 
         <div className={styles.sidebarBottom}>
           <button className={styles.logoutBtn} onClick={logout}>
-            Sign out
+            {user.isGuest ? 'Exit guest' : 'Sign out'}
           </button>
           <button
             data-tour="profile"
             className={styles.userChip}
-            onClick={() => setProfileOpen(true)}
+            onClick={() => {
+              if (!user.isGuest) setProfileOpen(true)
+            }}
+            disabled={user.isGuest}
             aria-haspopup="dialog"
             aria-label={`Open profile settings for ${userName ?? 'you'}`}
-            title="Profile"
+            title={user.isGuest ? 'Guest session' : 'Profile'}
           >
             <div className={styles.userAvatar}>
               {userName?.charAt(0).toUpperCase() ?? '?'}
@@ -665,7 +674,7 @@ export default function HomePage() {
         </div>
       </main>
 
-      {profileOpen && (
+      {profileOpen && !user.isGuest && (
         <ProfileModal
           userName={userName ?? ''}
           onSave={setUserName}

@@ -163,6 +163,14 @@
 
 .userChip:hover { background: var(--forest-mid); }
 
+.userChip:disabled {
+  cursor: default;
+}
+
+.userChip:disabled:hover {
+  background: transparent;
+}
+
 .userChip:focus-visible {
   outline: 2px solid var(--lime);
   outline-offset: 2px;
@@ -836,6 +844,24 @@
   font-size: 13px;
   line-height: 1.4;
   text-align: left;
+}
+
+.guestBtn {
+  width: 100%;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.guestBtn:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.guestBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ─── Spinner ─── */
