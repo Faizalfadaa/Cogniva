@@ -1,6 +1,43 @@
-import { useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import styles from '../../styles/LandingPage.module.css'
+import { LEARNERS } from '../../lib/Learner'
+
+/**
+ * Fade-and-lift sections in as they scroll into view.
+ *
+ * Native IntersectionObserver plus a class toggle, no animation library: the
+ * transition itself lives in CSS, this only decides when to add the class.
+ * Reveals once and then stops observing, so scrolling back up does not replay
+ * it. Anyone who asked for reduced motion gets the end state immediately (see
+ * the media query in the stylesheet).
+ */
+function useReveal<T extends HTMLElement>() {
+  const ref = useRef<T>(null)
+  const [shown, setShown] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el || shown) return
+    if (typeof IntersectionObserver === 'undefined') {
+      setShown(true)
+      return
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShown(true)
+          io.disconnect()
+        }
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [shown])
+
+  return { ref, className: shown ? `${styles.reveal} ${styles.revealIn}` : styles.reveal }
+}
 
 /** Where every call-to-action lands. Authentication is a separate workstream,
  *  so "Sign in" points at the same place as "Start teaching" for now. */
@@ -17,7 +54,7 @@ const STEPS: Step[] = [
   {
     num: '01',
     title: 'Open a board',
-    body: "Name a topic, or don't. Attach a reference PDF if you have one — your student never sees it, so she can't cheat off the answer key.",
+    body: "Name a topic, or don't. Attach a reference PDF if you have one. Your student never sees it, so she can't cheat off the answer key.",
   },
   {
     num: '02',
@@ -47,43 +84,34 @@ const STEPS: Step[] = [
   },
 ]
 
-interface Student {
-  name: string
-  trait: string
-  body: string
-  quote: string
-  avatarClass: string
-  avatarFile: string
-}
-
-const STUDENTS: Student[] = [
-  {
-    name: 'Yuzuki Akatsuki',
-    trait: 'Anxious, thorough',
-    body: "Apologises before every question, then asks the sharpest one in the session. She'll admit when she only copied your diagram.",
-    quote: '“E-Etto… sensei, sorry, one more thing?”',
-    avatarClass: 'avatarYuzuki',
-    avatarFile: 'yuzuki.png',
-  },
-  {
-    name: 'Reina Kisaragi',
-    trait: 'Loud, delighted',
-    body: 'Enthusiastic to the point of chaos. Jumps three steps ahead, which is exactly how you find out your explanation had no step two.',
-    quote: '“KYAA—! Wait, so does that mean—”',
-    avatarClass: 'avatarReina',
-    avatarFile: 'reina.png',
-  },
-  {
-    name: 'Akira Kagetsu',
-    trait: 'Blunt, unimpressed',
-    body: 'Says the quiet part out loud. If a section of your explanation was filler, his letter will name it. The most useful one to draw.',
-    quote: '“…You’re late. And that part made no sense.”',
-    avatarClass: 'avatarAkira',
-    avatarFile: 'akira.png',
-  },
+/** The people who built it. No portraits exist, so every card keeps the
+ *  hatch-pattern placeholder rather than inventing a face. */
+const TEAM = [
+  'Fauzan Mohamad Abdul Ghani',
+  'Tengku Naufal Saqib',
+  'Muhammad Ashkar',
+  'Rhenaldy Cahyadi Putra',
+  'Almer Zain Farisseno',
+  'Fayyaz Akmal Lauda',
+  'Muhammad Faiz Alfada Dharma',
+  'Muh. Hartawan Haidir',
 ]
 
-const TEAM = ['Design', 'Engineering', 'Learning research', 'Product']
+/** Question and answer pairs for the FAQ accordion. */
+const FAQS = [
+  {
+    q: 'What happens to my free workspaces?',
+    a: 'They stay. Upgrading only lifts the limits, and nothing is deleted or migrated.',
+  },
+  {
+    q: 'Is my board used for training?',
+    a: 'No. Your boards, voice and PDFs are used to run your session and nothing else.',
+  },
+  {
+    q: 'Do I need an account to pay?',
+    a: "Only from Sensei upwards. That is the point where your reports need somewhere to live.",
+  },
+]
 
 /** Feature bullet marker. `on={false}` renders the muted "not included" dash. */
 function Tick({ on = true, dark = false }: { on?: boolean; dark?: boolean }) {
@@ -104,13 +132,14 @@ export default function LandingPage() {
       <header className={styles.nav}>
         <div className={styles.navInner}>
           <a href="#top" className={styles.brand}>
-            <span className={styles.brandMark}>C</span>
+            <img src="/cogniva_logo.png" alt="" aria-hidden="true" className={styles.brandMarkImg} />
             <span className={styles.brandName}>Cogniva</span>
           </a>
           <nav className={styles.navLinks}>
             <a href="#how">How it works</a>
             <a href="#students">Your students</a>
             <a href="#pricing">Pricing</a>
+            <a href="#faq">FAQ</a>
             <a href="#about">About us</a>
           </nav>
           <div className={styles.navActions}>
@@ -128,17 +157,14 @@ export default function LandingPage() {
       <section id="top" className={styles.hero}>
         <div className={styles.heroInner}>
           <div className={styles.heroCopy}>
-            <span className={styles.betaPill}>
-              <span className={styles.betaDot} /> Free while we're in open beta
-            </span>
             <h1 className={styles.heroTitle}>
               You don't know it
               <br />
               until you can teach it.
             </h1>
             <p className={styles.heroLead}>
-              Cogniva gives you a student instead of a quiz. Explain a topic on a whiteboard — out
-              loud if you like — and she'll interrupt, get confused, and ask the one question you
+              Cogniva gives you a student instead of a quiz. Explain a topic on a whiteboard, out
+              loud if you like, and she'll interrupt, get confused, and ask the one question you
               were quietly hoping she wouldn't. Afterwards she writes you a letter about what she
               actually understood.
             </p>
@@ -192,13 +218,11 @@ export default function LandingPage() {
                   <div className={styles.avatarStage}>
                     <span className={styles.ring} />
                     <span className={`${styles.ring} ${styles.ringDelayed}`} />
-                    <div className={`${styles.avatarBlob} ${styles.avatarYuzuki}`}>
-                      <span>
-                        avatar
-                        <br />
-                        yuzuki
-                      </span>
-                    </div>
+                    <img
+                      src="/assets/avatars/yuzuki.png"
+                      alt="Yuzuki"
+                      className={styles.avatarBlob}
+                    />
                   </div>
                   <span className={styles.previewSideTitle}>Reading your board…</span>
                   <span className={styles.previewSideNote}>
@@ -225,7 +249,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className={styles.stepGrid}>
+          <div ref={howReveal.ref} className={`${styles.stepGrid} ${howReveal.className}`}>
             {STEPS.map((step) => (
               <div
                 key={step.num}
@@ -245,10 +269,10 @@ export default function LandingPage() {
               <span className={styles.letterKicker}>What the letter looks like</span>
               <p className={styles.letterQuote}>
                 “Arif-sensei, I think I finally get why C4 plants bother with the extra step. But
-                when you drew the two cell types I wrote them down without really following — if
+                when you drew the two cell types I wrote them down without really following. If
                 you asked me now which one has the rubisco, I would guess.”
               </p>
-              <span className={styles.letterBy}>— Yuzuki, after 24 minutes</span>
+              <span className={styles.letterBy}>(Yuzuki, after 24 minutes)</span>
             </div>
             <div className={styles.statCard}>
               <div className={styles.stat}>
@@ -264,7 +288,7 @@ export default function LandingPage() {
               <div className={styles.stat}>
                 <span className={styles.statNum}>∞</span>
                 <span className={styles.statLabel}>
-                  rounds per topic — each one keeps its own report
+                  rounds per topic, and each one keeps its own report
                 </span>
               </div>
             </div>
@@ -286,22 +310,16 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className={styles.studentGrid}>
-            {STUDENTS.map((s) => (
-              <div key={s.name} className={styles.studentCard}>
-                <div className={`${styles.avatarBlobLarge} ${styles[s.avatarClass]}`}>
-                  <span>
-                    avatar
-                    <br />
-                    {s.avatarFile}
-                  </span>
-                </div>
+          <div ref={studentsReveal.ref} className={`${styles.studentGrid} ${studentsReveal.className}`}>
+            {LEARNERS.map((s) => (
+              <div key={s.id} className={styles.studentCard}>
+                <img src={s.avatarUrl} alt={s.name} className={styles.avatarBlobLarge} />
                 <div className={styles.studentHead}>
                   <h3 className={styles.studentName}>{s.name}</h3>
-                  <span className={styles.studentTrait}>{s.trait}</span>
+                  <span className={styles.studentTrait}>{s.traits}</span>
                 </div>
-                <p className={styles.studentBody}>{s.body}</p>
-                <span className={styles.studentQuote}>{s.quote}</span>
+                <p className={styles.studentBody}>{s.description}</p>
+                <span className={styles.studentQuote}>{s.catchphrase}</span>
               </div>
             ))}
           </div>
@@ -419,7 +437,7 @@ export default function LandingPage() {
                 <div className={styles.feature}>
                   <Tick dark />
                   <span className={styles.featureOnDark}>
-                    Deeper evaluation — she remembers earlier rounds
+                    Deeper evaluation that remembers earlier rounds
                   </span>
                 </div>
                 <div className={styles.feature}>
@@ -467,26 +485,42 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className={styles.faqRow}>
-            <div className={styles.faq}>
-              <span className={styles.faqQ}>What happens to my free workspaces?</span>
-              <p className={styles.faqA}>
-                They stay. Upgrading only lifts the limits — nothing is deleted or migrated.
-              </p>
-            </div>
-            <div className={styles.faq}>
-              <span className={styles.faqQ}>Is my board used for training?</span>
-              <p className={styles.faqA}>
-                No. Your boards, voice and PDFs are used to run your session and nothing else.
-              </p>
-            </div>
-            <div className={styles.faq}>
-              <span className={styles.faqQ}>Do I need an account to pay?</span>
-              <p className={styles.faqA}>
-                Only from Sensei upwards — that's the point where your reports need somewhere to
-                live.
-              </p>
-            </div>
+        </div>
+      </section>
+
+      {/* ============ FAQ ============ */}
+      <section id="faq" className={styles.faqSection}>
+        <div className={styles.container}>
+          <div className={styles.pricingHead}>
+            <span className={styles.eyebrow}>FAQ</span>
+            <h2 className={styles.h2Centered}>Questions you might have</h2>
+          </div>
+
+          <div ref={faqReveal.ref} className={`${styles.faqList} ${faqReveal.className}`}>
+            {FAQS.map((item, i) => {
+              const open = openFaq === i
+              return (
+                <div key={item.q} className={open ? `${styles.faq} ${styles.faqOpen}` : styles.faq}>
+                  <button
+                    type="button"
+                    className={styles.faqQ}
+                    aria-expanded={open}
+                    aria-controls={`faq-a-${i}`}
+                    onClick={() => setOpenFaq(open ? null : i)}
+                  >
+                    <span>{item.q}</span>
+                    <span className={styles.faqChevron} aria-hidden="true">
+                      ⌄
+                    </span>
+                  </button>
+                  {/* Kept mounted and collapsed by max-height so the open/close
+                      is animatable and the text stays findable by Ctrl+F. */}
+                  <div id={`faq-a-${i}`} className={styles.faqAWrap} role="region">
+                    <p className={styles.faqA}>{item.a}</p>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>
@@ -536,22 +570,8 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className={styles.teamRow}>
-            {TEAM.map((role) => (
-              <div key={role} className={styles.teamMember}>
-                <div className={styles.teamPhoto}>
-                  <span>
-                    team photo
-                    <br />
-                    square
-                  </span>
-                </div>
-                <div className={styles.teamMeta}>
-                  <span className={styles.teamName}>Name</span>
-                  <span className={styles.teamRole}>{role}</span>
-                </div>
-              </div>
-            ))}
+          <div ref={teamReveal.ref} className={teamReveal.className}>
+            <TeamSlider people={TEAM} />
           </div>
         </div>
       </section>
@@ -565,7 +585,7 @@ export default function LandingPage() {
               Type your name, open a board, and find out in twenty minutes. No card, no account.
             </p>
             <Link to={APP_ENTRY} className={styles.btnLimeLarge}>
-              Start teaching — free
+              Start teaching for free
             </Link>
           </div>
 
@@ -574,7 +594,7 @@ export default function LandingPage() {
           <footer className={styles.footer}>
             <div className={styles.footerBrand}>
               <div className={styles.brand}>
-                <span className={styles.brandMarkLime}>C</span>
+                <img src="/cogniva_logo.png" alt="" aria-hidden="true" className={styles.brandMarkImg} />
                 <span className={styles.brandNameOnDark}>Cogniva</span>
               </div>
               <span className={styles.footerTagline}>

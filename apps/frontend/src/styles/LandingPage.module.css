@@ -7,6 +7,12 @@
    decorative mock-ups (hatch placeholders, dot grid, preview chrome), so they
    are scoped here rather than added to the shared palette. */
 .page {
+  /* Landing-only heading face. Overriding the custom property here keeps it to
+     descendants of .page -- globals.css still hands Syne to Workspace, HomePage
+     and everything else. Fredoka tops out at 700, so the 800 weights below
+     render at its heaviest cut. */
+  --font-display: 'Fredoka', var(--font-body);
+
   --ln-max: 1180px;
   --ln-gutter: 28px;
 
@@ -97,29 +103,16 @@
   text-decoration: none;
 }
 
-.brandMark,
-.brandMarkLime {
+/* Real mark, same footprint the lettered placeholder had so the nav and footer
+   keep their rhythm. `contain` rather than `cover`: the logo has its own
+   padding and must not be cropped. */
+.brandMarkImg {
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font: 800 15px/1 var(--font-display);
-}
-
-.brandMark {
-  background: var(--forest-dark);
-  color: var(--lime);
-}
-
-.brandMarkLime {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--lime);
-  color: var(--forest-dark);
+  object-fit: contain;
+  display: block;
+  flex: none;
 }
 
 .brandName {
@@ -229,27 +222,6 @@
   flex-direction: column;
   gap: 24px;
   padding-bottom: 76px;
-}
-
-.betaPill {
-  align-self: flex-start;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--card-bg);
-  border: 1px solid var(--ln-pill-border);
-  border-radius: var(--radius-pill);
-  padding: 7px 14px;
-  font: 600 11.5px/1 var(--font-body);
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-}
-
-.betaDot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--green-accent);
 }
 
 .heroTitle {
@@ -471,11 +443,10 @@
   width: 70px;
   height: 70px;
   border-radius: var(--radius-pill);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  font: 500 8px/1.4 var(--font-mono);
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+  background: var(--forest-mid);
   animation: bob 3.2s var(--ease-out) infinite;
 }
 
@@ -489,20 +460,6 @@
   font: 400 10.5px/1.5 var(--font-body);
   color: var(--text-on-forest-muted);
   text-align: center;
-}
-
-/* Placeholder avatars — hatched swatches, exactly as the mockup left them. */
-.avatarYuzuki {
-  background: repeating-linear-gradient(135deg, var(--ln-yuzuki-a) 0 6px, var(--ln-yuzuki-b) 6px 12px);
-  color: var(--ln-yuzuki-ink);
-}
-.avatarReina {
-  background: repeating-linear-gradient(135deg, var(--ln-reina-a) 0 6px, var(--ln-reina-b) 6px 12px);
-  color: var(--ln-reina-ink);
-}
-.avatarAkira {
-  background: repeating-linear-gradient(135deg, var(--ln-akira-a) 0 6px, var(--ln-akira-b) 6px 12px);
-  color: var(--ln-akira-ink);
 }
 
 /* ═══════════════ Shared section furniture ═══════════════ */
@@ -701,11 +658,12 @@
   width: 76px;
   height: 76px;
   border-radius: var(--radius-pill);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  font: 500 9px/1.4 var(--font-mono);
+  object-fit: cover;
+  /* The portraits are head-and-shoulders, so anchor to the top or a circular
+     crop cuts the face off. */
+  object-position: top center;
+  display: block;
+  background: var(--forest-mid);
 }
 
 .studentHead {
@@ -994,30 +952,80 @@
   color: var(--forest-dark);
 }
 
-.faqRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+/* ═══════════════ FAQ ═══════════════ */
+/* Cream, so it reads as its own band between two page-bg sections. */
+.faqSection {
   background: var(--cream);
-  border: 1px solid var(--border-cream);
-  border-radius: var(--radius-xl);
-  padding: 28px 30px;
+  border-bottom: 1px solid var(--border-cream);
+}
+
+.faqList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .faq {
-  flex: 1 1 300px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.faq:hover { border-color: var(--border-sand); }
+
+.faqOpen {
+  border-color: var(--border-sand);
+  box-shadow: 0 8px 24px rgba(30, 45, 8, 0.07);
 }
 
 .faqQ {
-  font: 700 15px/1.3 var(--font-display);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: 700 15px/1.35 var(--font-display);
   color: var(--text-primary);
 }
 
+.faqQ:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: -2px;
+}
+
+.faqChevron {
+  flex: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.faqOpen .faqChevron { transform: rotate(180deg); }
+
+/* Collapsed by max-height rather than unmounted: the answer stays in the DOM,
+   so it is still findable with Ctrl+F and the open/close can animate. */
+.faqAWrap {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--dur-base) var(--ease-out);
+}
+
+.faqOpen .faqAWrap { max-height: 240px; }
+
 .faqA {
   margin: 0;
+  padding: 0 20px 18px;
   font: 400 14px/1.65 var(--font-body);
   color: var(--text-secondary);
 }
@@ -1108,13 +1116,9 @@
 }
 
 .teamName {
-  font: 700 15px/1.2 var(--font-display);
+  font: 700 14px/1.35 var(--font-display);
   color: var(--text-primary);
-}
-
-.teamRole {
-  font: 500 12.5px/1.3 var(--font-body);
-  color: var(--text-muted);
+  text-wrap: balance;
 }
 
 /* ═══════════════ Closing CTA + footer ═══════════════ */
@@ -1224,3 +1228,62 @@
   }
   .ring { opacity: 0.25; }
 }
+
+/* ═══════════════ Scroll reveal + card lift ═══════════════ */
+/* The class is toggled by useReveal (IntersectionObserver); the motion itself
+   is entirely CSS, so no animation library is involved. */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 520ms var(--ease-out), transform 520ms var(--ease-out);
+}
+
+.revealIn {
+  opacity: 1;
+  transform: none;
+}
+
+/* Lift on hover for the cards that are meant to feel clickable-ish. Kept to a
+   few pixels: the page is text-heavy and big movement makes it harder to read. */
+.stepCard,
+.studentCard,
+.plan,
+.planFeatured {
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+
+.stepCard:hover,
+.studentCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 34px rgba(30, 45, 8, 0.1);
+}
+
+.plan:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 34px rgba(30, 45, 8, 0.1);
+}
+
+.planFeatured:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 30px 66px -30px rgba(30, 45, 8, 0.66);
+}
+
+/* Everything above is decoration. Honour the OS setting by landing on the end
+   state instead of animating towards it. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .stepCard:hover,
+  .studentCard:hover,
+  .plan:hover,
+  .planFeatured:hover,
+  .teamMember:hover {
+    transform: none;
+  }
+  .faqAWrap,
+  .faqChevron { transition: none; }
+}
+

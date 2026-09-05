@@ -61,6 +61,33 @@
 }
 .backBtn:hover { background: var(--parchment); }
 
+/* Sits beside the back arrow; deliberately quiet so it never competes with
+   the title field next to it. */
+.landingLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 6px;
+  border-radius: var(--radius-pill);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+
+.landingLink:hover {
+  background: var(--parchment);
+  color: var(--text-primary);
+}
+
+.landingLinkLogo {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: block;
+}
+
 .titleInput {
   font-family: var(--font-display);
   font-size: 16px;

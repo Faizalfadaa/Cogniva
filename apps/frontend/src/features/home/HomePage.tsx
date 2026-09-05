@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import { useUserStore } from '../../state/UserStore'
 import Onboarding from './Onboarding'
@@ -534,10 +534,11 @@ export default function HomePage() {
       {/* ── Sidebar ── */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarTop}>
-          <div className={styles.logo}>
+          {/* The mark doubles as the way back to the public site. */}
+          <Link to="/" className={styles.logo} title="Back to the Cogniva home page">
             <span className={styles.logoMark}><img src="/cogniva_logo.png" alt="Cogniva Logo" className={styles.logoImg} /></span>
             <span className={styles.logoText}>Cogniva</span>
-          </div>
+          </Link>
 
           <button
             data-tour="new-workspace"
