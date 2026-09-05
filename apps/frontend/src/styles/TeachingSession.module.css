@@ -224,16 +224,18 @@
    Learner response bubble  (top-right of canvas)
 ═══════════════════════════════════════════════════════════ */
 /* ── Shared notification stack (intro toasts + teach response + chat toasts) ──
-   Anchored top-left, just below the tldraw style panel (~68px from canvas top). */
+   Anchored bottom-right, stacking upward from just above the chat launcher.
+   The 90px bottom offset clears .chatLauncher (24px offset + 56px tall) with
+   room to spare, so a toast never sits on top of the button that opens chat. */
 .notifStack {
   position: absolute;
-  top: 76px;
-  left: 8px;
+  bottom: 90px;
+  right: 24px;
   z-index: 950;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: flex-start;
+  align-items: flex-end;
   pointer-events: none;
   max-width: 300px;
 }
@@ -253,8 +255,9 @@
   animation: notifSlideIn 200ms var(--ease-out) both;
 }
 
+/* Slides in from the right edge now that the stack lives bottom-right. */
 @keyframes notifSlideIn {
-  from { opacity: 0; transform: translateX(-10px); }
+  from { opacity: 0; transform: translateX(10px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 
@@ -549,18 +552,77 @@
 .chatSidebarSend:disabled { opacity: 0.5; cursor: default; }
 
 /* ═══════════════════════════════════════════════════════════
+   Chat launcher — floating button, bottom-right of the canvas
+═══════════════════════════════════════════════════════════ */
+/* Lives inside .canvasArea (not the header), so when the sidebar opens as a
+   flex sibling the launcher travels left with the shrinking canvas instead of
+   ending up underneath the panel. Nothing else is anchored bottom-right --
+   .sidebarTrigger (right/middle) is unused CSS, .introSkip is top-right. */
+.chatLauncher {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 960; /* above .notifStack (950) so a tall stack never buries it */
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--lime, #b8d94a);
+  color: var(--text-primary, #2e2b22);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.24);
+  transition: transform 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
+}
+
+.chatLauncher:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+}
+
+.chatLauncher:active { transform: translateY(0); }
+
+.chatLauncher:focus-visible {
+  outline: 2px solid var(--text-primary, #2e2b22);
+  outline-offset: 3px;
+}
+
+.chatLauncherIcon {
+  width: 26px;
+  height: 26px;
+  display: block;
+  pointer-events: none;
+}
+
+/* Secondary: who you are talking to. Small on purpose -- the chat glyph is the
+   thing that has to read at a glance, the face is a supporting detail. */
+.chatLauncherAvatar {
+  position: absolute;
+  left: -2px;
+  bottom: -2px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--lime, #b8d94a);
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
    Chat toast notifications — use shared .notifStack / .notifToast above
 ═══════════════════════════════════════════════════════════ */
 /* ChatToasts renders a .notifStack wrapper; aliases below keep ChatToasts.tsx compiling */
 .chatToastsContainer {
   position: absolute;
-  top: 76px;
-  left: 8px;
+  bottom: 90px;
+  right: 24px;
   z-index: 950;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: flex-start;
+  align-items: flex-end;
   pointer-events: none;
   max-width: 300px;
 }
@@ -579,7 +641,7 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
   cursor: pointer;
   opacity: 0;
-  transform: translateX(-10px);
+  transform: translateX(10px);
   transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
 }
 

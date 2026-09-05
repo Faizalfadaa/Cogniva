@@ -8,6 +8,7 @@ import { LearnerResponseBubble } from '../../features/teaching-session/component
 import { LearnerIntro } from '../../features/teaching-session/components/LearnerIntro'
 import { ChatSidebar } from '../../features/teaching-session/components/ChatSidebar'
 import { ChatToasts } from '../../features/teaching-session/components/ChatToasts'
+import { ChatLauncher } from '../../features/teaching-session/components/ChatLauncher'
 import { useTeachingSession } from '../../features/teaching-session/state/useTeachingSession'
 import { useWorkspaceTitleAutosave } from '../../features/teaching-session/hooks/useWorkspaceTitleAutosave'
 import { useIntroSeen } from '../../features/teaching-session/hooks/useIntroSeen'
@@ -115,11 +116,6 @@ export default function WorkspacePage() {
         onUploadPdf={handleUploadPdf}
         pdfUrl={workspace?.pdfUrl}
         uploadingPdf={uploadingPdf}
-        learnerAvatarUrl={learner.avatarUrl}
-        learnerName={learner.name}
-        chatOpen={chat.isOpen}
-        chatUnread={chat.unreadCount}
-        onToggleChat={chat.toggle}
       />
 
       <div className={styles.workspaceBody}>
@@ -149,6 +145,19 @@ export default function WorkspacePage() {
               toasts={chat.toasts}
               onDismiss={chat.dismissToast}
               onOpenChat={chat.open}
+            />
+          )}
+
+          {/* Chat entry point, bottom-right. Gated on intro.seen for the same
+              reason ChatSidebar is: before the intro is done the sidebar is not
+              mounted, so a toggle would flip state with nothing to show. */}
+          {intro.seen && (
+            <ChatLauncher
+              chatOpen={chat.isOpen}
+              chatUnread={chat.unreadCount}
+              onToggleChat={chat.toggle}
+              learnerAvatarUrl={learner.avatarUrl}
+              learnerName={learner.name}
             />
           )}
         </div>
