@@ -56,6 +56,13 @@ export interface TeachingCheckpoint {
   /** The Learner's reaction; absent while the turn is still processing. */
   learnerResponse?: string;
   /**
+   * Set when the turn ended in a handled condition rather than a real reply,
+   * so the UI can show it as a state instead of as something the student said.
+   * `learnerResponse` still carries readable text for clients that ignore this.
+   * A union so more kinds can join without another field.
+   */
+  errorKind?: CheckpointErrorKind;
+  /**
    * When each board change happened relative to the recording (Phase 1).
    * Stored only — like whiteboardSnapshot, nothing reads it yet. Absent on
    * checkpoints made before this field existed, and on clients that can't
@@ -64,6 +71,9 @@ export interface TeachingCheckpoint {
   timeline?: Timeline;
   createdAt: string;
 }
+
+/** Handled, non-exceptional outcomes of a teaching turn (§7.3). */
+export type CheckpointErrorKind = "budget_exceeded";
 
 export type ChatSender = "user" | "learner";
 
