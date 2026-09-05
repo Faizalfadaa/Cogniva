@@ -344,7 +344,7 @@ function toWorkspace(row: WorkspaceRow): Workspace {
 }
 
 /**
- * Coerce an opaque client document (a tldraw snapshot, a Timeline) into what a
+ * Coerce an opaque client document (an Excalidraw snapshot, a Timeline) into what a
  * Json column accepts. `undefined` clears the column rather than leaving it
  * untouched, matching the in-memory store's assignment semantics.
  */

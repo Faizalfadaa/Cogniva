@@ -157,7 +157,7 @@ model workspace {
   title               String?
   description         String?
   state               String
-  /// Latest autosaved tldraw document (opaque JSON).
+  /// Latest autosaved Excalidraw scene (opaque JSON).
   whiteboard_snapshot Json?
   /// Small raster preview, as a data URL.
   thumbnail_url       String?

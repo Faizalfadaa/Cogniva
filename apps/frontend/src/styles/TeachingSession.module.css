@@ -188,7 +188,7 @@
 }
 
 /* Header chat toggle — opens the learner chat drawer. Lives in the header so
-   it never overlaps the whiteboard tool panels (tldraw right / excalidraw left). */
+   it never overlaps the whiteboard tool panels. */
 .headerChatBtn {
   position: relative;
   width: 38px;
