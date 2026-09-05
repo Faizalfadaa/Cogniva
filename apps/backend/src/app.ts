@@ -10,6 +10,7 @@ import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
 import Fastify, { type FastifyInstance } from "fastify";
 
+import { authRoutes } from "./api/rest/auth.js";
 import { restRoutes } from "./api/rest/index.js";
 import { workspaceRoutes } from "./api/rest/workspaces.js";
 import { wsRoutes } from "./api/websocket/index.js";
@@ -31,6 +32,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await app.register(websocket);
+  await app.register(authRoutes, { prefix: "/api" });
   await app.register(restRoutes, { prefix: "/api" });
   await app.register(workspaceRoutes, { prefix: "/api" });
   await app.register(wsRoutes);

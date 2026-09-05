@@ -321,8 +321,8 @@ async function ensureOwner(ownerId: string): Promise<void> {
       id_user: ownerId,
       username: ownerId,
       email: `${ownerId}@device.cogniva.local`,
-      password_hash: "",
-      profile_photo: "",
+      password_hash: null,
+      profile_photo: null,
     },
     update: {},
   });

@@ -27,9 +27,9 @@ datasource db {
 model users {
   id_user       String   @id
   username      String   @unique
-  password_hash String
+  password_hash String?
   email         String   @unique
-  profile_photo String
+  profile_photo String?
   created_at    DateTime @default(now())
 
   workspace workspace[]
