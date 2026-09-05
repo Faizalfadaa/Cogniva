@@ -177,6 +177,51 @@ function EmptyState({ filter, onNew, loading }: { filter: ViewFilter; onNew: () 
 
 // ─── Delete Confirm Modal ─────────────────────────────────────────────────────
 
+/**
+ * Second step before leaving a session. Not styled as a danger action: signing
+ * out destroys nothing, it just ends the session. The wording differs for a
+ * guest because "exit guest" sounds more final than it is.
+ */
+function LogoutConfirmModal({
+  isGuest,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  isGuest: boolean
+  busy: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div className={styles.modalOverlay} onClick={() => !busy && onCancel()}>
+      <div
+        className={styles.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="logout-modal-title"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={styles.modalMark}>?</div>
+        <h2 id="logout-modal-title" className={styles.modalTitle}>
+          {isGuest ? 'Exit guest session?' : 'Sign out?'}
+        </h2>
+        <p className={styles.modalBody}>
+          {isGuest
+            ? 'You will go back to the Cogniva home page. Your workspaces stay on this device, so continuing as a guest again brings them back.'
+            : 'You will go back to the Cogniva home page. Sign in again any time to pick up where you left off.'}
+        </p>
+        <button className={styles.modalBtn} onClick={onConfirm} disabled={busy}>
+          {busy ? 'Signing out...' : isGuest ? 'Yes, exit guest' : 'Yes, sign out'}
+        </button>
+        <button className={styles.modalBtnGhost} onClick={onCancel} disabled={busy}>
+          Stay signed in
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function DeleteConfirmModal({
   ws,
   deleting,
@@ -306,6 +351,7 @@ const FILTER_OPTIONS: Array<{ label: string; value: ViewFilter }> = [
 export default function HomePage() {
   const bridge = useBridge()
   const navigate = useNavigate()
+
   const {
     user,
     userName,
@@ -318,6 +364,28 @@ export default function HomePage() {
     logout,
     setUserName,
   } = useUserStore()
+
+  const [logoutConfirm, setLogoutConfirm] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  /**
+   * Leaving a session drops you at the public landing page, not at the sign-in
+   * panel. Without the navigate, clearing `user` just re-triggers the
+   * `if (!user)` guard below and the login form appears in place, which reads
+   * as "sign in again" rather than "you have signed out".
+   */
+  const handleLogout = useCallback(async () => {
+    if (loggingOut) return
+    setLoggingOut(true)
+    try {
+      await logout()
+      navigate('/')
+    } finally {
+      // The component usually unmounts on navigate; resetting keeps the dialog
+      // usable again if logout threw and we are still here.
+      setLoggingOut(false)
+    }
+  }, [loggingOut, logout, navigate])
 
   const [workspaces, setWorkspaces] = useState<WorkspaceDTO[]>([])
   const [loading, setLoading] = useState(true)
@@ -476,7 +544,7 @@ export default function HomePage() {
         </nav>
 
         <div className={styles.sidebarBottom}>
-          <button className={styles.logoutBtn} onClick={logout}>
+          <button className={styles.logoutBtn} onClick={() => setLogoutConfirm(true)}>
             {user.isGuest ? 'Exit guest' : 'Sign out'}
           </button>
           <button
@@ -581,6 +649,15 @@ export default function HomePage() {
           userName={userName ?? ''}
           onSave={setUserName}
           onClose={() => setProfileOpen(false)}
+        />
+      )}
+
+      {logoutConfirm && (
+        <LogoutConfirmModal
+          isGuest={Boolean(user.isGuest)}
+          busy={loggingOut}
+          onConfirm={handleLogout}
+          onCancel={() => !loggingOut && setLogoutConfirm(false)}
         />
       )}
 
