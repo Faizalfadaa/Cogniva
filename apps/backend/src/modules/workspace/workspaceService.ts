@@ -26,6 +26,7 @@ import * as config from "../../config/index.js";
 import type { VisionInterpretation } from "../../contracts/board.js";
 import { utcNowIso } from "../../contracts/common.js";
 import type { Session } from "../../contracts/session.js";
+import type { Timeline } from "../../contracts/timeline.js";
 import type { Topic } from "../../contracts/topic.js";
 import type {
   ChatMessage,
@@ -161,6 +162,7 @@ export function submitCheckpoint(
     whiteboardSnapshot?: unknown;
     audio?: string;
     audioMime?: string;
+    timeline?: Timeline;
   },
 ): TeachingCheckpoint | undefined {
   const ws = workspaces.get(id);
@@ -177,6 +179,9 @@ export function submitCheckpoint(
       ? dataUrl(payload.audioMime ?? "audio/webm", payload.audio)
       : undefined,
     learnerResponse: undefined,
+    // Phase 1: stored alongside whiteboardSnapshot and deliberately NOT passed
+    // to runTeachingTurn -- wiring it into Vision/Learner is Phase 2.
+    timeline: payload.timeline,
     createdAt: utcNowIso(),
   };
   workspaces.addCheckpoint(id, checkpoint);

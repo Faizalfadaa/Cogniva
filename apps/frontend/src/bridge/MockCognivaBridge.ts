@@ -3,6 +3,7 @@ import type { WorkspaceDTO } from '../dto/WorkspaceDTO';
 import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
 import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
+import type { TimelineDTO } from '../dto/TimelineDTO';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -214,6 +215,7 @@ export class MockCognivaBridge implements CognivaBridge {
       snapshotImage: Blob;
       whiteboardSnapshot: unknown;
       audio?: Blob;
+      timeline?: TimelineDTO;
     }
   ): Promise<TeachingCheckpointDTO> {
     await delay(1200);
@@ -226,6 +228,8 @@ export class MockCognivaBridge implements CognivaBridge {
       snapshotImageUrl,
       whiteboardSnapshot: payload.whiteboardSnapshot,
       audioUrl,
+      // Echoed back like the real backend does — stored, never read (Phase 1).
+      timeline: payload.timeline,
       learnerResponse: undefined,
       createdAt: now(),
     };

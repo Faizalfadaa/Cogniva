@@ -2,6 +2,7 @@ import type { WorkspaceDTO } from '../dto/WorkspaceDTO';
 import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
 import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
+import type { TimelineDTO } from '../dto/TimelineDTO';
 
 export interface CognivaBridge {
   // Home
@@ -33,6 +34,10 @@ export interface CognivaBridge {
       // The user's explanation recorded during editing, uploaded whole with the snapshot.
       // Optional - the mic may be off or not permitted.
       audio?: Blob;
+      // When each board change happened relative to the recording (Phase 1:
+      // stored, not yet used). Plain JSON, so no encoding step like the Blobs.
+      // Optional - absent without a mic, or on the Excalidraw engine.
+      timeline?: TimelineDTO;
     }
   ): Promise<TeachingCheckpointDTO>;
   getCheckpoints(workspaceId: string): Promise<TeachingCheckpointDTO[]>;
