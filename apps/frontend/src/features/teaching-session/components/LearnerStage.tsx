@@ -56,22 +56,31 @@ export function LearnerStage({
     latestLearnerLine?.learnerAudioUrl && voice.playingUrl === latestLearnerLine.learnerAudioUrl,
   )
 
-  // Speak replies as they arrive, but never the backlog: messages already
-  // present on first render are marked heard so reopening does not replay them.
+  // Whatever is already on screen when this opens counts as heard, so reopening
+  // a conversation does not replay it.
+  //
+  // This deliberately seeds on the first non-empty message list, NOT on the
+  // first message that happens to carry audio. Speech now lands minutes after
+  // the text it belongs to, so keying on "has audio" meant the very first clip
+  // to arrive was mistaken for backlog and silently skipped — which is what
+  // made pressing replay feel mandatory.
   useEffect(() => {
-    if (!latestLearnerLine?.learnerAudioUrl) return
-    // Download before it is needed, so pressing replay starts instantly and the
-    // clip is same-origin by the time the analyser reads it.
-    voice.prefetch(latestLearnerLine.learnerAudioUrl)
-    if (!seededRef.current) {
-      seededRef.current = true
-      voice.markHeard(messages.map((m) => m.learnerAudioUrl))
-      return
-    }
-    voice.autoPlay(latestLearnerLine.learnerAudioUrl)
-    // The two callbacks are useCallback-stable; depending on `voice` itself
-    // would re-run this on every render.
-  }, [messages, latestLearnerLine, voice.autoPlay, voice.markHeard, voice.prefetch]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (seededRef.current || messages.length === 0) return
+    seededRef.current = true
+    voice.markHeard(messages.map((m) => m.learnerAudioUrl))
+  }, [messages, voice.markHeard]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Speak each reply the moment its audio is attached. Nothing to press.
+  useEffect(() => {
+    const url = latestLearnerLine?.learnerAudioUrl
+    if (!url || !seededRef.current) return
+    // Fetch first so playback starts instantly and the clip is same-origin by
+    // the time the analyser reads it.
+    voice.prefetch(url)
+    voice.autoPlay(url)
+    // The callbacks are useCallback-stable; depending on `voice` itself would
+    // re-run this on every render.
+  }, [latestLearnerLine, voice.autoPlay, voice.prefetch]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!showTranscript) return

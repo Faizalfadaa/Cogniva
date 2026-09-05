@@ -282,8 +282,15 @@ export function useLearnerVoice(): LearnerVoice {
   const autoPlay = useCallback(
     (url: string | undefined) => {
       if (!url || muted || autoPlayed.has(url)) return
+      // Claimed before the await, so two polls landing together cannot both
+      // start the same clip.
       autoPlayed.add(url)
-      play(url)
+
+      // Unlike a replay press, this fires from polling — there is no user
+      // gesture to forfeit by awaiting. So fetch first: the very first play is
+      // then same-origin, which is what lets the analyser read the waveform and
+      // move the avatar. A manual press still plays synchronously.
+      void prefetchClip(url).then(() => play(url))
     },
     [muted, play],
   )
