@@ -128,16 +128,86 @@
 }
 .finishBtn:disabled { opacity: 0.5; cursor: default; }
 
+.micBtnIdle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), color var(--dur-fast), background var(--dur-fast);
+}
+.micBtnIdle:hover {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+.micBtnActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid #e0453c;
+  background: rgba(224, 69, 60, 0.08);
+  color: #c0342c;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.micBtnActive:hover {
+  background: rgba(224, 69, 60, 0.15);
+}
+
+.micBtnIcon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.micBtnLabel {
+  white-space: nowrap;
+}
+
 .micDot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #e0453c;
+  flex-shrink: 0;
   animation: micPulse 1.4s infinite;
 }
 @keyframes micPulse {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.5; transform: scale(0.85); }
+  50%       { opacity: 0.4; transform: scale(0.8); }
+}
+
+/* Header chat toggle — opens the learner chat drawer. Lives in the header so
+   it never overlaps the whiteboard tool panels (tldraw right / excalidraw left). */
+.headerChatBtn {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  background: var(--cream);
+  flex-shrink: 0;
+  transition: transform var(--dur-fast), border-color var(--dur-fast);
+}
+.headerChatBtn:hover { transform: scale(1.06); border-color: var(--lime); }
+
+.headerChatAvatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--parchment);
+  display: block;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -671,3 +741,89 @@
 ═══════════════════════════════════════════════════════════ */
 .dockCollapsed { display: none; }
 .dockExpanded  { display: none; }
+
+/* ═══════════════════════════════════════════════════════════
+   Mobile (≤768px)
+   - Chat becomes a full-screen slide-in drawer (not a flex child
+     that squeezes the canvas).
+   - Header wraps into two rows so all controls stay reachable.
+   - Toasts/intro are capped to the viewport width.
+   Desktop layout above is untouched.
+═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* ── Header: wrap into two rows ── */
+  .header {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .headerLeft {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .headerRight {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .saveStatus { display: none; }
+  .titleInput { max-width: none; flex: 1 1 120px; }
+
+  /* Compact the action buttons so the second row fits a phone. */
+  .teachBtn,
+  .outlineBtn { padding: 8px 16px; }
+  .finishBtn { padding: 7px 12px; }
+  .micBtnIdle,
+  .micBtnActive { padding: 6px 10px; }
+
+  /* ── Chat drawer: full-screen overlay ──
+     Overrides the inline width set by ChatSidebar.tsx (hence !important). */
+  .chatSidebar {
+    position: fixed;
+    inset: 0;
+    width: 100% !important;
+    min-width: 0 !important;
+    border-left: none;
+    z-index: 1000;
+    animation: drawerSlideIn var(--dur-base) var(--ease-out);
+  }
+  @keyframes drawerSlideIn {
+    from { opacity: 0; transform: translateX(100%); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Drag-to-resize is pointless on touch — hide the handle. */
+  .chatSidebarHandle { display: none; }
+
+  /* Larger tap targets inside the drawer. */
+  .chatSidebarClose { width: 36px; height: 36px; font-size: 22px; }
+  .chatSidebarInput { padding: 10px 14px; font-size: 16px; }
+  .chatSidebarSend { width: 38px; height: 38px; }
+
+  /* ── Toasts: never wider than the screen ── */
+  .notifStack,
+  .chatToastsContainer {
+    max-width: calc(100vw - 16px);
+  }
+  .notifToast,
+  .chatToast {
+    width: auto;
+    max-width: 100%;
+  }
+
+  /* ── Learner intro card: stack vertically ── */
+  .introCard { flex-direction: column; align-items: stretch; width: 92%; }
+  .introCardImage { width: 100%; height: 200px; object-position: center 20%; }
+  .introCardText { padding: 20px 20px 24px; }
+  .introLine2Hidden,
+  .introLine2Visible { font-size: 24px; }
+}
+
+/* Small phones (≤420px) — drop the mic label to save the second row. */
+@media (max-width: 420px) {
+  .micBtnLabel { display: none; }
+}

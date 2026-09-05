@@ -2,10 +2,9 @@ import type { AIMessage } from "./learner.prompt.js";
 import type { AsrAgentInput } from "../../agents/asr/asr.types.js";
 
 /**
- * Schema keluaran terstruktur ASR, dipasang ke Gemini lewat responseJsonSchema
- * (Architecture Document §7.3) -- sama mekanismenya dengan
- * VISION_LLM_OUTPUT_SCHEMA: model dipaksa taat bentuk, bukan cuma diminta lewat
- * instruksi teks.
+ * ASR's structured-output schema, attached to Gemini via responseJsonSchema
+ * (Architecture Document §7.3) -- same mechanism as VISION_LLM_OUTPUT_SCHEMA: the
+ * model is forced to obey the shape rather than just being asked via text.
  */
 export const ASR_LLM_OUTPUT_SCHEMA: Record<string, unknown> = {
   type: "object",
@@ -20,43 +19,42 @@ export const ASR_LLM_OUTPUT_SCHEMA: Record<string, unknown> = {
 };
 
 /**
- * System prompt ASR -- mencerminkan filosofi yang sama dengan Vision: transkrip
- * apa adanya, jangan koreksi. Inti: tulis persis yang diucapkan, pengetahuan
- * dunia BUKAN sumber kebenaran (sumbernya bunyi audio), ragu = transkrip
- * fonetik + turunkan confidence (jangan menebak fakta yang "masuk akal"),
- * konteks topik membantu ejaan tapi tidak memaksa. Aturan 2 & 4 diperkuat
- * setelah uji menemukan model sempat "membetulkan" 50->100 derajat pada audio
- * tak jelas (lihat GAPS_ASR.md bagian G).
+ * ASR system prompt -- mirrors the same philosophy as Vision: transcribe as-is,
+ * don't correct. Core: write exactly what was said, world knowledge is NOT the
+ * source of truth (the audio is), when unsure use a phonetic transcript + lower
+ * confidence (don't guess "plausible" facts), topic context helps spelling but
+ * doesn't force. Rules 2 & 4 were reinforced after testing found the model would
+ * "fix" 50->100 degrees on unclear audio (see GAPS_ASR.md section G).
  */
 const asrSystemPrompt = `
-Kamu adalah modul PERSEPSI SUARA untuk aplikasi belajar 'learning by teaching'.
-Tugasmu HANYA menranskripsikan ucapan pengajar dari klip audio, lalu
-melaporkannya.
+You are the SPEECH PERCEPTION module for a 'learning by teaching' study app.
+Your ONLY job is to transcribe the teacher's speech from an audio clip and
+report it.
 
-ATURAN PENTING:
-1. Tulis PERSIS apa yang diucapkan, apa adanya. JANGAN mengoreksi kesalahan
-   pengajar. Bila pengajar mengucapkan sesuatu yang keliru, transkripsikan
-   kekeliruan itu apa adanya. Kekeliruan justru penting bagi sistem --
-   Learner mempelajari miskonsepsi itu, bukan versi yang sudah dibetulkan.
-2. KRITIS: pengetahuanmu tentang dunia BUKAN sumber kebenaran di sini. Sumber
-   kebenaran satu-satunya adalah BUNYI di audio. Bila pengajar berkata "air
-   mendidih pada lima puluh derajat", tulis "lima puluh" -- JANGAN ganti jadi
-   "seratus" hanya karena kamu tahu nilai yang benar. Bila ia berkata "H tiga O",
-   tulis "H3O" -- JANGAN perbaiki jadi "H2O". Mengganti angka/fakta yang salah
-   dengan yang benar adalah KEGAGALAN, sekecil apa pun.
-3. Kamu BUKAN guru. Jangan menilai, menjelaskan, meringkas, atau membetulkan
-   apa pun. Jangan menambah, menghapus, atau menyusun ulang kata. Transkripkan
-   SEMUA kalimat yang terdengar, termasuk yang menurutmu salah atau aneh.
-4. Bila ada bagian yang tidak terdengar jelas (bising/aksen/terpotong), JANGAN
-   menebak fakta "yang masuk akal". Tulis sedekat mungkin dengan BUNYI yang
-   kamu dengar (boleh fonetik), turunkan 'confidence', dan catat bagian itu di
-   'ambiguities'. Lebih baik transkrip yang janggal tapi jujur daripada kalimat
-   rapi yang menyembunyikan apa yang sebenarnya diucapkan.
-5. Gunakan topik sebagai konteks untuk membantu mengeja istilah teknis yang
-   mirip-mirip, tapi jangan memaksakan bila audio tidak mendukungnya, dan jangan
-   memakai topik untuk "membetulkan" isi yang keliru.
-6. Isi 'language' dengan kode bahasa BCP-47 yang terdeteksi (mis. "id-ID").
-7. Balas HANYA dengan JSON valid sesuai schema yang diberikan.
+IMPORTANT RULES:
+1. Write EXACTLY what was said, as-is. DO NOT correct the teacher's mistakes. If
+   the teacher says something wrong, transcribe that mistake as-is. Mistakes are
+   actually important to the system -- the Learner studies those misconceptions,
+   not a corrected version.
+2. CRITICAL: your knowledge about the world is NOT the source of truth here. The
+   only source of truth is the SOUND in the audio. If the teacher says "water
+   boils at fifty degrees", write "fifty" -- DO NOT change it to "one hundred"
+   just because you know the correct value. If they say "H three O", write "H3O"
+   -- DO NOT fix it to "H2O". Replacing a wrong number/fact with the correct one
+   is a FAILURE, however small.
+3. You are NOT a teacher. Don't judge, explain, summarize, or fix anything. Don't
+   add, remove, or reorder words. Transcribe EVERY sentence you hear, including
+   the ones you think are wrong or strange.
+4. If a part is not clearly audible (noise/accent/cut off), DO NOT guess a
+   "plausible" fact. Write as close as possible to the SOUND you hear (phonetic
+   is fine), lower 'confidence', and note that part in 'ambiguities'. A clumsy
+   but honest transcript is better than a clean sentence that hides what was
+   actually said.
+5. Use the topic as context to help spell similar-sounding technical terms, but
+   don't force it if the audio doesn't support it, and don't use the topic to
+   "fix" wrong content.
+6. Fill 'language' with the detected BCP-47 language code (e.g. "en-US").
+7. Reply with ONLY valid JSON matching the given schema.
 `;
 
 export function buildAsrMessages(input: AsrAgentInput): AIMessage[] {
@@ -68,7 +66,7 @@ export function buildAsrMessages(input: AsrAgentInput): AIMessage[] {
 
 function buildAsrUserPrompt(input: AsrAgentInput): string {
   return [
-    `Topik yang sedang diajarkan: "${input.topic}".`,
-    "Transkripsikan ucapan pada klip audio ini, lalu keluarkan JSON sesuai schema.",
+    `Topic being taught: "${input.topic}".`,
+    "Transcribe the speech in this audio clip, then output JSON matching the schema.",
   ].join("\n");
 }

@@ -1,9 +1,12 @@
 import {
+  LearnerAction,
+  LearnerActionKind,
   LearnerAgentInput,
   LearnerAgentOutput,
   LearnerLLMOutput,
   LearnerResponse,
   LearnerResponseDerivedFrom,
+  LearnerResponseStrategy,
   LearnerResponseType,
   LearnerState,
   Misconception
@@ -16,6 +19,39 @@ const allowedResponseTypes: LearnerResponseType[] = [
   "paraphrase"
 ];
 
+const allowedActionKinds: LearnerActionKind[] = [
+  "respond",
+  "reread_board",
+  "recall_earlier"
+];
+
+const allowedStrategies: LearnerResponseStrategy[] = [
+  "ask_clarification",
+  "request_example",
+  "challenge_claim",
+  "paraphrase",
+  "attempt_problem"
+];
+
+/**
+ * Coerce the model's chosen action into a safe shape. Unknown/missing -> the
+ * terminal "respond" so a malformed action can never stall the agent loop.
+ */
+export function normalizeAction(raw: unknown): LearnerAction {
+  const a = (raw ?? {}) as Partial<LearnerAction>;
+  const kind = allowedActionKinds.includes(a.kind as LearnerActionKind)
+    ? (a.kind as LearnerActionKind)
+    : "respond";
+  return {
+    kind,
+    focus: typeof a.focus === "string" ? a.focus.trim() : undefined,
+    query: typeof a.query === "string" ? a.query.trim() : undefined,
+    strategy: allowedStrategies.includes(a.strategy as LearnerResponseStrategy)
+      ? (a.strategy as LearnerResponseStrategy)
+      : undefined
+  };
+}
+
 const allowedDerivedFrom: LearnerResponseDerivedFrom[] = [
   "gap",
   "misconception",
@@ -23,16 +59,23 @@ const allowedDerivedFrom: LearnerResponseDerivedFrom[] = [
 ];
 
 const teacherLikePhrases = [
-  "kamu salah",
-  "yang benar adalah",
-  "seharusnya",
-  "berdasarkan teori",
-  "jawaban yang tepat",
-  "penjelasan lengkapnya",
-  "definisi resminya",
-  "mari kita bahas",
-  "dapat disimpulkan bahwa",
-  "konsep ini sebenarnya"
+  "you're wrong",
+  "you are wrong",
+  "the correct answer is",
+  "it should be",
+  "according to theory",
+  "the right answer",
+  "the full explanation",
+  "the official definition",
+  "let's discuss",
+  "it can be concluded that",
+  "this concept is actually",
+  "you should know that",
+  "scientifically speaking",
+  "according to the reference",
+  "the fact is",
+  "let me explain",
+  "i will explain"
 ];
 
 export function normalizeLearnerOutput(
@@ -119,7 +162,7 @@ export function createFallbackOutput(
       turnIndex: input.turnIndex,
       type: "confusion",
       text: fallbackText,
-      targetConcept: "penjelasan terbaru",
+      targetConcept: "the latest explanation",
       derivedFrom: "gap"
     }
   };
@@ -198,10 +241,10 @@ function normalizeMisconceptions(
 
 function createDefaultQuestion(input: LearnerAgentInput): string {
   if (!input.teachingText.trim()) {
-    return "Aku belum nangkep penjelasannya. Bisa mulai jelasin dari bagian paling dasar?";
+    return "I haven't caught the explanation yet. Could you start from the most basic part?";
   }
 
-  return "Aku masih agak bingung. Bisa jelasin bagian itu pakai contoh yang lebih sederhana?";
+  return "I'm still a bit confused. Could you explain that part with a simpler example?";
 }
 
 function createId(prefix: string): string {

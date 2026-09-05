@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import type { WorkspaceDTO } from '../../dto/WorkspaceDTO'
 import type { EvaluationReportDTO } from '../../dto/EvaluationReportDTO'
@@ -20,6 +20,7 @@ export default function EvaluationPage() {
   const [workspace, setWorkspace] = useState<WorkspaceDTO | null>(null)
   const [report, setReport] = useState<EvaluationReportDTO | null>(null)
   const [loading, setLoading] = useState(true)
+  const [resuming, setResuming] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const learner = useMemo(() => deriveLearner(id ?? ''), [id])
@@ -71,7 +72,25 @@ export default function EvaluationPage() {
     navigate(`/workspace/${ws.id}`)
   }
 
+  async function handleResumeSession() {
+    if (!id) return
+    setResuming(true)
+    try {
+      await bridge.resumeSession(id)
+      navigate(`/workspace/${id}`)
+    } catch (err) {
+      console.error('[Evaluation] resumeSession failed', err)
+      setResuming(false)
+    }
+  }
+
   if (loading || !workspace) return null
+
+  // A resumed workspace is back in Teaching — the debrief no longer applies
+  // (e.g. landing here via the browser back button after "Lanjutkan Sesi").
+  if (workspace.state === 'Teaching' || workspace.state === 'Draft') {
+    return <Navigate to={`/workspace/${id}`} replace />
+  }
 
   // ── Processing screen ─────────────────────────────────────────────────────
   if (workspace.state === 'Evaluating' || (workspace.state === 'Completed' && !report)) {
@@ -97,9 +116,9 @@ export default function EvaluationPage() {
 
       {/* Hero */}
       <div className={styles.reportHero}>
-        <p className={styles.reportHeroEyebrow}>Sesi selesai</p>
+        <p className={styles.reportHeroEyebrow}>Session complete</p>
         <h1 className={styles.reportHeroTitle}>
-          {workspace.title ?? 'Workspace tanpa judul'}
+          {workspace.title ?? 'Untitled workspace'}
         </h1>
       </div>
 
@@ -107,7 +126,7 @@ export default function EvaluationPage() {
       <div className={styles.reportContent}>
         <LetterFromLearner learner={learner} letter={report!.letter} />
         <Notebook notebook={report!.notebook} learnerName={learner.name} />
-        <ContinueLearning topics={report!.continueLearning} onNewSession={handleNewSession} />
+        <ContinueLearning topics={report!.continueLearning} onNewSession={handleNewSession} onResumeSession={handleResumeSession} resuming={resuming} />
       </div>
     </div>
   )

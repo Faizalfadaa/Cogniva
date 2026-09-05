@@ -472,8 +472,7 @@
 
 .continueFooter {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 16px;
   padding: 20px 24px;
 }
@@ -482,8 +481,32 @@
   font-size: 13px;
   color: var(--text-on-dark-muted);
   line-height: 1.5;
-  flex: 1;
 }
+
+.continueActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.continueSecondaryBtn {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--text-on-dark-muted);
+  border: 1.5px solid rgba(255,255,255,0.15);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: border-color var(--dur-fast), color var(--dur-fast);
+  white-space: nowrap;
+}
+.continueSecondaryBtn:hover:not(:disabled) {
+  border-color: rgba(255,255,255,0.4);
+  color: var(--text-on-dark);
+}
+.continueSecondaryBtn:disabled { opacity: 0.5; cursor: default; }
 
 .continueBtn {
   flex-shrink: 0;
@@ -496,4 +519,41 @@
   transition: background var(--dur-fast);
   white-space: nowrap;
 }
-.continueBtn:hover { background: var(--lime-hover); }
+.continueBtn:hover:not(:disabled) { background: var(--lime-hover); }
+.continueBtn:disabled { opacity: 0.5; cursor: default; }
+
+/* ═══════════════════════════════════════════════════════════
+   Mobile (≤768px) — tighten padding, stack action buttons.
+   Centered max-width containers already narrow on their own.
+═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .processingPage { padding: 20px 16px; }
+  .processingBack { top: 16px; left: 16px; }
+  .processingVideoWrap { width: 160px; height: 160px; }
+  .processingContent { gap: 24px; }
+
+  .reportHeader { padding: 0 16px; }
+  .reportLearnerName { display: none; }
+
+  .reportHero { padding: 40px 16px 32px; }
+
+  .reportContent {
+    padding: 32px 16px 64px;
+    gap: 32px;
+  }
+
+  .letterSealed { padding: 16px; gap: 12px; }
+  .letterHeader { padding: 14px 16px; }
+  .letterBody { padding: 16px; }
+
+  .notebookHeader { padding: 12px 16px; }
+  .notebookBody { padding: 16px; }
+
+  .continueTopic { padding: 14px 16px; gap: 12px; }
+  .continueFooter { padding: 16px; }
+
+  /* Stack the two footer buttons full-width so they stay tappable. */
+  .continueActions { flex-direction: column-reverse; }
+  .continueSecondaryBtn,
+  .continueBtn { width: 100%; text-align: center; }
+}

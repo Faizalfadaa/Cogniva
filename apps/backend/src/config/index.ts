@@ -49,6 +49,19 @@ export const VISION_MODEL: string =
   process.env.COGNIVA_VISION_MODEL ?? "gemini-2.5-flash";
 
 /**
+ * Vision's own output-token budget, separate from the shared LLM_MAX_TOKENS
+ * (2048) used by Learner/ASR/Evaluator. A dense whiteboard can have 20+
+ * elements, each needing kind+content+confidence+location in the JSON
+ * response -- 2048 was observed truncating mid-string on a busy board
+ * (photosynthesis diagram with two staged sub-diagrams + factors list).
+ * Override with COGNIVA_VISION_MAX_TOKENS if even denser boards still
+ * truncate.
+ */
+export const VISION_MAX_TOKENS: number = num(
+  process.env.COGNIVA_VISION_MAX_TOKENS,
+  4096,
+);
+/**
  * Below this confidence the orchestrator asks the user to confirm/correct the
  * board reading instead of guessing (real Vision lands in M2).
  */
@@ -66,6 +79,79 @@ export const VISION_CONFIDENCE_THRESHOLD: number = num(
  */
 export const EVALUATOR_MODEL: string =
   process.env.COGNIVA_EVALUATOR_MODEL ?? "gemini-2.5-flash";
+
+// --- Retrieval / RAG for the Evaluator (§3.7) ------------------------------
+
+/**
+ * Embedding model used to index the reference material and to embed retrieval
+ * queries. `gemini-embedding-001` is the current model; older ids such as
+ * `text-embedding-004` are no longer served on v1beta.
+ */
+export const EMBEDDING_MODEL: string =
+  process.env.COGNIVA_EMBEDDING_MODEL ?? "gemini-embedding-001";
+
+/**
+ * Output dimensionality requested from the embedding model. The model's native
+ * size is 3072; asking for fewer truncates the vector, which keeps the in-memory
+ * index small. Truncated vectors are NOT unit-length, so the client re-normalizes
+ * them — cosine similarity then reduces to a plain dot product.
+ */
+export const EMBEDDING_DIMENSIONS: number = num(
+  process.env.COGNIVA_EMBEDDING_DIMENSIONS,
+  768,
+);
+
+/** How many texts go in one embedContent call. Keeps requests well under limits. */
+export const EMBEDDING_BATCH_SIZE: number = num(
+  process.env.COGNIVA_EMBEDDING_BATCH_SIZE,
+  32,
+);
+
+/** Target size of one reference chunk, in characters. */
+export const RAG_CHUNK_SIZE: number = num(process.env.COGNIVA_RAG_CHUNK_SIZE, 900);
+
+/**
+ * Characters of the preceding text carried into each chunk. Overlap keeps a
+ * sentence that straddles a chunk boundary readable in at least one chunk.
+ */
+export const RAG_CHUNK_OVERLAP: number = num(
+  process.env.COGNIVA_RAG_CHUNK_OVERLAP,
+  150,
+);
+
+/** Chunks retrieved per query before the results of all queries are merged. */
+export const RAG_TOP_K: number = num(process.env.COGNIVA_RAG_TOP_K, 3);
+
+/** Upper bound on the merged excerpt set handed to the Evaluator prompt. */
+export const RAG_MAX_CHUNKS: number = num(process.env.COGNIVA_RAG_MAX_CHUNKS, 8);
+
+/** Upper bound on how many queries one evaluation may embed (cost guard). */
+export const RAG_MAX_QUERIES: number = num(process.env.COGNIVA_RAG_MAX_QUERIES, 12);
+
+/**
+ * Weight of the keyword score when blending with vector similarity (0..1).
+ * Vectors capture meaning; keywords catch exact tokens a paraphrase would miss —
+ * formulas, symbols, and names such as "ATP", "NADPH", "C6H12O6".
+ */
+export const RAG_KEYWORD_WEIGHT: number = num(
+  process.env.COGNIVA_RAG_KEYWORD_WEIGHT,
+  0.3,
+);
+
+/** Entries in the outline of the whole document sent alongside the excerpts. */
+export const RAG_MAX_OUTLINE_ENTRIES: number = num(
+  process.env.COGNIVA_RAG_MAX_OUTLINE_ENTRIES,
+  60,
+);
+
+/**
+ * Sanity bound on extracted reference text. Chunking replaced the old 20k
+ * truncation, so this only guards against a pathologically large upload.
+ */
+export const RAG_MAX_REFERENCE_CHARS: number = num(
+  process.env.COGNIVA_RAG_MAX_REFERENCE_CHARS,
+  400_000,
+);
 
 // --- ASR (§3.5) ------------------------------------------------------------
 

@@ -1,0 +1,69 @@
+# Cogniva — two independent services, one network.
+#
+#   frontend  nginx serving the built SPA + reverse-proxying to the backend (:80)
+#   backend   Fastify API run with tsx (:8000, internal)
+#
+# Only the frontend publishes a host port; the browser reaches the API through
+# nginx on the same origin. Copy .env.docker.example to .env and set your key:
+#
+#   cp .env.docker.example .env
+#   docker compose up -d --build
+
+services:
+  backend:
+    build:
+      context: ./apps/backend
+    image: cogniva-backend:latest
+    restart: unless-stopped
+    environment:
+      # Optional — without it the Learner uses a deterministic mock.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      COGNIVA_LEARNER_MODEL: ${COGNIVA_LEARNER_MODEL:-gemini-2.5-flash}
+      PORT: "8000"
+      NODE_ENV: production
+    expose:
+      - "8000"
+    networks:
+      - cogniva
+
+  frontend:
+    build:
+      context: ./apps/frontend
+      args:
+        # Empty => the SPA calls relative /api paths, proxied by nginx.
+        VITE_API_BASE: ""
+        # Production runs on an HTTPS domain → Excalidraw (tldraw needs a paid
+        # license there). Override to "tldraw" only if you have a tldraw license.
+        VITE_WHITEBOARD: ${VITE_WHITEBOARD:-excalidraw}
+    image: cogniva-frontend:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80"
+    networks:
+      - cogniva
+  
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"          
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       
+      - caddy_config:/config
+    networks:
+      - cogniva
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  cogniva:
+    driver: bridge

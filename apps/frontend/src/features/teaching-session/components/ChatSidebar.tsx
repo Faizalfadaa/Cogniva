@@ -11,7 +11,6 @@ interface ChatSidebarProps {
   learner: LearnerCharacter
   messages: ChatMessageDTO[]
   isOpen: boolean
-  unreadCount: number
   onToggle: () => void
   onSend: (content: string) => void
 }
@@ -20,7 +19,6 @@ export function ChatSidebar({
   learner,
   messages,
   isOpen,
-  unreadCount,
   onToggle,
   onSend,
 }: ChatSidebarProps) {
@@ -79,23 +77,9 @@ export function ChatSidebar({
     setDraft('')
   }
 
-  // ── Avatar trigger (collapsed state) ─────────────────────────────────────
-  if (!isOpen) {
-    return (
-      <div className={styles.sidebarTrigger}>
-        <button
-          className={styles.sidebarAvatarBtn}
-          onClick={onToggle}
-          aria-label={`Buka chat dengan ${learner.name}`}
-        >
-          <img src={learner.avatarUrl} alt={learner.name} className={styles.sidebarAvatarImg} />
-          {unreadCount > 0 && (
-            <span className={styles.sidebarBadge}>{unreadCount > 9 ? '9+' : unreadCount}</span>
-          )}
-        </button>
-      </div>
-    )
-  }
+  // Collapsed state renders nothing — the chat is opened from the header button
+  // (a floating avatar over the canvas overlapped the whiteboard tools).
+  if (!isOpen) return null
 
   // ── Full sidebar (open state) ─────────────────────────────────────────────
   return (
@@ -124,7 +108,7 @@ export function ChatSidebar({
         <button
           className={styles.chatSidebarClose}
           onClick={onToggle}
-          aria-label="Tutup chat"
+          aria-label="Close chat"
         >
           ×
         </button>
@@ -134,7 +118,7 @@ export function ChatSidebar({
       <div className={styles.chatSidebarMessages} ref={listRef}>
         {messages.length === 0 ? (
           <p className={styles.chatSidebarEmpty}>
-            Belum ada chat. Sapa {learner.name} dulu, yuk.
+            No messages yet. Say hi to {learner.name}!
           </p>
         ) : (
           messages.map((m) => (
@@ -157,14 +141,14 @@ export function ChatSidebar({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-          placeholder={`Tulis pesan ke ${learner.name}...`}
-          aria-label="Tulis pesan"
+          placeholder={`Message ${learner.name}...`}
+          aria-label="Write a message"
         />
         <button
           className={styles.chatSidebarSend}
           onClick={handleSubmit}
           disabled={!draft.trim()}
-          aria-label="Kirim"
+          aria-label="Send"
         >
           ↑
         </button>

@@ -1,8 +1,8 @@
 import type { LearnerDTO } from '../dto/LearnerDTO';
 
-// 3 karakter learner, hardcoded "for fun".
-// firstMessages adalah array bubble yang ditampilkan satu per satu,
-// dengan placeholder {userName} diganti runtime sebelum ditampilkan.
+// 3 learner characters, hardcoded "for fun".
+// firstMessages is an array of bubbles shown one at a time, with the {userName}
+// placeholder replaced at runtime before being displayed.
 export interface LearnerCharacter extends Omit<LearnerDTO, 'firstMessage' | 'introVideoUrl'> {
   firstMessages: string[];
   introImageUrl: string;
@@ -31,7 +31,7 @@ const LEARNERS: LearnerCharacter[] = [
       'A-Are you really...',
       '{userName}-sensei?',
       'KYAA—!',
-      'Finally!! Aku ketemu juga!',
+      'Finally!! I found you!',
       "...Don't disappear on me, okay?",
       '...Promise?',
     ],
@@ -46,7 +46,7 @@ const LEARNERS: LearnerCharacter[] = [
       '...Hm?',
       'Oh.',
       "So you're {userName}-sensei.",
-      "...I'm Rhen.",
+      "...I'm Akira.",
       'Remember my name.',
       "...You're going to hear it a lot from now on.",
     ],
@@ -54,9 +54,9 @@ const LEARNERS: LearnerCharacter[] = [
 ];
 
 /**
- * Pilih learner secara deterministik berdasarkan workspaceId supaya learner
- * yang sama selalu muncul lagi tiap kali workspace yang sama dibuka,
- * tanpa backend perlu menyimpan apa pun soal "siapa learner-nya".
+ * Pick a learner deterministically from the workspaceId so the same learner
+ * always shows up again whenever the same workspace is reopened, without the
+ * backend needing to store anything about "who the learner is".
  */
 export function deriveLearner(workspaceId: string): LearnerCharacter {
   let hash = 0;
@@ -67,8 +67,8 @@ export function deriveLearner(workspaceId: string): LearnerCharacter {
 }
 
 /**
- * Resolve firstMessages ke array string final dengan userName sudah disubstitusi.
- * Ini yang langsung dipakai komponen untuk ditampilkan bubble per bubble.
+ * Resolve firstMessages into the final string array with userName substituted in.
+ * This is what the component uses directly to display the bubbles one by one.
  */
 export function resolveFirstMessages(learner: LearnerCharacter, userName: string): string[] {
   return learner.firstMessages.map((msg) => msg.replace(/\{userName\}/g, userName));

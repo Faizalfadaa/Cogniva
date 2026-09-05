@@ -47,7 +47,7 @@ function ToastItem({ toast, onDismiss, onOpenChat }: ToastItemProps) {
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onOpenChat()}
-      aria-label={`Pesan dari ${toast.senderName}: ${toast.content}. Klik untuk buka chat.`}
+      aria-label={`Message from ${toast.senderName}: ${toast.content}. Click to open chat.`}
     >
       <img src={toast.avatarUrl} alt={toast.senderName} className={styles.chatToastAvatar} />
       <div className={styles.chatToastBody}>

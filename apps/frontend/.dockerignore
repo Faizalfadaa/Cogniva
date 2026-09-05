@@ -1,0 +1,22 @@
+# Keep the build context small and free of local installs / artefacts.
+node_modules
+npm-debug.log
+Dockerfile
+.dockerignore
+
+dist
+build
+.vite
+*.tsbuildinfo
+*.log
+
+# Env (VITE_API_BASE is passed as a build arg, not baked from a file)
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db

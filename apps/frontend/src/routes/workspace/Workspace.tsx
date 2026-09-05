@@ -50,6 +50,7 @@ export default function WorkspacePage() {
   const { userName } = useUserStore()
   const navigate = useNavigate()
   const [finishingSession, setFinishingSession] = useState(false)
+  const [uploadingPdf, setUploadingPdf] = useState(false)
 
   const handleFinishSession = useCallback(async () => {
     if (!id) return
@@ -63,10 +64,26 @@ export default function WorkspacePage() {
     }
   }, [bridge, id, navigate])
 
+  const handleUploadPdf = useCallback(
+    async (file: File) => {
+      if (!id) return
+      setUploadingPdf(true)
+      try {
+        const ws = await bridge.uploadWorkspacePdf(id, file)
+        setWorkspace(ws)
+      } catch (err) {
+        console.error('[Workspace] uploadWorkspacePdf failed', err)
+      } finally {
+        setUploadingPdf(false)
+      }
+    },
+    [bridge, id]
+  )
+
   // Resolve first messages with userName substitution — stable across renders
   const seedMessages = useMemo(
     () =>
-      resolveFirstMessages(learner, userName || 'kamu').map((content, i) => ({
+      resolveFirstMessages(learner, userName || 'you').map((content, i) => ({
         id: `seed-${id}-${i}`,
         content,
       })),
@@ -88,12 +105,21 @@ export default function WorkspacePage() {
         saveStatus={titleField.status}
         isRecording={session.isRecording}
         micPermissionDenied={session.micPermissionDenied}
+        onToggleRecording={session.toggleRecording}
         mode={session.mode}
         pending={session.pending}
         onTeach={session.teach}
         onContinueEditing={session.continueEditing}
         onFinishSession={handleFinishSession}
         finishingSession={finishingSession}
+        onUploadPdf={handleUploadPdf}
+        pdfUrl={workspace?.pdfUrl}
+        uploadingPdf={uploadingPdf}
+        learnerAvatarUrl={learner.avatarUrl}
+        learnerName={learner.name}
+        chatOpen={chat.isOpen}
+        chatUnread={chat.unreadCount}
+        onToggleChat={chat.toggle}
       />
 
       <div className={styles.workspaceBody}>
@@ -133,7 +159,6 @@ export default function WorkspacePage() {
             learner={learner}
             messages={chat.messages}
             isOpen={chat.isOpen}
-            unreadCount={chat.unreadCount}
             onToggle={chat.toggle}
             onSend={chat.sendMessage}
           />

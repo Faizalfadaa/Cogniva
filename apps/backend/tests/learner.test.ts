@@ -6,9 +6,10 @@
  * guard directly, in deterministic mock mode (no network, no API key).
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { LearnerAgent, seedLearnerState } from "../src/agents/index.js";
+import { LearnerAgent, seedLearnerState, seedLearnerStateFromEvaluation } from "../src/agents/index.js";
+import type { EvaluationResult } from "../src/contracts/evaluation.js";
 import { runLearnerTurn } from "../src/agents/learner/learner.agent.js";
 import {
   createFallbackOutput,
@@ -66,6 +67,57 @@ describe("seedLearnerState", () => {
   });
 });
 
+describe("seedLearnerStateFromEvaluation (adaptive resume)", () => {
+  function evalResult(findings: EvaluationResult["findings"], improvements: string[] = []): EvaluationResult {
+    return {
+      evaluationId: "ev_1",
+      sessionId: "ses_1",
+      score: 60,
+      findings,
+      summary: "ringkasan",
+      strengths: [],
+      improvements,
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    };
+  }
+
+  it("re-aims the Learner at the user's weak spots from the last evaluation", () => {
+    const seeded = seedLearnerStateFromEvaluation(
+      "ses_1",
+      evalResult(
+        [
+          { category: "CORRECT", concept: "Definisi dasar", detail: "tersampaikan", evidenceTurnIndex: 0 },
+          { category: "WRONG", concept: "Arah reaksi", detail: "membalik sebab dan akibat", evidenceTurnIndex: 1 },
+          { category: "MISSED", concept: "Peran cahaya", detail: "belum dibahas", evidenceTurnIndex: null },
+        ],
+        ["Bahas peran enzim"],
+      ),
+    );
+
+    // CORRECT -> understood (won't be re-probed)
+    expect(seeded.understoodConcepts).toContain("Definisi dasar");
+    // WRONG -> active misconception to correct by re-teaching
+    expect(seeded.activeMisconceptions).toEqual([
+      { concept: "Arah reaksi", belief: "membalik sebab dan akibat" },
+    ]);
+    // MISSED/CONFUSING + improvements -> open gaps to ask about
+    expect(seeded.openGaps).toEqual(expect.arrayContaining(["Peran cahaya", "Bahas peran enzim"]));
+  });
+
+  it("keeps the carried-over memory when the evaluation has no findings", () => {
+    const previous = {
+      sessionId: "ses_1",
+      understoodConcepts: ["X"],
+      activeMisconceptions: [{ concept: "Y", belief: "z" }],
+      openGaps: ["g"],
+      questionsAsked: ["q"],
+      updatedAtTurn: 3,
+    };
+    const seeded = seedLearnerStateFromEvaluation("ses_1", evalResult([]), previous);
+    expect(seeded).toEqual(previous);
+  });
+});
+
 describe("LearnerAgent adapter (mock mode)", () => {
   it("returns a student-role response and advances the state", async () => {
     const agent = new LearnerAgent({ forceMock: true });
@@ -106,11 +158,64 @@ describe("runLearnerTurn (mock)", () => {
   });
 });
 
+describe("runLearnerTurn agentic loop (mock)", () => {
+  it("uses the reread_board tool to investigate, then responds", async () => {
+    const rereadBoard = vi.fn(async (focus: string) => `(detail) ${focus}`);
+
+    const out = await runLearnerTurn(
+      {
+        sessionId: "ses_1",
+        turnIndex: 1,
+        teachingText: 'Yang penting di sini adalah istilah "fotosintesis".',
+        currentState: freshState(),
+      },
+      { useMock: true, tools: { rereadBoard } },
+    );
+
+    // The student investigated the unclear term before asking (agentic tool use).
+    expect(rereadBoard).toHaveBeenCalledTimes(1);
+    expect(rereadBoard).toHaveBeenCalledWith("fotosintesis");
+    // ...and still finalized with a valid student response.
+    expect(STUDENT_TYPES).toContain(out.response.type);
+    expect(out.response.text.trim()).toBeTruthy();
+  });
+
+  it("collapses to a single response when no tools are injected", async () => {
+    const rereadBoard = vi.fn(async () => "(detail)");
+    await runLearnerTurn(
+      {
+        sessionId: "ses_1",
+        turnIndex: 1,
+        teachingText: 'Istilah "klorofil" itu kuncinya.',
+        currentState: freshState(),
+      },
+      { useMock: true }, // no tools
+    );
+    expect(rereadBoard).not.toHaveBeenCalled();
+  });
+
+  it("is bounded — never loops forever even if a tool stays available", async () => {
+    const rereadBoard = vi.fn(async () => "(detail)");
+    const out = await runLearnerTurn(
+      {
+        sessionId: "ses_1",
+        turnIndex: 2,
+        teachingText: 'Istilah "kloroplas" itu kuncinya.',
+        currentState: freshState(),
+      },
+      { useMock: true, tools: { rereadBoard } },
+    );
+    // Dedup + step cap keep it to one investigation, then a response.
+    expect(rereadBoard.mock.calls.length).toBeLessThanOrEqual(2);
+    expect(STUDENT_TYPES).toContain(out.response.type);
+  });
+});
+
 describe("learner guard", () => {
   it("flags teacher-like or overly long text as unsafe", () => {
-    expect(isLearnerTextSafe("Aku masih bingung, bisa diulang?")).toBe(true);
-    expect(isLearnerTextSafe("Yang benar adalah fotosintesis menghasilkan oksigen.")).toBe(false);
-    expect(isLearnerTextSafe(Array(60).fill("kata").join(" "))).toBe(false);
+    expect(isLearnerTextSafe("I'm still confused, can you repeat that?")).toBe(true);
+    expect(isLearnerTextSafe("The correct answer is that photosynthesis produces oxygen.")).toBe(false);
+    expect(isLearnerTextSafe(Array(60).fill("word").join(" "))).toBe(false);
   });
 
   it("coerces an invalid LLM response into a safe student shape", () => {

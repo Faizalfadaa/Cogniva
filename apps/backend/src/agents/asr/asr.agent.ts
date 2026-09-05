@@ -15,9 +15,9 @@ import type {
 } from "./asr.types.js";
 
 /**
- * Jalankan satu transkripsi suara. Dipanggil oleh AsrAgent (agents/asr/index.ts)
- * hanya ketika ada audio untuk ditranskripsi -- jalur typedText tetap memakai
- * jalan pintas tanpa model di AsrAgent.
+ * Run one speech transcription. Called by AsrAgent (agents/asr/index.ts) only
+ * when there's audio to transcribe -- the typedText path still uses the
+ * no-model shortcut inside AsrAgent.
  */
 export async function runAsrTurn(
   input: AsrAgentInput,
@@ -41,9 +41,9 @@ export async function runAsrTurn(
 }
 
 /**
- * Jalur LLM nyata -- lewat pembungkus Gemini terpusat proyek (§7.3), memakai
- * field `audio` di StructuredArgs (pola aditif sama dengan `image` milik Vision;
- * lihat GAPS_ASR.md). gemini-2.5-flash menerima audio inline langsung.
+ * Real LLM path -- through the project's centralized Gemini wrapper (§7.3), using
+ * the `audio` field in StructuredArgs (same additive pattern as Vision's `image`;
+ * see GAPS_ASR.md). gemini-2.5-flash accepts inline audio directly.
  */
 async function callRealAI(input: AsrAgentInput): Promise<Record<string, unknown>> {
   const messages = buildAsrMessages(input);

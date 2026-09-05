@@ -5,8 +5,8 @@ function storageKey(workspaceId: string): string {
 }
 
 /**
- * "Pertama kali dibuka" di-track per browser (localStorage), bukan di backend -
- * cukup buat keperluan UI (gak perlu nambah field di WorkspaceDTO/bridge).
+ * "First opened" is tracked per browser (localStorage), not on the backend -
+ * enough for UI purposes (no need to add a field to WorkspaceDTO/bridge).
  */
 export function useIntroSeen(workspaceId: string) {
   const [seen, setSeen] = useState<boolean>(() => {
@@ -14,8 +14,8 @@ export function useIntroSeen(workspaceId: string) {
     try {
       return localStorage.getItem(storageKey(workspaceId)) === '1'
     } catch {
-      // localStorage gak available (private mode, dll) - anggap udah seen
-      // supaya gak maksa nampilin intro tiap kali tanpa bisa di-skip-permanen-kan.
+      // localStorage not available (private mode, etc.) - assume already seen
+      // so it doesn't force the intro every time without being permanently skippable.
       return true
     }
   })

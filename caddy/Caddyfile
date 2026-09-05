@@ -1,0 +1,9 @@
+cogniva.web.id, www.cogniva.web.id {
+    # Email untuk notifikasi Let's Encrypt (kedaluwarsa, dsb).
+    tls naufal.saqib1@gmail.com
+
+    # Teruskan semua trafik ke container frontend (nginx) di port 80.
+    # Caddy otomatis meminta & memperbarui sertifikat TLS untuk domain di atas,
+    # dan mengalihkan http:// ke https://.
+    reverse_proxy frontend:80
+}

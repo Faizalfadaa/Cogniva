@@ -8,10 +8,10 @@ interface EvaluationProcessingProps {
 }
 
 const MESSAGES = [
-  'Muridmu sedang mengingat-ingat sesinya...',
-  'Catatan sedang ditulis...',
-  'Surat untukmu sedang disiapkan...',
-  'Hampir selesai...',
+  'Your student is thinking back over the session...',
+  'Writing up the notes...',
+  'Preparing a letter for you...',
+  'Almost done...',
 ]
 
 const MESSAGE_INTERVAL_MS = 3500
@@ -45,7 +45,7 @@ export function EvaluationProcessing({ workspaceId, workspaceTitle }: Evaluation
     <div className={styles.processingPage}>
       {/* Back to home — user can leave and come back */}
       <button className={styles.processingBack} onClick={() => navigate('/')}>
-        ← Kembali ke Home
+        ← Back to Home
       </button>
 
       <div className={styles.processingContent}>
@@ -62,7 +62,7 @@ export function EvaluationProcessing({ workspaceId, workspaceTitle }: Evaluation
 
         <div className={styles.processingText}>
           <h1 className={styles.processingTitle}>
-            {workspaceTitle ? `Mengevaluasi "${workspaceTitle}"` : 'Mengevaluasi sesimu...'}
+            {workspaceTitle ? `Evaluating "${workspaceTitle}"` : 'Evaluating your session...'}
           </h1>
           <p
             ref={msgElRef}
@@ -72,7 +72,7 @@ export function EvaluationProcessing({ workspaceId, workspaceTitle }: Evaluation
         </div>
 
         <p className={styles.processingHint}>
-          Kamu bisa kembali ke Home dan balik lagi nanti — evaluasi tetap berjalan di background.
+          You can head back to Home and return later — the evaluation keeps running in the background.
         </p>
       </div>
     </div>

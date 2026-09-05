@@ -1,0 +1,27 @@
+# Never bake local installs, secrets, or test fixtures into the image.
+node_modules
+npm-debug.log
+Dockerfile
+.dockerignore
+
+# Secrets — the container gets env from docker-compose / `docker run --env`.
+.env
+.env.*
+!.env.example
+
+# Local build/test artefacts
+dist
+build
+coverage
+*.tsbuildinfo
+*.log
+
+# Local test media (each contributor supplies their own)
+suara-uji/*.wav
+gambar-uji
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db

@@ -3,9 +3,11 @@ import styles from '../../../styles/Evaluation.module.css'
 interface ContinueLearningProps {
   topics: string[]
   onNewSession: () => void
+  onResumeSession: () => void
+  resuming?: boolean
 }
 
-export function ContinueLearning({ topics, onNewSession }: ContinueLearningProps) {
+export function ContinueLearning({ topics, onNewSession, onResumeSession, resuming = false }: ContinueLearningProps) {
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>
@@ -15,7 +17,7 @@ export function ContinueLearning({ topics, onNewSession }: ContinueLearningProps
 
       <div className={styles.continueCard}>
         {topics.length === 0 ? (
-          <p className={styles.continueEmpty}>Tidak ada rekomendasi saat ini.</p>
+          <p className={styles.continueEmpty}>No recommendations right now.</p>
         ) : (
           <ul className={styles.continueList}>
             {topics.map((topic, i) => (
@@ -30,11 +32,20 @@ export function ContinueLearning({ topics, onNewSession }: ContinueLearningProps
 
         <div className={styles.continueFooter}>
           <p className={styles.continueFooterText}>
-            Siap mengajar topik-topik baru? Buat sesi baru atau lanjutkan sesi ini.
+            Ready to teach new topics? Start a new session or continue this one.
           </p>
-          <button className={styles.continueBtn} onClick={onNewSession}>
-            Mulai sesi baru ↗
-          </button>
+          <div className={styles.continueActions}>
+            <button
+              className={styles.continueSecondaryBtn}
+              onClick={onResumeSession}
+              disabled={resuming}
+            >
+              {resuming ? 'Opening...' : 'Continue Session ↩'}
+            </button>
+            <button className={styles.continueBtn} onClick={onNewSession} disabled={resuming}>
+              Start a new session ↗
+            </button>
+          </div>
         </div>
       </div>
     </section>

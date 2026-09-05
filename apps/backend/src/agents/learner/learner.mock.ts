@@ -18,17 +18,18 @@ export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
 
   if (!text) {
     const question =
-      "Aku belum dapat penjelasannya. Bisa mulai dari hal paling dasar?";
+      "I haven't gotten the explanation yet. Could you start from the very basics?";
 
-    addUnique(nextState.openGaps, "materi dasar");
+    addUnique(nextState.openGaps, "the basics");
     addUnique(nextState.questionsAsked, question);
 
     return {
       nextState,
+      action: { kind: "respond", strategy: "ask_clarification" },
       response: {
         type: "question",
         text: question,
-        targetConcept: "materi dasar",
+        targetConcept: "the basics",
         derivedFrom: "gap"
       }
     };
@@ -45,17 +46,40 @@ export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
     addUnique(nextState.openGaps, unclearTerm);
   }
 
-  const responseText = createMockResponse(concept, unclearTerm);
+  const responseText = createMockResponse(concept, unclearTerm, input.turnIndex);
   if (unclearTerm) {
     addUnique(nextState.questionsAsked, responseText);
   }
 
+  // Agentic demo (offline): on the first step, if a directed board re-read is
+  // available and there's an unclear term, investigate it before asking — so the
+  // tool loop is exercised even without an LLM. After observing (or with no tool
+  // available) the student responds normally.
+  const canReread = (input.availableTools ?? []).includes("reread_board");
+  const alreadyInvestigated = (input.observations ?? []).length > 0;
+  if (unclearTerm && canReread && !alreadyInvestigated) {
+    return {
+      nextState,
+      action: { kind: "reread_board", focus: unclearTerm },
+      response: {
+        type: "question",
+        text: responseText,
+        targetConcept: unclearTerm,
+        derivedFrom: "gap"
+      }
+    };
+  }
+
   return {
     nextState,
+    action: {
+      kind: "respond",
+      strategy: unclearTerm ? "ask_clarification" : "paraphrase"
+    },
     response: {
       type: unclearTerm ? "question" : "paraphrase",
       text: responseText,
-      targetConcept: unclearTerm ?? concept ?? "penjelasan terbaru",
+      targetConcept: unclearTerm ?? concept ?? "the latest explanation",
       derivedFrom: unclearTerm ? "gap" : "new_info"
     }
   };
@@ -65,9 +89,12 @@ function extractPossibleConcept(text: string): string | null {
   const normalized = text.replace(/\s+/g, " ").trim();
 
   const patterns = [
+    /(.+?)\s+is\s+(.+)/i,
+    /(.+?)\s+are\s+(.+)/i,
+    /(.+?)\s+means\s+(.+)/i,
+    // Indonesian fallbacks (kept so mixed input still extracts a concept).
     /(.+?)\s+adalah\s+(.+)/i,
-    /(.+?)\s+merupakan\s+(.+)/i,
-    /(.+?)\s+yaitu\s+(.+)/i
+    /(.+?)\s+merupakan\s+(.+)/i
   ];
 
   for (const pattern of patterns) {
@@ -107,17 +134,64 @@ function extractUnclearTerm(text: string): string | null {
 
 function createMockResponse(
   concept: string | null,
-  unclearTerm: string | null
+  unclearTerm: string | null,
+  turnIndex: number
 ): string {
+  // styleIndex 0/1/2 -> tsundere / kuudere / yandere-lite tone.
+  const styleIndex = Math.abs(turnIndex) % 3;
+
   if (unclearTerm) {
-    return `Aku mulai nangkep sedikit, tapi istilah "${unclearTerm}" itu maksudnya apa ya?`;
+    const templates = styleIndex === 0
+      ? [
+          `Hmm, what does "${unclearTerm}" mean? I have not heard that before.`,
+          `I-it's not like I am super curious, but what does "${unclearTerm}" mean?`,
+          `Hmph, explain "${unclearTerm}" a bit. I do not want to misunderstand it.`
+        ]
+      : styleIndex === 1
+      ? [
+          `The term "${unclearTerm}" is not clear to me yet. What is the definition?`,
+          `I do not have a handle on "${unclearTerm}" yet. Explain it briefly.`,
+          `Where does "${unclearTerm}" fit in? I need the context.`
+        ]
+      : [
+          `Wait, which part is "${unclearTerm}"? I missed it.`,
+          `I need to understand "${unclearTerm}" now. Do not leave that concept blurry for me.`,
+          `"${unclearTerm}" is stuck in my head but not clear yet. Explain it again, okay?`
+        ];
+
+    return templates[turnIndex % templates.length];
   }
 
   if (concept) {
-    return `Jadi sejauh ini aku pahamnya, ${concept} itu bagian penting dari materi ini ya?`;
+    const templates = styleIndex === 0
+      ? [
+          `Ohh, so ${concept} works like that. N-not that I am impressed, but it is starting to click.`,
+          `Hmm, ${concept} is interesting. Do not get smug though, I still want to know why it works.`,
+          `So ${concept} is basically the main idea, right? I am just checking.`
+        ]
+      : styleIndex === 1
+      ? [
+          `Okay. ${concept} is starting to make sense, but the details still need clarification.`,
+          `I understand ${concept} as the core idea from that explanation. There are still gaps.`,
+          `I get the outline of ${concept}. A concrete example would help.`
+        ]
+      : [
+          `I am starting to get ${concept}, but I need the next part so the idea does not slip away.`,
+          `${concept} is landing, but I want to stay with the flow until it is fully clear.`,
+          `So ${concept} is the center of it? Do not move on yet, I need to make sure this is right.`
+        ];
+
+    return templates[turnIndex % templates.length];
   }
 
-  return "Aku mulai paham sedikit, tapi bisa jelasin lagi dengan contoh yang lebih sederhana?";
+  const fallback = [
+    "I am starting to understand a little, but can you explain it again with an easier example?",
+    "I am not ignoring it, okay? I just need a simpler example.",
+    "I caught a little. A simpler example would help.",
+    "I am starting to get it, but do not leave me with this half-clear part."
+  ];
+
+  return fallback[styleIndex];
 }
 
 function cleanupConcept(value: string): string {

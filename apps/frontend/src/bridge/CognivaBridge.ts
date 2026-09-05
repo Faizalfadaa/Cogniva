@@ -7,6 +7,7 @@ export interface CognivaBridge {
   // Home
   listWorkspaces(): Promise<WorkspaceDTO[]>;
   createWorkspace(): Promise<WorkspaceDTO>;
+  deleteWorkspace(workspaceId: string): Promise<void>;
 
   // Workspace meta
   getWorkspace(workspaceId: string): Promise<WorkspaceDTO>;
@@ -15,9 +16,9 @@ export interface CognivaBridge {
     meta: { title?: string; description?: string }
   ): Promise<WorkspaceDTO>;
   uploadWorkspacePdf(workspaceId: string, file: File): Promise<WorkspaceDTO>;
-  // Autosave draft whiteboard selama state Editing - dipanggil berkala (debounced),
-  // terpisah dari submitCheckpoint yang hanya jalan saat tombol Teach ditekan.
-  // thumbnail (opsional) dipakai sebagai preview kecil di card Home.
+  // Autosaves the draft whiteboard during the Editing state - called periodically
+  // (debounced), separate from submitCheckpoint which only runs when the Teach
+  // button is pressed. The (optional) thumbnail is used as a small preview on the Home card.
   saveWhiteboardDraft(
     workspaceId: string,
     payload: { snapshot: unknown; thumbnail?: Blob }
@@ -29,20 +30,23 @@ export interface CognivaBridge {
     payload: {
       snapshotImage: Blob;
       whiteboardSnapshot: unknown;
-      // Rekaman penjelasan user selama editing, di-upload utuh bareng snapshot.
-      // Optional - mic mungkin tidak aktif/diizinkan.
+      // The user's explanation recorded during editing, uploaded whole with the snapshot.
+      // Optional - the mic may be off or not permitted.
       audio?: Blob;
     }
   ): Promise<TeachingCheckpointDTO>;
   getCheckpoints(workspaceId: string): Promise<TeachingCheckpointDTO[]>;
 
-  // Chat (polling - dipanggil berkala oleh caller, bukan subscription)
+  // Chat (polling - called periodically by the caller, not a subscription)
   sendChatMessage(workspaceId: string, content: string): Promise<ChatMessageDTO>;
   getChatMessages(workspaceId: string): Promise<ChatMessageDTO[]>;
 
   // Evaluation
-  // State workspace langsung pindah ke 'Evaluating'; caller poll getWorkspace()
-  // untuk tahu kapan berubah jadi 'Completed' - tidak ada endpoint status terpisah.
+  // The workspace state moves straight to 'Evaluating'; the caller polls getWorkspace()
+  // to learn when it becomes 'Completed' - there's no separate status endpoint.
   finishSession(workspaceId: string): Promise<void>;
   getEvaluationReport(workspaceId: string): Promise<EvaluationReportDTO>;
+
+  // Resume a session from Completed back to Teaching
+  resumeSession(workspaceId: string): Promise<WorkspaceDTO>;
 }

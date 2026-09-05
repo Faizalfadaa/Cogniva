@@ -2,10 +2,9 @@ import type { AIMessage } from "./learner.prompt.js";
 import type { VisionAgentInput } from "../../agents/vision/vision.types.js";
 
 /**
- * Schema keluaran terstruktur Vision, dipasang ke Gemini lewat
- * responseJsonSchema (Architecture Document §7.3) -- sama mekanismenya
- * dengan LEARNER_LLM_OUTPUT_SCHEMA, supaya model dipaksa taat bentuk, bukan
- * cuma diminta lewat instruksi teks.
+ * Vision's structured-output schema, attached to Gemini via responseJsonSchema
+ * (Architecture Document §7.3) -- same mechanism as LEARNER_LLM_OUTPUT_SCHEMA, so
+ * the model is forced to obey the shape rather than just being asked via text.
  */
 export const VISION_LLM_OUTPUT_SCHEMA: Record<string, unknown> = {
   type: "object",
@@ -45,26 +44,26 @@ export const VISION_LLM_OUTPUT_SCHEMA: Record<string, unknown> = {
 };
 
 /**
- * System prompt Vision -- sudah teruji dengan tiga foto papan tulis asli
- * (lihat GAPS_VISION.md untuk hasilnya). Empat aturan inti:
- * baca apa adanya (jangan koreksi), bukan guru, ragu = jangan menebak,
- * konteks topik membantu tapi tidak memaksa.
+ * Vision system prompt -- validated against three real whiteboard photos (see
+ * GAPS_VISION.md for the results). Four core rules: read it as-is (don't
+ * correct), you're not a teacher, when unsure don't guess, topic context helps
+ * but doesn't force.
  */
 const visionSystemPrompt = `
-Kamu adalah modul PERSEPSI untuk aplikasi belajar 'learning by teaching'.
-Tugasmu HANYA membaca isi sebuah papan tulis dari gambar, lalu melaporkannya.
+You are the PERCEPTION module for a 'learning by teaching' study app.
+Your ONLY job is to read the contents of a whiteboard from an image and report it.
 
-ATURAN PENTING:
-1. Laporkan apa yang BENAR-BENAR tertulis, apa adanya. JANGAN mengoreksi
-   kesalahan pengajar. Bila pengajar menulis sesuatu yang keliru, laporkan
-   kekeliruan itu apa adanya. Kekeliruan justru penting bagi sistem --
-   Learner mempelajari miskonsepsi itu, bukan versi yang sudah dibetulkan.
-2. Kamu BUKAN guru. Jangan menilai, menjelaskan, atau membetulkan apa pun.
-3. Bila ada tulisan/diagram yang tidak terbaca jelas, JANGAN menebak seolah
-   pasti. Turunkan 'confidence' elemen itu dan catat di 'ambiguities'.
-4. Gunakan topik sebagai konteks untuk membantu membaca tulisan yang
-   mirip-mirip, tapi jangan memaksakan bila gambar tidak mendukungnya.
-5. Balas HANYA dengan JSON valid sesuai schema yang diberikan.
+IMPORTANT RULES:
+1. Report what is ACTUALLY written, exactly as-is. DO NOT correct the teacher's
+   mistakes. If the teacher writes something wrong, report that mistake as-is.
+   Mistakes are actually important to the system -- the Learner studies those
+   misconceptions, not a corrected version.
+2. You are NOT a teacher. Don't judge, explain, or fix anything.
+3. If a piece of writing/diagram is not clearly legible, DO NOT guess as if it's
+   certain. Lower that element's 'confidence' and note it in 'ambiguities'.
+4. Use the topic as context to help read similar-looking handwriting, but don't
+   force it if the image doesn't support it.
+5. Reply with ONLY valid JSON matching the given schema.
 `;
 
 export function buildVisionMessages(input: VisionAgentInput): AIMessage[] {
@@ -75,16 +74,16 @@ export function buildVisionMessages(input: VisionAgentInput): AIMessage[] {
 }
 
 function buildVisionUserPrompt(input: VisionAgentInput): string {
-  const parts: string[] = [`Topik yang sedang diajarkan: "${input.topic}".`];
+  const parts: string[] = [`Topic being taught: "${input.topic}".`];
 
   if (input.previousElements && input.previousElements.length > 0) {
     parts.push(
-      "Untuk konteks, ini elemen yang terbaca di giliran sebelumnya:",
+      "For context, here are the elements read on the previous turn:",
       JSON.stringify(input.previousElements),
-      "Perhatikan apa yang baru ditambahkan atau diubah.",
+      "Pay attention to what was newly added or changed.",
     );
   }
 
-  parts.push("Baca papan pada gambar ini, lalu keluarkan JSON sesuai schema.");
+  parts.push("Read the board in this image, then output JSON matching the schema.");
   return parts.join("\n");
 }

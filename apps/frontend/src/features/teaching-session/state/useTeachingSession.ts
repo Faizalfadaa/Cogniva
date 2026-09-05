@@ -49,11 +49,14 @@ export function useTeachingSession(
     setMode('locked')
     setPending(true)
 
-    const audioBlob = await audio.stop()
+    // Stop the active recording segment (if any) so the final chunk is committed,
+    // then flush all accumulated chunks since the last checkpoint into one blob.
+    await audio.stop()
+    const audioBlob = audio.flush()
     const { document, image } = await handle.exportSnapshot()
 
     if (!image) {
-      // Kanvas masih kosong - gak ada yang berarti buat dikirim ke Vision, batalkan.
+      // Canvas is still empty - nothing meaningful to send to Vision, so cancel.
       setPending(false)
       setMode('editing')
       audio.start()
@@ -76,6 +79,14 @@ export function useTeachingSession(
     audio.start()
   }, [audio, stopPolling])
 
+  const toggleRecording = useCallback(async () => {
+    if (audio.isRecording) {
+      await audio.stop()
+    } else {
+      await audio.start()
+    }
+  }, [audio])
+
   useEffect(() => stopPolling, [stopPolling])
 
   return {
@@ -86,5 +97,6 @@ export function useTeachingSession(
     micPermissionDenied: audio.permissionDenied,
     teach,
     continueEditing,
+    toggleRecording,
   }
 }
