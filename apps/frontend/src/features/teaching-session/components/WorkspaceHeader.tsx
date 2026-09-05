@@ -21,12 +21,6 @@ interface WorkspaceHeaderProps {
   onUploadPdf: (file: File) => void
   pdfUrl?: string
   uploadingPdf?: boolean
-  /** Chat toggle lives in the header so it never overlaps the whiteboard tools. */
-  learnerAvatarUrl: string
-  learnerName: string
-  chatOpen: boolean
-  chatUnread: number
-  onToggleChat: () => void
 }
 
 /** The backend returns a relative /api path; mock/blobs are already absolute. */
@@ -80,18 +74,13 @@ export function WorkspaceHeader({
   onUploadPdf,
   pdfUrl,
   uploadingPdf = false,
-  learnerAvatarUrl,
-  learnerName,
-  chatOpen,
-  chatUnread,
-  onToggleChat,
 }: WorkspaceHeaderProps) {
   const navigate = useNavigate()
 
   return (
     <header className={styles.header}>
       <div className={styles.headerLeft}>
-        <button className={styles.backBtn} onClick={() => navigate('/')} aria-label="Back to Home">
+        <button className={styles.backBtn} onClick={() => navigate('/home')} aria-label="Back to Home">
           ←
         </button>
 
@@ -124,7 +113,11 @@ export function WorkspaceHeader({
               📄 Reference attached
             </a>
           )}
-          <label style={{ ...pdfBtnStyle, opacity: uploadingPdf ? 0.6 : 1 }} title="Upload reference material (PDF) to ground your evaluation">
+          <label
+            data-tour="pdf-upload"
+            style={{ ...pdfBtnStyle, opacity: uploadingPdf ? 0.6 : 1 }}
+            title="Upload reference material (PDF) to ground your evaluation"
+          >
             {uploadingPdf ? 'Uploading…' : pdfUrl ? 'Replace' : '📎 Reference (PDF)'}
             <input
               type="file"
@@ -144,6 +137,7 @@ export function WorkspaceHeader({
       <div className={styles.headerRight}>
         {!micPermissionDenied && (
           <button
+            data-tour="mic-button"
             className={isRecording ? styles.micBtnActive : styles.micBtnIdle}
             onClick={onToggleRecording}
             aria-label={isRecording ? 'Stop recording' : 'Start recording'}
@@ -155,6 +149,7 @@ export function WorkspaceHeader({
           </button>
         )}
         <button
+          data-tour="finish-button"
           className={styles.finishBtn}
           onClick={onFinishSession}
           disabled={finishingSession || pending}
@@ -162,19 +157,8 @@ export function WorkspaceHeader({
         >
           {finishingSession ? 'Finishing...' : 'Finish Session'}
         </button>
+        {/* Chat now opens from ChatLauncher, floating bottom-right of the canvas. */}
         <TeachButton mode={mode} pending={pending} onTeach={onTeach} onContinueEditing={onContinueEditing} />
-
-        <button
-          className={styles.headerChatBtn}
-          onClick={onToggleChat}
-          aria-label={chatOpen ? 'Close chat' : `Open chat with ${learnerName}`}
-          title={chatOpen ? 'Close chat' : `Chat with ${learnerName}`}
-        >
-          <img src={learnerAvatarUrl} alt={learnerName} className={styles.headerChatAvatar} />
-          {!chatOpen && chatUnread > 0 && (
-            <span className={styles.sidebarBadge}>{chatUnread > 9 ? '9+' : chatUnread}</span>
-          )}
-        </button>
       </div>
     </header>
   )

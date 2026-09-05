@@ -30,6 +30,7 @@ import type { Timeline } from "../../contracts/timeline.js";
 import type { Topic } from "../../contracts/topic.js";
 import type {
   ChatMessage,
+  CheckpointErrorKind,
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
@@ -223,19 +224,29 @@ export async function submitCheckpoint(
   // Run the actual teaching turn in the background; the UI polls getCheckpoints
   // for `learnerResponse` and getChatMessages for the mirrored reply.
   inBackground("teaching turn", async () => {
-    let reply: string;
+    let reply: TurnReply;
     try {
       reply = await runTeachingTurn(ws, {
         image: payload.snapshotImage,
         audio: payload.audio ?? null,
       });
     } catch (err) {
+      // A thrown turn stays untagged: errorKind is for conditions we understand
+      // and can explain, not for "something broke". The client surfaces those
+      // from the failed request itself.
       console.error("[workspace] teaching turn failed:", err);
-      reply = "Hmm, I'm a little confused about this one... could you walk me through it again slowly?";
+      reply = {
+        text: "Hmm, I'm a little confused about this one... could you walk me through it again slowly?",
+      };
     }
     if (!(await stillExists(id))) return;
-    await workspaces.updateCheckpoint(id, checkpoint.id, { learnerResponse: reply });
-    await workspaces.addMessage(id, learnerMessage(reply));
+    await workspaces.updateCheckpoint(id, checkpoint.id, {
+      learnerResponse: reply.text,
+      errorKind: reply.errorKind,
+    });
+    // Still mirrored into chat: the text is written in the student's voice, and
+    // dropping it would leave a silent gap in the conversation history.
+    await workspaces.addMessage(id, learnerMessage(reply.text));
     await bump(id);
   });
 
@@ -374,11 +385,21 @@ const BUDGET_EXCEEDED_REPLY =
   "Waduh, sesi ini sudah mencapai batas token untuk babak ini. " +
   "Yuk akhiri dulu babak ini supaya aku bisa kasih evaluasinya.";
 
+/**
+ * What one teaching turn produced. `text` is always readable prose so a client
+ * that ignores `errorKind` still shows something sensible; `errorKind` marks the
+ * turns that ended in a handled condition rather than a real student reply.
+ */
+interface TurnReply {
+  text: string;
+  errorKind?: CheckpointErrorKind;
+}
+
 /** Run one teaching turn through the orchestrator, never pausing for confirmation. */
 async function runTeachingTurn(
   ws: Workspace,
   input: { image: string; audio: string | null },
-): Promise<string> {
+): Promise<TurnReply> {
   const session = await requireSession(ws);
   const topic = await synthTopic(ws);
 
@@ -396,9 +417,11 @@ async function runTeachingTurn(
   // Only one orchestrator call now (the planner absorbed the retry), so one
   // budget check is enough -- the old second check guarded a retry that no
   // longer exists.
-  if (result.kind === "budget_exceeded") return BUDGET_EXCEEDED_REPLY;
+  if (result.kind === "budget_exceeded") {
+    return { text: BUDGET_EXCEEDED_REPLY, errorKind: "budget_exceeded" };
+  }
 
-  return result.response?.text ?? "Okay... go on, I'm following.";
+  return { text: result.response?.text ?? "Okay... go on, I'm following." };
 }
 
 /** Drive the Learner persona for a free-text chat message (no teaching turn saved). */
