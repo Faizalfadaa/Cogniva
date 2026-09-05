@@ -9,6 +9,7 @@ import { LearnerIntro } from '../../features/teaching-session/components/Learner
 import { ChatSidebar } from '../../features/teaching-session/components/ChatSidebar'
 import { ChatToasts } from '../../features/teaching-session/components/ChatToasts'
 import { ChatLauncher } from '../../features/teaching-session/components/ChatLauncher'
+import { ErrorBanner } from '../../features/teaching-session/components/ErrorBanner'
 import { useTeachingSession } from '../../features/teaching-session/state/useTeachingSession'
 import { useWorkspaceTitleAutosave } from '../../features/teaching-session/hooks/useWorkspaceTitleAutosave'
 import { useIntroSeen } from '../../features/teaching-session/hooks/useIntroSeen'
@@ -96,6 +97,13 @@ export default function WorkspacePage() {
     seedMessages,
   })
 
+  // One banner, two sources. Teaching errors win: the user just pressed Teach
+  // and is waiting on that, whereas a chat poll fails quietly in the background.
+  // Both hooks report `network` identically, so a dropped connection reads the
+  // same whichever noticed it first.
+  const activeError = session.error ?? chat.error
+  const dismissActiveError = session.error ? session.dismissError : chat.dismissError
+
   if (!id || loading) return null
 
   return (
@@ -127,6 +135,10 @@ export default function WorkspacePage() {
             onAutosave={handleAutosave}
             readOnly={session.mode === 'locked'}
           />
+
+          {/* Top-centre: the bottom-right corner already holds the toast stack,
+              the response bubble and the chat launcher. See .errorBanner. */}
+          <ErrorBanner error={activeError} onDismiss={dismissActiveError} />
 
           <LearnerResponseBubble
             learner={learner}

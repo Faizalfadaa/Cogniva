@@ -3,6 +3,8 @@ import type { CognivaBridge } from '../../../bridge/CognivaBridge'
 import type { TeachingCheckpointDTO } from '../../../dto/TeachingCheckpointDTO'
 import type { TimelineDTO } from '../../../dto/TimelineDTO'
 import type { BoardChange } from '../components/whiteboardTypes'
+import type { SessionError } from '../components/errorTypes'
+import { useNetworkStatus } from '../hooks/useNetworkStatus'
 import type { WhiteboardHandle } from '../components/Whiteboard'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
 
@@ -43,6 +45,8 @@ export function useTeachingSession(
   const [mode, setMode] = useState<TeachingMode>('editing')
   const [pending, setPending] = useState(false)
   const [latestCheckpoint, setLatestCheckpoint] = useState<TeachingCheckpointDTO | null>(null)
+  const [error, setError] = useState<SessionError | null>(null)
+  const online = useNetworkStatus()
   const audio = useAudioRecorder()
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -75,6 +79,9 @@ export function useTeachingSession(
 
     setMode('locked')
     setPending(true)
+    // A fresh attempt clears the last complaint; a still-true one comes back
+    // below, and the offline effect re-raises the network case on its own.
+    setError(null)
 
     // Stop the active recording segment (if any) so the final chunk is committed,
     // then flush all accumulated chunks since the last checkpoint into one blob.
@@ -94,14 +101,40 @@ export function useTeachingSession(
       return
     }
 
-    const checkpoint = await bridge.submitCheckpoint(workspaceId, {
-      snapshotImage: image,
-      whiteboardSnapshot: document,
-      audio: audioBlob,
-      timeline,
-    })
-    setLatestCheckpoint(checkpoint)
-    pollForResponse(checkpoint.id)
+    try {
+      const checkpoint = await bridge.submitCheckpoint(workspaceId, {
+        snapshotImage: image,
+        whiteboardSnapshot: document,
+        audio: audioBlob,
+        timeline,
+      })
+      setLatestCheckpoint(checkpoint)
+
+      // Not an exception: the request succeeded, and the backend is telling us
+      // the turn was refused for a reason it understands (§7.3). No point
+      // polling for a reply that will never be written.
+      if (checkpoint.errorKind === 'budget_exceeded') {
+        setError({ kind: 'budget_exceeded' })
+        setPending(false)
+        setMode('editing')
+        return
+      }
+
+      pollForResponse(checkpoint.id)
+    } catch (err) {
+      // The bridge throws a plain Error for a non-2xx response and a TypeError
+      // when fetch never reached anyone; `navigator.onLine` is what separates
+      // "your wifi is off" from "the server is unhappy".
+      console.error('[useTeachingSession] submitCheckpoint failed', err)
+      const detail = err instanceof Error ? err.message : String(err)
+      setError(
+        navigator.onLine ? { kind: 'ai_unavailable', detail } : { kind: 'network' }
+      )
+      // Unlock the board so the work is not trapped behind a failed turn.
+      setPending(false)
+      setMode('editing')
+      audio.start()
+    }
   }, [audio, bridge, workspaceId, whiteboardRef, pollForResponse])
 
   const continueEditing = useCallback(() => {
@@ -111,6 +144,8 @@ export function useTeachingSession(
     audio.start()
   }, [audio, stopPolling])
 
+  const dismissError = useCallback(() => setError(null), [])
+
   const toggleRecording = useCallback(async () => {
     if (audio.isRecording) {
       await audio.stop()
@@ -118,6 +153,17 @@ export function useTeachingSession(
       await audio.start()
     }
   }, [audio])
+
+  // Proactive: raise the moment the connection drops rather than waiting for
+  // the user to press Teach and fail. Clearing is automatic too — a network
+  // banner the user has to dismiss by hand after reconnecting is just noise.
+  useEffect(() => {
+    if (!online) {
+      setError({ kind: 'network' })
+      return
+    }
+    setError((prev) => (prev?.kind === 'network' ? null : prev))
+  }, [online])
 
   useEffect(() => stopPolling, [stopPolling])
 
@@ -130,5 +176,7 @@ export function useTeachingSession(
     teach,
     continueEditing,
     toggleRecording,
+    error,
+    dismissError,
   }
 }
