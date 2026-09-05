@@ -1,0 +1,106 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// User table
+model users {
+  id_user       String @id
+  username      String @unique
+  password_hash String
+  email         String @unique
+  profile_photo String
+
+  workspace workspace[]
+
+  @@map("users")
+}
+
+// Workspace
+model workspace {
+  id_workspace        String @id
+  id_user             String
+  title               String
+  state               String
+  whiteboard_snapshot String
+
+  users        users          @relation(fields: [id_user], references: [id_user], onDelete: Cascade)
+  checkpoint   checkpoint[]
+  chat_message chat_message[]
+  report       report[]
+
+  @@map("workspace")
+}
+
+// Teaching checkpoint
+model checkpoint {
+  id_checkpoint       String @id
+  id_workspace        String
+  snapshot_image      String
+  whiteboard_snapshot String
+  audio_text          String
+
+  workspace workspace @relation(fields: [id_workspace], references: [id_workspace], onDelete: Cascade)
+
+  @@map("checkpoint")
+}
+
+// Chat Message
+model chat_message {
+  id_chat      String @id
+  id_workspace String
+  sender       String
+  content      String
+
+  workspace workspace @relation(fields: [id_workspace], references: [id_workspace], onDelete: Cascade)
+
+  @@map("chat_message")
+}
+
+// Report
+model report {
+  id_report    String @id
+  id_workspace String
+  letter       String
+  reflection   String
+  created_at DateTime @default(now())
+
+  workspace workspace  @relation(fields: [id_workspace], references: [id_workspace], onDelete: Cascade)
+  learned   learned[]
+  confused  confused[]
+
+  @@map("report")
+}
+
+// Learned
+model learned {
+  id_learner String
+  id_report  String
+  content    String
+
+  report report @relation(fields: [id_report], references: [id_report], onDelete: Cascade)
+
+  @@id([id_learner, id_report])
+  @@map("learned")
+}
+
+// Confused
+model confused {
+  id_confused String
+  id_report   String
+  content     String
+
+  report report @relation(fields: [id_report], references: [id_report], onDelete: Cascade)
+
+  @@id([id_confused, id_report])
+  @@map("confused")
+}
