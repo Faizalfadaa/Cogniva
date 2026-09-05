@@ -149,12 +149,18 @@ interface StepArgs {
   audio: string | null | undefined;
   turnIndex: number;
   previousTurn: TeachingTurn | undefined;
+  /**
+   * The previous turn's board image, fetched once at the top of the turn. The
+   * Planner asks "did the board change?" before every step, and that question
+   * must not cost a database read each time it is asked.
+   */
+  previousImage: string | undefined;
   allowConfirmation: boolean;
   ctx: TurnContext;
   /** Every agent call reports its token cost here (§7.3). */
   onUsage: UsageReporter;
   /** Commit this turn's metered tokens onto the session. Call on every exit. */
-  recordUsage: () => void;
+  recordUsage: () => Promise<void>;
 }
 
 export class Orchestrator {
@@ -202,8 +208,8 @@ export class Orchestrator {
     const onUsage: UsageReporter = (usage): void => {
       turnTokens += usage.inputTokens + usage.outputTokens;
     };
-    const recordUsage = (): void => {
-      sessions.addTokenUsage(session.sessionId, turnTokens);
+    const recordUsage = async (): Promise<void> => {
+      await sessions.addTokenUsage(session.sessionId, turnTokens);
     };
 
     const snapshot: BoardSnapshot = {
@@ -214,9 +220,12 @@ export class Orchestrator {
       format: "png",
       capturedAt: utcNowIso(),
     };
-    sessions.saveSnapshot(snapshot);
+    await sessions.saveSnapshot(snapshot);
 
-    const previousTurn = lastTurn(session.sessionId);
+    const previousTurn = await sessions.lastTurn(session.sessionId);
+    const previousImage = previousTurn
+      ? (await sessions.getSnapshot(previousTurn.snapshotId))?.image
+      : undefined;
     const ctx: TurnContext = { interpretation: null, speech: null, completed: [] };
     const trace: PlanTraceEntry[] = [];
     const args: StepArgs = {
@@ -227,6 +236,7 @@ export class Orchestrator {
       audio,
       turnIndex,
       previousTurn,
+      previousImage,
       allowConfirmation,
       ctx,
       onUsage,
@@ -357,14 +367,14 @@ export class Orchestrator {
         // typedText is the board-channel fallback, so it is NOT fed to ASR (that
         // would duplicate the same text into both channels).
         ctx.speech = await this.asr.transcribe(clip, null, topic.title, args.onUsage);
-        sessions.saveTranscript(ctx.speech);
+        await sessions.saveTranscript(ctx.speech);
 
         if (ctx.speech.needsConfirmation && args.allowConfirmation) {
           // Same pause as an unreadable board (§5.3), for the voice channel:
           // handing a probably-wrong transcript to the Learner teaches it the
           // wrong thing. Suppressed when the caller can't show a prompt --
           // the workspace UI passes allowConfirmation: false.
-          args.recordUsage();
+          await args.recordUsage();
           return {
             kind: "confirmation",
             speech: ctx.speech,
@@ -379,7 +389,7 @@ export class Orchestrator {
       case "ask_confirmation":
         // Pause the turn and ask the user to confirm/correct (§5.3). Vision
         // already ran, so its tokens count even though the turn didn't finish.
-        args.recordUsage();
+        await args.recordUsage();
         return {
           kind: "confirmation",
           interpretation: ctx.interpretation ?? undefined,
@@ -415,7 +425,7 @@ export class Orchestrator {
     const speech = ctx.speech;
 
     const state =
-      sessions.getLearnerState(session.sessionId) ??
+      (await sessions.getLearnerState(session.sessionId)) ??
       seedLearnerState(session.sessionId, topic.commonMisconceptions, {
         topicTitle: topic.title,
       });
@@ -430,8 +440,7 @@ export class Orchestrator {
       // No network, so nothing here can fail.
       rereadBoard: (focus) =>
         Promise.resolve(focusInterpretation(interpretation, focus)),
-      recallEarlier: (query) =>
-        Promise.resolve(recallFromTranscript(session.sessionId, query)),
+      recallEarlier: (query) => recallFromTranscript(session.sessionId, query),
     };
 
     const [response, newState] = await this.learner.respond({
@@ -445,9 +454,11 @@ export class Orchestrator {
       onUsage,
     });
 
-    sessions.saveResponse(response);
-    sessions.saveLearnerState(newState);
-    sessions.saveTurn({
+    // The response is written before the turn that references it, so the
+    // transcript never points at a learner response that isn't there yet.
+    await sessions.saveResponse(session.sessionId, response);
+    await sessions.saveLearnerState(newState);
+    await sessions.saveTurn({
       turnIndex,
       sessionId: session.sessionId,
       snapshotId: snapshot.snapshotId,
@@ -459,8 +470,8 @@ export class Orchestrator {
     });
 
     session.turnCount = turnIndex + 1;
-    sessions.saveSession(session);
-    recordUsage();
+    await sessions.saveSession(session);
+    await recordUsage();
 
     return { kind: "learner", interpretation, speech: speech ?? undefined, response };
   }
@@ -476,7 +487,16 @@ export class Orchestrator {
  * Planner schedules work; it has no business holding the answer key.
  */
 function buildSituation(
-  { turnIndex, audio, typedText, previousTurn, allowConfirmation, ctx, snapshot }: StepArgs,
+  {
+    turnIndex,
+    audio,
+    typedText,
+    previousTurn,
+    previousImage,
+    allowConfirmation,
+    ctx,
+    snapshot,
+  }: StepArgs,
   stepsLeft: number,
 ): TurnSituation {
   const hasImage = Boolean(snapshot.image.trim());
@@ -494,6 +514,7 @@ function buildSituation(
       hasImage,
       hasTypedText,
       previousTurn,
+      previousImage,
     }),
     completed: [...ctx.completed],
     boardRead: interpretation !== null,
@@ -519,17 +540,17 @@ function isBoardUnchanged({
   hasImage,
   hasTypedText,
   previousTurn,
+  previousImage,
 }: {
   image: string;
   hasImage: boolean;
   hasTypedText: boolean;
   previousTurn: TeachingTurn | undefined;
+  previousImage: string | undefined;
 }): boolean {
   if (!previousTurn) return false;
   if (hasTypedText) return false; // typed text is new board content by definition
   if (!hasImage) return true; // nothing new arrived on the board channel
-
-  const previousImage = sessions.getSnapshot(previousTurn.snapshotId)?.image;
   if (!previousImage) return false;
   return digest(image) === digest(previousImage);
 }
@@ -581,11 +602,6 @@ function blankInterpretation(snapshotId: string): VisionInterpretation {
   };
 }
 
-function lastTurn(sessionId: string): TeachingTurn | undefined {
-  const turns = sessions.listTurns(sessionId);
-  return turns.length ? turns[turns.length - 1] : undefined;
-}
-
 /** One line per turn: which steps ran, why they were chosen, what they cost (§S8). */
 function logPlan(sessionId: string, turnIndex: number, trace: PlanTraceEntry[]): void {
   const steps = trace.map((t) => `${t.kind}(${t.source},${t.durationMs}ms)`).join(" -> ");
@@ -597,8 +613,8 @@ function logPlan(sessionId: string, turnIndex: number, trace: PlanTraceEntry[]):
  * this session for the one most relevant to its query. Reads only the user's own
  * prior explanations (never the answer key, §1.4).
  */
-function recallFromTranscript(sessionId: string, query: string): string {
-  const turns = sessions.listTurns(sessionId);
+async function recallFromTranscript(sessionId: string, query: string): Promise<string> {
+  const turns = await sessions.listTurns(sessionId);
   if (turns.length === 0) return "(no earlier explanation to recall yet)";
 
   const summarize = (t: (typeof turns)[number]): string =>

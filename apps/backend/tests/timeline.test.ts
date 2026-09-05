@@ -107,8 +107,8 @@ describe("submitCheckpoint storage", () => {
   /** A 1x1 PNG is enough — the teaching turn runs in the background on mocks. */
   const snapshotImage = "iVBORw0KGgo=";
 
-  it("stores the timeline on the checkpoint verbatim", () => {
-    const ws = service.createWorkspace();
+  it("stores the timeline on the checkpoint verbatim", async () => {
+    const ws = await service.createWorkspace();
     const timeline = {
       recordingStartedAt: utcNowIso(),
       events: [
@@ -117,7 +117,7 @@ describe("submitCheckpoint storage", () => {
       ],
     };
 
-    const checkpoint = service.submitCheckpoint(ws.id, {
+    const checkpoint = await service.submitCheckpoint(ws.id, {
       snapshotImage,
       snapshotMime: "image/png",
       whiteboardSnapshot: {},
@@ -126,14 +126,14 @@ describe("submitCheckpoint storage", () => {
 
     expect(checkpoint?.timeline).toEqual(timeline);
     // And it survives a round trip through the store, not just the return value.
-    const stored = service.getCheckpoints(ws.id)?.[0];
+    const stored = (await service.getCheckpoints(ws.id))?.[0];
     expect(stored?.timeline).toEqual(timeline);
   });
 
-  it("stores a checkpoint with no timeline unchanged", () => {
-    const ws = service.createWorkspace();
+  it("stores a checkpoint with no timeline unchanged", async () => {
+    const ws = await service.createWorkspace();
 
-    const checkpoint = service.submitCheckpoint(ws.id, {
+    const checkpoint = await service.submitCheckpoint(ws.id, {
       snapshotImage,
       snapshotMime: "image/png",
       whiteboardSnapshot: {},

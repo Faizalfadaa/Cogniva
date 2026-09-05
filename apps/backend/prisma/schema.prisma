@@ -1,7 +1,15 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// Cogniva persistence (Architecture Document §8).
+//
+// Everything the two former in-memory stores held now lives here:
+//
+//   users / workspace / checkpoint / chat_message / report   — what the UI reads
+//   session / teaching_turn / board_snapshot / ...           — what the agents write
+//
+// Agent payloads (VisionInterpretation, SpeechTranscript, LearnerResponse,
+// LearnerState, EvaluationResult) are stored as Json rather than shredded into
+// columns: nothing queries *inside* them, they are validated by Zod contracts on
+// the way in, and keeping them whole means the contracts stay the single source
+// of truth for their shape.
 
 generator client {
   provider = "prisma-client"
@@ -12,67 +20,214 @@ datasource db {
   provider = "postgresql"
 }
 
-// User table
+// --- Who owns what ---------------------------------------------------------
+
+/// One row per owner. There are no real accounts yet, so the frontend's
+/// per-device `x-client-id` is provisioned as a user on first use (§8 isolation).
 model users {
-  id_user       String @id
-  username      String @unique
+  id_user       String   @id
+  username      String   @unique
   password_hash String
-  email         String @unique
+  email         String   @unique
   profile_photo String
+  created_at    DateTime @default(now())
 
   workspace workspace[]
 
   @@map("users")
 }
 
-// Workspace
-model workspace {
-  id_workspace        String @id
-  id_user             String
-  title               String
-  state               String
-  whiteboard_snapshot String
+// --- Session: what the orchestrator and Evaluator drive --------------------
 
-  users        users          @relation(fields: [id_user], references: [id_user], onDelete: Cascade)
+/// The session backing a workspace (§6.2). Deleting it cascades to the
+/// workspace, so a session is never orphaned from what the UI shows.
+model session {
+  id_session    String    @id
+  topic_id      String
+  status        String
+  created_at    DateTime
+  started_at    DateTime?
+  ended_at      DateTime?
+  turn_count    Int       @default(0)
+  tokens_used   Int       @default(0)
+  /// The latest evaluation; the full history is the `evaluation` rows, by seq.
+  evaluation_id String?
+
+  workspace         workspace?
+  learner_state     learner_state?
+  evaluation        evaluation[]
+  teaching_turn     teaching_turn[]
+  board_snapshot    board_snapshot[]
+  speech_transcript speech_transcript[]
+  learner_response  learner_response[]
+
+  @@map("session")
+}
+
+/// The student's mental model (§6.7), one per session, overwritten each turn.
+model learner_state {
+  id_session String   @id
+  /// LearnerState
+  payload    Json
+  updated_at DateTime @updatedAt
+
+  session session @relation(fields: [id_session], references: [id_session], onDelete: Cascade)
+
+  @@map("learner_state")
+}
+
+/// One per ended round (§4.2). `seq` preserves "oldest first" ordering.
+model evaluation {
+  id_evaluation String   @id
+  id_session    String
+  seq           Int      @unique @default(autoincrement())
+  /// EvaluationResult
+  payload       Json
+  created_at    DateTime @default(now())
+
+  session session @relation(fields: [id_session], references: [id_session], onDelete: Cascade)
+
+  @@index([id_session, seq])
+  @@map("evaluation")
+}
+
+/// The board capture for one turn (§6.3). Kept because the next turn compares
+/// against it to detect an unchanged board.
+model board_snapshot {
+  id_snapshot String   @id
+  id_session  String
+  turn_index  Int
+  image       String
+  format      String
+  captured_at DateTime
+
+  session session @relation(fields: [id_session], references: [id_session], onDelete: Cascade)
+
+  @@index([id_session, turn_index])
+  @@map("board_snapshot")
+}
+
+/// ASR output for one turn (§6.5).
+model speech_transcript {
+  id_segment String @id
+  id_session String
+  /// SpeechTranscript
+  payload    Json
+
+  session session @relation(fields: [id_session], references: [id_session], onDelete: Cascade)
+
+  @@index([id_session])
+  @@map("speech_transcript")
+}
+
+/// The Learner's utterance for one turn (§6.8).
+model learner_response {
+  id_response String @id
+  id_session  String
+  /// LearnerResponse
+  payload     Json
+
+  session session @relation(fields: [id_session], references: [id_session], onDelete: Cascade)
+
+  @@index([id_session])
+  @@map("learner_response")
+}
+
+/// One teaching turn (§6.6); the ordered set of these is the transcript the
+/// Evaluator reads.
+model teaching_turn {
+  id_session String
+  turn_index Int
+  /// TeachingTurn
+  payload    Json
+  created_at DateTime
+
+  session session @relation(fields: [id_session], references: [id_session], onDelete: Cascade)
+
+  @@id([id_session, turn_index])
+  @@map("teaching_turn")
+}
+
+// --- Workspace: what the UI reads back -------------------------------------
+
+model workspace {
+  id_workspace        String   @id
+  id_user             String
+  id_session          String   @unique
+  title               String?
+  description         String?
+  state               String
+  /// Latest autosaved tldraw document (opaque JSON).
+  whiteboard_snapshot Json?
+  /// Small raster preview, as a data URL.
+  thumbnail_url       String?
+  /// The uploaded reference PDF, served back by GET /workspaces/:id/pdf.
+  pdf_data            Bytes?
+  pdf_mime            String?
+  /// Text extracted from that PDF — the Evaluator's answer key (§1.4, §3.7).
+  reference_text      String?
+  /// Chunked (and where possible embedded) form of reference_text, so the index
+  /// survives a restart instead of being rebuilt at evaluation time.
+  reference_index     Json?
+  created_at          DateTime
+  updated_at          DateTime
+
+  users   users   @relation(fields: [id_user], references: [id_user], onDelete: Cascade)
+  session session @relation(fields: [id_session], references: [id_session], onDelete: Cascade)
+
   checkpoint   checkpoint[]
   chat_message chat_message[]
   report       report[]
 
+  @@index([id_user, updated_at])
   @@map("workspace")
 }
 
-// Teaching checkpoint
+/// One teaching checkpoint — produced each time the user presses "Teach".
 model checkpoint {
-  id_checkpoint       String @id
+  id_checkpoint       String   @id
   id_workspace        String
-  snapshot_image      String
-  whiteboard_snapshot String
-  audio_text          String
+  seq                 Int      @unique @default(autoincrement())
+  /// The board snapshot sent to Vision, as a data URL.
+  snapshot_image_url  String
+  whiteboard_snapshot Json?
+  /// The spoken explanation, as a data URL.
+  audio_url           String?
+  /// Filled in when the background teaching turn finishes.
+  learner_response    String?
+  /// Board-change timeline (Phase 1: stored only).
+  timeline            Json?
+  created_at          DateTime
 
   workspace workspace @relation(fields: [id_workspace], references: [id_workspace], onDelete: Cascade)
 
+  @@index([id_workspace, seq])
   @@map("checkpoint")
 }
 
-// Chat Message
 model chat_message {
-  id_chat      String @id
+  id_chat      String   @id
   id_workspace String
+  seq          Int      @unique @default(autoincrement())
   sender       String
   content      String
+  created_at   DateTime
 
   workspace workspace @relation(fields: [id_workspace], references: [id_workspace], onDelete: Cascade)
 
+  @@index([id_workspace, seq])
   @@map("chat_message")
 }
 
-// Report
+/// The debrief the Evaluation screen renders. One per workspace: finishing a
+/// later round replaces it, matching what the old store did.
 model report {
-  id_report    String @id
-  id_workspace String
-  letter       String
-  reflection   String
-  created_at DateTime @default(now())
+  id_report         String   @id
+  id_workspace      String   @unique
+  letter            String
+  reflection        String
+  continue_learning String[]
+  created_at        DateTime @default(now())
 
   workspace workspace  @relation(fields: [id_workspace], references: [id_workspace], onDelete: Cascade)
   learned   learned[]
@@ -81,26 +236,26 @@ model report {
   @@map("report")
 }
 
-// Learned
 model learned {
-  id_learner String
+  id_learned String @id
   id_report  String
+  seq        Int
   content    String
 
   report report @relation(fields: [id_report], references: [id_report], onDelete: Cascade)
 
-  @@id([id_learner, id_report])
+  @@index([id_report, seq])
   @@map("learned")
 }
 
-// Confused
 model confused {
-  id_confused String
+  id_confused String @id
   id_report   String
+  seq         Int
   content     String
 
   report report @relation(fields: [id_report], references: [id_report], onDelete: Cascade)
 
-  @@id([id_confused, id_report])
+  @@index([id_report, seq])
   @@map("confused")
 }

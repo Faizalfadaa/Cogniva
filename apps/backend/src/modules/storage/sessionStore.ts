@@ -1,11 +1,11 @@
 /**
- * In-memory storage for the M1 skeleton (Architecture Document §8 placeholder).
+ * The session store singleton, plus the in-memory double the tests use.
  *
- * The persistent storage model (SQLite + object store) comes in a later
- * milestone. For M1 an in-memory store holds the session, its teaching turns
- * (the transcript), board snapshots, speech transcripts, learner responses, and
- * the per-session LearnerState — everything one full teaching turn produces and
- * the Evaluator (M3) will later read.
+ * Storage is Postgres (src/database/stores/prismaSessionStore.ts). The Map-based
+ * implementation below is NOT a production path: it exists so `npm test` runs
+ * without a database, and is selected only by an explicit COGNIVA_STORE=memory
+ * (vitest sets it). Anything else gets Postgres, and a missing DATABASE_URL then
+ * fails loudly at boot rather than silently losing data.
  */
 
 import { randomUUID } from "node:crypto";
@@ -16,14 +16,19 @@ import type { LearnerResponse, LearnerState } from "../../contracts/learner.js";
 import type { Session } from "../../contracts/session.js";
 import type { SpeechTranscript } from "../../contracts/speech.js";
 import type { TeachingTurn } from "../../contracts/teaching.js";
+import { PrismaSessionStore } from "../../database/stores/prismaSessionStore.js";
+import { usingMemoryStore } from "./mode.js";
+import type { SessionStore, TurnWithResponse } from "./types.js";
+
+export type { SessionStore, TurnWithResponse } from "./types.js";
 
 /** Generate a short prefixed id, e.g. "ses_1a2b3c4d". */
 export function newId(prefix: string): string {
   return `${prefix}_${randomUUID().replace(/-/g, "").slice(0, 8)}`;
 }
 
-/** In-memory store for sessions and everything a turn produces (§8 placeholder). */
-export class SessionStore {
+/** Test double: the same contract, held in Maps. See the file header. */
+export class MemorySessionStore implements SessionStore {
   private sessions = new Map<string, Session>();
   private evaluationsById = new Map<string, EvaluationResult>();
   private evaluationIdsBySession = new Map<string, string[]>();
@@ -35,115 +40,131 @@ export class SessionStore {
 
   // --- Session ----------------------------------------------------------
 
-  saveSession(session: Session): Session {
+  async saveSession(session: Session): Promise<Session> {
     this.sessions.set(session.sessionId, session);
     return session;
   }
 
-  getSession(sessionId: string): Session | undefined {
+  async getSession(sessionId: string): Promise<Session | undefined> {
     return this.sessions.get(sessionId);
   }
 
-  /**
-   * Add one turn's token spend to the session's running total. A missing
-   * session is a no-op on purpose: usage accounting must never be the thing
-   * that breaks a turn (§7.3).
-   */
-  addTokenUsage(sessionId: string, tokens: number): void {
+  async addTokenUsage(sessionId: string, tokens: number): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) return;
     session.tokensUsed += tokens;
-    this.saveSession(session);
+    await this.saveSession(session);
   }
 
-  deleteSession(sessionId: string): void {
+  async deleteSession(sessionId: string): Promise<void> {
     this.sessions.delete(sessionId);
-    const evalIds = this.evaluationIdsBySession.get(sessionId) ?? [];
-    for (const evalId of evalIds) this.evaluationsById.delete(evalId);
+    for (const evalId of this.evaluationIdsBySession.get(sessionId) ?? []) {
+      this.evaluationsById.delete(evalId);
+    }
     this.evaluationIdsBySession.delete(sessionId);
     this.learnerStates.delete(sessionId);
+    for (const turn of this.turns.get(sessionId) ?? []) {
+      this.snapshots.delete(turn.snapshotId);
+      this.responses.delete(turn.learnerResponseId);
+    }
     this.turns.delete(sessionId);
+    for (const [id, transcript] of this.transcripts) {
+      if (transcript.sessionId === sessionId) this.transcripts.delete(id);
+    }
   }
 
-  // --- Evaluation (history: one per ended round, oldest first) ----------
+  // --- Evaluations ------------------------------------------------------
 
-  saveEvaluation(result: EvaluationResult): EvaluationResult {
+  async saveEvaluation(result: EvaluationResult): Promise<EvaluationResult> {
     this.evaluationsById.set(result.evaluationId, result);
     const ids = this.evaluationIdsBySession.get(result.sessionId) ?? [];
-    ids.push(result.evaluationId);
+    if (!ids.includes(result.evaluationId)) ids.push(result.evaluationId);
     this.evaluationIdsBySession.set(result.sessionId, ids);
     return result;
   }
 
-  getEvaluationById(evaluationId: string): EvaluationResult | undefined {
+  async getEvaluationById(evaluationId: string): Promise<EvaluationResult | undefined> {
     return this.evaluationsById.get(evaluationId);
   }
 
-  /** Full evaluation history for a session, oldest first. */
-  listEvaluations(sessionId: string): EvaluationResult[] {
-    const ids = this.evaluationIdsBySession.get(sessionId) ?? [];
-    return ids
+  async listEvaluations(sessionId: string): Promise<EvaluationResult[]> {
+    return (this.evaluationIdsBySession.get(sessionId) ?? [])
       .map((id) => this.evaluationsById.get(id))
       .filter((e): e is EvaluationResult => Boolean(e));
   }
 
-  /** The most recent evaluation for a session (latest round), if any. */
-  getLatestEvaluation(sessionId: string): EvaluationResult | undefined {
+  async getLatestEvaluation(sessionId: string): Promise<EvaluationResult | undefined> {
     const ids = this.evaluationIdsBySession.get(sessionId);
     return ids?.length ? this.evaluationsById.get(ids[ids.length - 1]) : undefined;
   }
 
   // --- Board snapshots --------------------------------------------------
 
-  saveSnapshot(snapshot: BoardSnapshot): BoardSnapshot {
+  async saveSnapshot(snapshot: BoardSnapshot): Promise<BoardSnapshot> {
     this.snapshots.set(snapshot.snapshotId, snapshot);
     return snapshot;
   }
 
-  getSnapshot(snapshotId: string): BoardSnapshot | undefined {
+  async getSnapshot(snapshotId: string): Promise<BoardSnapshot | undefined> {
     return this.snapshots.get(snapshotId);
   }
 
-  // --- Speech transcripts ----------------------------------------------
+  // --- Speech transcripts -----------------------------------------------
 
-  saveTranscript(transcript: SpeechTranscript): SpeechTranscript {
+  async saveTranscript(transcript: SpeechTranscript): Promise<SpeechTranscript> {
     this.transcripts.set(transcript.segmentId, transcript);
     return transcript;
   }
 
-  // --- Learner responses & state ---------------------------------------
+  // --- Learner responses & state ----------------------------------------
 
-  saveResponse(response: LearnerResponse): LearnerResponse {
+  async saveResponse(_sessionId: string, response: LearnerResponse): Promise<LearnerResponse> {
     this.responses.set(response.responseId, response);
     return response;
   }
 
-  getResponse(responseId: string): LearnerResponse | undefined {
+  async getResponse(responseId: string): Promise<LearnerResponse | undefined> {
     return this.responses.get(responseId);
   }
 
-  saveLearnerState(state: LearnerState): LearnerState {
+  async saveLearnerState(state: LearnerState): Promise<LearnerState> {
     this.learnerStates.set(state.sessionId, state);
     return state;
   }
 
-  getLearnerState(sessionId: string): LearnerState | undefined {
+  async getLearnerState(sessionId: string): Promise<LearnerState | undefined> {
     return this.learnerStates.get(sessionId);
   }
 
-  // --- Teaching turns (the transcript) ----------------------------------
+  // --- Teaching turns ---------------------------------------------------
 
-  saveTurn(turn: TeachingTurn): TeachingTurn {
+  async saveTurn(turn: TeachingTurn): Promise<TeachingTurn> {
     const list = this.turns.get(turn.sessionId) ?? [];
-    list.push(turn);
+    const existing = list.findIndex((t) => t.turnIndex === turn.turnIndex);
+    if (existing === -1) list.push(turn);
+    else list[existing] = turn;
     this.turns.set(turn.sessionId, list);
     return turn;
   }
 
-  listTurns(sessionId: string): TeachingTurn[] {
+  async listTurns(sessionId: string): Promise<TeachingTurn[]> {
     return [...(this.turns.get(sessionId) ?? [])];
+  }
+
+  async lastTurn(sessionId: string): Promise<TeachingTurn | undefined> {
+    const list = this.turns.get(sessionId) ?? [];
+    return list.length ? list[list.length - 1] : undefined;
+  }
+
+  async listTurnsWithResponses(sessionId: string): Promise<TurnWithResponse[]> {
+    return (this.turns.get(sessionId) ?? []).map((turn) => ({
+      turn,
+      response: this.responses.get(turn.learnerResponseId),
+    }));
   }
 }
 
-/** Singleton store for the skeleton. */
-export const sessions = new SessionStore();
+/** The store the whole backend writes through. */
+export const sessions: SessionStore = usingMemoryStore()
+  ? new MemorySessionStore()
+  : new PrismaSessionStore();

@@ -116,7 +116,7 @@ class FixedPlanner implements Planner {
   }
 }
 
-function newSession(): Session {
+function newSession(): Promise<Session> {
   return sessions.saveSession({
     sessionId: newId("ses"),
     topicId: "topic_photosynthesis",
@@ -243,7 +243,7 @@ describe("planner guard", () => {
 
 describe("orchestrator as planner-driven supervisor", () => {
   it("skips the Vision call when the same board comes back", async () => {
-    const session = newSession();
+    const session = await newSession();
     const vision = new VisionAgent({ confidenceThreshold: 0.6 });
     const interpret = vi.spyOn(vision, "interpret");
     const orch = new Orchestrator({ learner: new FakeLearner(), vision });
@@ -278,14 +278,14 @@ describe("orchestrator as planner-driven supervisor", () => {
       asr,
     });
 
-    const silent = await orch.runTeachingTurn(newSession(), topic(), {
+    const silent = await orch.runTeachingTurn(await newSession(), topic(), {
       image: "board",
       typedText: null,
     });
     expect(asr.calls).toBe(0);
     expect(silent.plan?.map((s) => s.kind)).toEqual(["read_board", "ask_learner"]);
 
-    const spoken = await orch.runTeachingTurn(newSession(), topic(), {
+    const spoken = await orch.runTeachingTurn(await newSession(), topic(), {
       image: "board",
       audio: "clip",
       typedText: null,
@@ -303,7 +303,7 @@ describe("orchestrator as planner-driven supervisor", () => {
     const vision = new UnsureVision();
     const orch = new Orchestrator({ learner: new FakeLearner(), vision });
 
-    const result = await orch.runTeachingTurn(newSession(), topic(), {
+    const result = await orch.runTeachingTurn(await newSession(), topic(), {
       image: "smudged-board",
       typedText: null,
       allowConfirmation: false,
@@ -324,7 +324,7 @@ describe("orchestrator as planner-driven supervisor", () => {
   it("still pauses for confirmation when the caller can act on it", async () => {
     const orch = new Orchestrator({ learner: new FakeLearner(), vision: new UnsureVision() });
 
-    const result = await orch.runTeachingTurn(newSession(), topic(), {
+    const result = await orch.runTeachingTurn(await newSession(), topic(), {
       image: "smudged-board",
       typedText: null,
     });
@@ -356,7 +356,7 @@ describe("orchestrator as planner-driven supervisor", () => {
       planner,
     });
 
-    const result = await orch.runTeachingTurn(newSession(), topic(), {
+    const result = await orch.runTeachingTurn(await newSession(), topic(), {
       image: "board",
       audio: "clip",
       typedText: null,
@@ -377,7 +377,7 @@ describe("orchestrator as planner-driven supervisor", () => {
     const vision = new VisionAgent({ confidenceThreshold: 0.6 });
     const orch = new Orchestrator({ learner: new FakeLearner(), vision, planner });
 
-    const result = await orch.runTeachingTurn(newSession(), topic(), {
+    const result = await orch.runTeachingTurn(await newSession(), topic(), {
       image: "board",
       typedText: null,
     });
@@ -395,7 +395,7 @@ describe("orchestrator as planner-driven supervisor", () => {
       vision: new VisionAgent({ confidenceThreshold: 0.6 }),
     });
 
-    const result = await orch.runTeachingTurn(newSession(), topic(), {
+    const result = await orch.runTeachingTurn(await newSession(), topic(), {
       image: "board",
       audio: "clip",
       typedText: null,

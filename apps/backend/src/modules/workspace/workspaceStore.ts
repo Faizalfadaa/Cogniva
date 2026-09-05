@@ -1,10 +1,9 @@
 /**
- * In-memory store for workspaces and everything the UI reads back (§8 placeholder).
+ * The workspace store singleton, plus the in-memory double the tests use.
  *
- * Mirrors the lightweight, restart-volatile approach of the session store. Each
- * workspace links to an underlying Session (held in the session store) via
- * `sessionId`, so the teaching turns and evaluations live in one place and the
- * Evaluator reads them unchanged.
+ * Storage is Postgres (src/database/stores/prismaWorkspaceStore.ts); see the
+ * header of ../storage/sessionStore.ts for why a Map-based implementation still
+ * lives alongside it.
  */
 
 import { randomUUID } from "node:crypto";
@@ -15,15 +14,20 @@ import type {
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
+import { PrismaWorkspaceStore } from "../../database/stores/prismaWorkspaceStore.js";
 import type { ReferenceIndex } from "../retrieval/index.js";
+import { usingMemoryStore } from "../storage/mode.js";
+import type { StoredBlob, WorkspaceStore } from "../storage/types.js";
 
-/** A stored binary blob (PDF) we serve back through a GET endpoint. */
-export interface StoredBlob {
-  data: Buffer;
-  mime: string;
+export type { StoredBlob, WorkspaceStore } from "../storage/types.js";
+
+/** Generate a workspace id, e.g. "ws_1a2b3c4d". */
+export function newWorkspaceId(): string {
+  return `ws_${randomUUID().replace(/-/g, "").slice(0, 8)}`;
 }
 
-export class WorkspaceStore {
+/** Test double: the same contract, held in Maps. See the file header. */
+export class MemoryWorkspaceStore implements WorkspaceStore {
   private workspaces = new Map<string, Workspace>();
   private sessionIdByWorkspace = new Map<string, string>();
   private checkpoints = new Map<string, TeachingCheckpoint[]>();
@@ -31,43 +35,38 @@ export class WorkspaceStore {
   private reports = new Map<string, EvaluationReport>();
   private pdfs = new Map<string, StoredBlob>();
   private references = new Map<string, string>();
-  /** Chunked + embedded reference, built once per upload and searched at
-   * evaluation time (§3.7 retrieval). Volatile like everything else here. */
   private referenceIndexes = new Map<string, ReferenceIndex>();
-  // Per-device ownership: which client (x-client-id) created each workspace, so
-  // one device only ever sees/touches its own. There's no user accounts in the
-  // skeleton — a device id stands in for "who". (§8 placeholder isolation.)
   private owners = new Map<string, string>();
 
   // --- Workspaces -------------------------------------------------------
 
-  save(workspace: Workspace): Workspace {
+  async create(workspace: Workspace, ownerId: string, sessionId: string): Promise<Workspace> {
+    this.owners.set(workspace.id, ownerId);
+    this.sessionIdByWorkspace.set(workspace.id, sessionId);
     this.workspaces.set(workspace.id, workspace);
     return workspace;
   }
 
-  get(id: string): Workspace | undefined {
+  async save(workspace: Workspace): Promise<Workspace> {
+    this.workspaces.set(workspace.id, workspace);
+    return workspace;
+  }
+
+  async get(id: string): Promise<Workspace | undefined> {
     return this.workspaces.get(id);
   }
 
-  /** Record the owning device for a workspace (called once, at creation). */
-  setOwner(id: string, ownerId: string): void {
-    this.owners.set(id, ownerId);
-  }
-
-  /** True when `ownerId` owns an existing workspace `id`. */
-  isOwner(id: string, ownerId: string): boolean {
+  async isOwner(id: string, ownerId: string): Promise<boolean> {
     return this.workspaces.has(id) && this.owners.get(id) === ownerId;
   }
 
-  /** This device's workspaces, most-recently-updated first (Home grid order). */
-  list(ownerId: string): Workspace[] {
+  async list(ownerId: string): Promise<Workspace[]> {
     return [...this.workspaces.values()]
       .filter((w) => this.owners.get(w.id) === ownerId)
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }
 
-  delete(id: string): void {
+  async delete(id: string): Promise<void> {
     this.workspaces.delete(id);
     this.sessionIdByWorkspace.delete(id);
     this.checkpoints.delete(id);
@@ -79,34 +78,31 @@ export class WorkspaceStore {
     this.owners.delete(id);
   }
 
-  // --- Workspace -> Session link ----------------------------------------
-
-  linkSession(workspaceId: string, sessionId: string): void {
-    this.sessionIdByWorkspace.set(workspaceId, sessionId);
-  }
-
-  sessionId(workspaceId: string): string | undefined {
+  async sessionId(workspaceId: string): Promise<string | undefined> {
     return this.sessionIdByWorkspace.get(workspaceId);
   }
 
   // --- Checkpoints ------------------------------------------------------
 
-  addCheckpoint(workspaceId: string, checkpoint: TeachingCheckpoint): TeachingCheckpoint {
+  async addCheckpoint(
+    workspaceId: string,
+    checkpoint: TeachingCheckpoint,
+  ): Promise<TeachingCheckpoint> {
     const list = this.checkpoints.get(workspaceId) ?? [];
     list.push(checkpoint);
     this.checkpoints.set(workspaceId, list);
     return checkpoint;
   }
 
-  listCheckpoints(workspaceId: string): TeachingCheckpoint[] {
+  async listCheckpoints(workspaceId: string): Promise<TeachingCheckpoint[]> {
     return [...(this.checkpoints.get(workspaceId) ?? [])];
   }
 
-  updateCheckpoint(
+  async updateCheckpoint(
     workspaceId: string,
     checkpointId: string,
     patch: Partial<TeachingCheckpoint>,
-  ): void {
+  ): Promise<void> {
     const list = this.checkpoints.get(workspaceId);
     if (!list) return;
     const idx = list.findIndex((c) => c.id === checkpointId);
@@ -115,64 +111,60 @@ export class WorkspaceStore {
 
   // --- Chat messages ----------------------------------------------------
 
-  addMessage(workspaceId: string, message: ChatMessage): ChatMessage {
+  async addMessage(workspaceId: string, message: ChatMessage): Promise<ChatMessage> {
     const list = this.messages.get(workspaceId) ?? [];
     list.push(message);
     this.messages.set(workspaceId, list);
     return message;
   }
 
-  listMessages(workspaceId: string): ChatMessage[] {
+  async listMessages(workspaceId: string): Promise<ChatMessage[]> {
     return [...(this.messages.get(workspaceId) ?? [])];
   }
 
   // --- Evaluation report ------------------------------------------------
 
-  saveReport(workspaceId: string, report: EvaluationReport): EvaluationReport {
+  async saveReport(workspaceId: string, report: EvaluationReport): Promise<EvaluationReport> {
     this.reports.set(workspaceId, report);
     return report;
   }
 
-  getReport(workspaceId: string): EvaluationReport | undefined {
+  async getReport(workspaceId: string): Promise<EvaluationReport | undefined> {
     return this.reports.get(workspaceId);
   }
 
-  // --- PDF blobs --------------------------------------------------------
+  // --- PDF blob ---------------------------------------------------------
 
-  savePdf(workspaceId: string, blob: StoredBlob): void {
+  async savePdf(workspaceId: string, blob: StoredBlob): Promise<void> {
     this.pdfs.set(workspaceId, blob);
   }
 
-  getPdf(workspaceId: string): StoredBlob | undefined {
+  async getPdf(workspaceId: string): Promise<StoredBlob | undefined> {
     return this.pdfs.get(workspaceId);
   }
 
-  // --- Reference material (text extracted from the uploaded PDF) ---------
-  // Read only by the Evaluator as the answer key (§1.4); never by the Learner.
+  // --- Reference material -----------------------------------------------
 
-  saveReference(workspaceId: string, text: string): void {
+  async saveReference(workspaceId: string, text: string): Promise<void> {
     this.references.set(workspaceId, text);
   }
 
-  getReference(workspaceId: string): string | undefined {
+  async getReference(workspaceId: string): Promise<string | undefined> {
     return this.references.get(workspaceId);
   }
 
-  // --- Reference index (chunked/embedded reference, §3.7 retrieval) -------
+  // --- Reference index --------------------------------------------------
 
-  saveReferenceIndex(workspaceId: string, index: ReferenceIndex): void {
+  async saveReferenceIndex(workspaceId: string, index: ReferenceIndex): Promise<void> {
     this.referenceIndexes.set(workspaceId, index);
   }
 
-  getReferenceIndex(workspaceId: string): ReferenceIndex | undefined {
+  async getReferenceIndex(workspaceId: string): Promise<ReferenceIndex | undefined> {
     return this.referenceIndexes.get(workspaceId);
   }
 }
 
-/** Generate a workspace id, e.g. "ws_1a2b3c4d". */
-export function newWorkspaceId(): string {
-  return `ws_${randomUUID().replace(/-/g, "").slice(0, 8)}`;
-}
-
-/** Singleton store for the skeleton. */
-export const workspaces = new WorkspaceStore();
+/** The store the whole backend writes through. */
+export const workspaces: WorkspaceStore = usingMemoryStore()
+  ? new MemoryWorkspaceStore()
+  : new PrismaWorkspaceStore();

@@ -29,7 +29,7 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     const id = (req.params as { id?: string })?.id;
     if (!id) return; // /workspaces collection
     if (req.method === "GET" && req.url.split("?")[0].endsWith("/pdf")) return;
-    if (!service.isOwner(id, clientOf(req))) return notFound(reply);
+    if (!(await service.isOwner(id, clientOf(req)))) return notFound(reply);
   });
 
   // --- Home ---------------------------------------------------------------
@@ -44,19 +44,19 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
   // --- Workspace meta -----------------------------------------------------
 
   app.get("/workspaces/:id", async (req, reply) => {
-    const ws = service.getWorkspace(idOf(req.params));
+    const ws = await service.getWorkspace(idOf(req.params));
     return ws ?? notFound(reply);
   });
 
   app.patch("/workspaces/:id", async (req, reply) => {
     const parsed = updateMetaSchema.safeParse(req.body);
     if (!parsed.success) return badRequest(reply, "Invalid meta payload");
-    const ws = service.updateMeta(idOf(req.params), parsed.data);
+    const ws = await service.updateMeta(idOf(req.params), parsed.data);
     return ws ?? notFound(reply);
   });
 
   app.delete("/workspaces/:id", async (req, reply) => {
-    const ok = service.deleteWorkspace(idOf(req.params));
+    const ok = await service.deleteWorkspace(idOf(req.params));
     if (!ok) return notFound(reply);
     return reply.code(204).send();
   });
@@ -64,7 +64,7 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
   app.put("/workspaces/:id/draft", async (req, reply) => {
     const parsed = saveDraftSchema.safeParse(req.body);
     if (!parsed.success) return badRequest(reply, "Invalid draft payload");
-    const ws = service.saveDraft(idOf(req.params), parsed.data);
+    const ws = await service.saveDraft(idOf(req.params), parsed.data);
     return ws ?? notFound(reply);
   });
 
@@ -80,7 +80,7 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/workspaces/:id/pdf", async (req, reply) => {
-    const blob = workspaces.getPdf(idOf(req.params));
+    const blob = await workspaces.getPdf(idOf(req.params));
     if (!blob) return notFound(reply);
     return reply.type(blob.mime).send(blob.data);
   });
@@ -90,14 +90,14 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
   app.post("/workspaces/:id/checkpoints", async (req, reply) => {
     const parsed = submitCheckpointSchema.safeParse(req.body);
     if (!parsed.success) return badRequest(reply, "Invalid checkpoint payload");
-    const checkpoint = service.submitCheckpoint(idOf(req.params), parsed.data);
+    const checkpoint = await service.submitCheckpoint(idOf(req.params), parsed.data);
     if (!checkpoint) return notFound(reply);
     reply.code(201);
     return checkpoint;
   });
 
   app.get("/workspaces/:id/checkpoints", async (req, reply) => {
-    const list = service.getCheckpoints(idOf(req.params));
+    const list = await service.getCheckpoints(idOf(req.params));
     return list ?? notFound(reply);
   });
 
@@ -106,35 +106,35 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
   app.post("/workspaces/:id/messages", async (req, reply) => {
     const parsed = sendMessageSchema.safeParse(req.body);
     if (!parsed.success) return badRequest(reply, "Message content is required");
-    const message = service.sendChatMessage(idOf(req.params), parsed.data.content);
+    const message = await service.sendChatMessage(idOf(req.params), parsed.data.content);
     if (!message) return notFound(reply);
     reply.code(201);
     return message;
   });
 
   app.get("/workspaces/:id/messages", async (req, reply) => {
-    const list = service.getChatMessages(idOf(req.params));
+    const list = await service.getChatMessages(idOf(req.params));
     return list ?? notFound(reply);
   });
 
   // --- Evaluation ---------------------------------------------------------
 
   app.post("/workspaces/:id/finish", async (req, reply) => {
-    const ok = service.finishSession(idOf(req.params));
+    const ok = await service.finishSession(idOf(req.params));
     if (!ok) return notFound(reply);
     return reply.code(204).send();
   });
 
   app.get("/workspaces/:id/report", async (req, reply) => {
-    if (!service.getWorkspace(idOf(req.params))) return notFound(reply);
-    const report = service.getReport(idOf(req.params));
+    if (!(await service.getWorkspace(idOf(req.params)))) return notFound(reply);
+    const report = await service.getReport(idOf(req.params));
     if (!report) return reply.code(404).send({ detail: "Report not ready yet" });
     return report;
   });
 
   // Resume a finished workspace back into teaching (§4.2, §5.4).
   app.post("/workspaces/:id/resume", async (req, reply) => {
-    const ws = service.resumeSession(idOf(req.params));
+    const ws = await service.resumeSession(idOf(req.params));
     return ws ?? notFound(reply);
   });
 }

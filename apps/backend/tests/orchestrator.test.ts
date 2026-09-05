@@ -40,7 +40,7 @@ class FakeLearner implements Learner {
   }
 }
 
-function newSession(): Session {
+async function newSession(): Promise<Session> {
   const session: Session = {
     sessionId: newId("ses"),
     topicId: "topic_photosynthesis",
@@ -62,7 +62,7 @@ function orchestrator(): Orchestrator {
 
 describe("orchestrator", () => {
   it("runs a full turn, persists it, and advances the counter", async () => {
-    const session = newSession();
+    const session = await newSession();
     const topic = topics.get("topic_photosynthesis")!;
     const orch = orchestrator();
 
@@ -77,15 +77,15 @@ describe("orchestrator", () => {
 
     // Turn was persisted and the counter advanced.
     expect(session.turnCount).toBe(1);
-    const turns = sessions.listTurns(session.sessionId);
+    const turns = await sessions.listTurns(session.sessionId);
     expect(turns).toHaveLength(1);
     expect(turns[0].learnerResponseId).toBe(result.response!.responseId);
-    expect(sessions.getResponse(result.response!.responseId)).toBeDefined();
-    expect(sessions.getLearnerState(session.sessionId)).toBeDefined();
+    expect(await sessions.getResponse(result.response!.responseId)).toBeDefined();
+    expect(await sessions.getLearnerState(session.sessionId)).toBeDefined();
   });
 
   it("proceeds to the learner on an image-only turn (M2: Vision can read it now)", async () => {
-    const session = newSession();
+    const session = await newSession();
     const topic = topics.get("topic_photosynthesis")!;
     const orch = orchestrator();
 
@@ -101,7 +101,7 @@ describe("orchestrator", () => {
   });
 
   it("lets the Learner use the reread_board tool mid-turn (agentic loop)", async () => {
-    const session = newSession();
+    const session = await newSession();
     const topic = topics.get("topic_photosynthesis")!;
     const vision = new VisionAgent({ confidenceThreshold: 0.6 });
     const interpret = vi.spyOn(vision, "interpret");
@@ -122,7 +122,7 @@ describe("orchestrator", () => {
   });
 
   it("requests confirmation when there is neither image nor typed text", async () => {
-    const session = newSession();
+    const session = await newSession();
     const topic = topics.get("topic_photosynthesis")!;
     const orch = orchestrator();
 
@@ -138,11 +138,11 @@ describe("orchestrator", () => {
     expect(result.source).toBe("board");
     // No learner turn ran, so the counter did not advance.
     expect(session.turnCount).toBe(0);
-    expect(sessions.listTurns(session.sessionId)).toEqual([]);
+    expect(await sessions.listTurns(session.sessionId)).toEqual([]);
   });
 
   it("also pauses when only the voice channel is uncertain", async () => {
-    const session = newSession();
+    const session = await newSession();
     const topic = topics.get("topic_photosynthesis")!;
     // The board is fine (typed text reads at full confidence), so any pause
     // here has to come from ASR — proving the voice channel can stop a turn
@@ -177,13 +177,13 @@ describe("orchestrator", () => {
     expect(result.suggestedClarification).toBe("Bisa diulang lebih jelas?");
     // The Learner never ran, so the counter did not advance.
     expect(session.turnCount).toBe(0);
-    expect(sessions.listTurns(session.sessionId)).toEqual([]);
+    expect(await sessions.listTurns(session.sessionId)).toEqual([]);
   });
 });
 
 describe("orchestrator board continuity", () => {
   it("passes the previous turn's elements into the next turn's board reading", async () => {
-    const session = newSession();
+    const session = await newSession();
     const topic = topics.get("topic_photosynthesis")!;
     const vision = new VisionAgent({ confidenceThreshold: 0.6 });
     const interpret = vi.spyOn(vision, "interpret");
@@ -237,7 +237,7 @@ describe("orchestrator token budget", () => {
   }
 
   it("adds each agent's reported tokens to the session total", async () => {
-    const session = newSession();
+    const session = await newSession();
     const topic = topics.get("topic_photosynthesis")!;
     const orch = new Orchestrator({
       learner: new FakeLearner(),
@@ -246,11 +246,11 @@ describe("orchestrator token budget", () => {
 
     await orch.runTeachingTurn(session, topic, { image: "base64data", typedText: null });
 
-    expect(sessions.getSession(session.sessionId)?.tokensUsed).toBe(140);
+    expect((await sessions.getSession(session.sessionId))?.tokensUsed).toBe(140);
   });
 
   it("still records tokens when the turn pauses for confirmation", async () => {
-    const session = newSession();
+    const session = await newSession();
     const topic = topics.get("topic_photosynthesis")!;
     // Vision spends tokens and then asks for confirmation, so the turn exits
     // early. Those tokens were spent regardless and must still be counted,
@@ -279,13 +279,13 @@ describe("orchestrator token budget", () => {
     // 200, not 100: an unsure reading makes the planner take a directed second
     // look (verify_board) before interrupting the user, and that second Vision
     // call is metered too. Both were spent before the turn paused.
-    expect(sessions.getSession(session.sessionId)?.tokensUsed).toBe(200);
+    expect((await sessions.getSession(session.sessionId))?.tokensUsed).toBe(200);
   });
 
   it("refuses the turn once the session is at its budget, spending nothing", async () => {
-    const session = newSession();
+    const session = await newSession();
     session.tokensUsed = config.SESSION_TOKEN_BUDGET;
-    sessions.saveSession(session);
+    await sessions.saveSession(session);
     const topic = topics.get("topic_photosynthesis")!;
 
     const learner = new FakeLearner();
@@ -304,7 +304,7 @@ describe("orchestrator token budget", () => {
     expect(interpret).not.toHaveBeenCalled();
     expect(respond).not.toHaveBeenCalled();
     expect(session.turnCount).toBe(0);
-    expect(sessions.getSession(session.sessionId)?.tokensUsed).toBe(
+    expect((await sessions.getSession(session.sessionId))?.tokensUsed).toBe(
       config.SESSION_TOKEN_BUDGET,
     );
   });
@@ -333,7 +333,7 @@ describe("orchestrator token budget", () => {
         tokensUsed: overBudget,
         evaluationIds: [],
       };
-      demoStore.sessions.saveSession(session);
+      await demoStore.sessions.saveSession(session);
 
       const orch = new DemoOrchestrator({
         learner: new FakeLearner(),
@@ -350,7 +350,7 @@ describe("orchestrator token budget", () => {
       expect(result.kind).toBe("learner");
       // ...but the accounting is not, so the demo can still be asked afterwards
       // what it actually cost.
-      expect(demoStore.sessions.getSession(session.sessionId)?.tokensUsed).toBe(
+      expect((await demoStore.sessions.getSession(session.sessionId))?.tokensUsed).toBe(
         overBudget + 140,
       );
     } finally {

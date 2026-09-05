@@ -27,6 +27,7 @@ offline development and testing.
 
 - Frontend: React, TypeScript, Vite, tldraw
 - Backend: Node.js, TypeScript, Fastify, Zod
+- Database: PostgreSQL via Prisma
 - AI provider: Gemini via `@google/genai`
 - Testing: Vitest
 
@@ -71,10 +72,41 @@ Install these before running the project:
 
 - Node.js 20 or newer
 - npm
+- PostgreSQL 14 or newer — or Docker, which brings its own (see [Database](#database))
 - A Gemini API key, if you want to use real AI responses
 
 You can still run the project without an API key. In that case, the backend uses
-mock AI responses.
+mock AI responses. A database, however, is required.
+
+## Database
+
+Cogniva stores everything in PostgreSQL — workspaces, sessions, teaching
+checkpoints, chat, transcripts, and the debrief report. The backend will not
+start without a `DATABASE_URL`; there is no local-file or in-memory fallback.
+
+The quickest way to get one is Docker Compose, which brings up Postgres, applies
+the migrations and starts the app together:
+
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --build
+```
+
+To run the backend directly instead, point it at a Postgres you already have and
+create the tables once:
+
+```powershell
+cd apps/backend
+Copy-Item .env.example .env      # then set DATABASE_URL
+npm install                       # also generates the Prisma client
+npm run db:migrate                # create/update the tables
+```
+
+Useful commands:
+
+- `npm run db:migrate` — apply pending migrations (safe to re-run).
+- `npm run db:generate` — regenerate the Prisma client after a schema change.
+- `npm run db:studio` — browse the data in Prisma Studio.
 
 ## Environment Setup
 
@@ -88,6 +120,7 @@ Copy-Item .env.example .env
 Open `apps/backend/.env` and configure the values you need:
 
 ```env
+DATABASE_URL=postgresql://cogniva:cogniva@localhost:5432/cogniva?schema=public
 GEMINI_API_KEY=your_gemini_api_key_here
 USE_MOCK_AI=false
 COGNIVA_LEARNER_MODEL=gemini-2.5-flash
@@ -96,6 +129,7 @@ PORT=8000
 
 Important environment variables:
 
+- `DATABASE_URL`: PostgreSQL connection string. Required — see [Database](#database).
 - `GEMINI_API_KEY`: Enables real Gemini-powered AI responses.
 - `USE_MOCK_AI`: Set to `false` to use Gemini, or `true` to force mock AI.
 - `COGNIVA_LEARNER_MODEL`: Gemini model used by the learner agent.
@@ -120,7 +154,8 @@ VITE_USE_MOCK=false
 
 ## Running the Application
 
-Run the backend in the first terminal:
+Run the backend in the first terminal (see [Database](#database) first — it
+needs `DATABASE_URL` and a migrated database):
 
 ```powershell
 cd apps/backend
@@ -131,8 +166,12 @@ npm run dev
 The backend should print:
 
 ```text
+Cogniva backend terhubung ke Postgres
 Cogniva backend listening on http://localhost:8000
 ```
+
+If it exits with `DATABASE_URL belum diisi`, the connection string is missing
+from `apps/backend/.env`.
 
 Check the backend health endpoint:
 
@@ -175,11 +214,19 @@ is found, it falls back to mock mode.
 
 ## Testing
 
-Run backend tests:
+Run backend tests. These use in-memory store doubles, so no database is needed:
 
 ```powershell
 cd apps/backend
 npm test
+```
+
+Run the database suite, which exercises the real PostgreSQL path. It needs a
+`DATABASE_URL` pointing at a migrated database and cleans up its own rows:
+
+```powershell
+cd apps/backend
+npm run test:db
 ```
 
 Run backend type checking:

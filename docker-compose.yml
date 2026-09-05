@@ -1,21 +1,52 @@
-# Cogniva — two independent services, one network.
+# Cogniva — three services, one network.
 #
+#   db        Postgres 16 — every workspace, session and transcript lives here
 #   frontend  nginx serving the built SPA + reverse-proxying to the backend (:80)
 #   backend   Fastify API run with tsx (:8000, internal)
 #
-# Only the frontend publishes a host port; the browser reaches the API through
-# nginx on the same origin. Copy .env.docker.example to .env and set your key:
+# Only the frontend (via caddy) publishes a host port; the browser reaches the
+# API through nginx on the same origin, and the database is never exposed off
+# the compose network. Copy .env.example to .env and set your key:
 #
-#   cp .env.docker.example .env
+#   cp .env.example .env
 #   docker compose up -d --build
+#
+# The backend applies pending migrations on start, so a fresh volume becomes a
+# fully migrated database on the first boot.
 
 services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cogniva}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cogniva}
+      POSTGRES_DB: ${POSTGRES_DB:-cogniva}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    # The backend waits on this, so it never starts against a database that is
+    # still initialising and dies on its first query.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cogniva} -d ${POSTGRES_DB:-cogniva}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - cogniva
+
   backend:
     build:
       context: ./apps/backend
     image: cogniva-backend:latest
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
+      # Required: all storage is Postgres. The backend refuses to start without it.
+      DATABASE_URL: >-
+        postgresql://${POSTGRES_USER:-cogniva}:${POSTGRES_PASSWORD:-cogniva}@db:5432/${POSTGRES_DB:-cogniva}?schema=public
       # Optional — without it the Learner uses a deterministic mock.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       COGNIVA_LEARNER_MODEL: ${COGNIVA_LEARNER_MODEL:-gemini-2.5-flash}
@@ -61,6 +92,7 @@ services:
       - cogniva
 
 volumes:
+  db_data:
   caddy_data:
   caddy_config:
 

@@ -118,6 +118,26 @@ export class ReferenceIndex {
     }
     return score / Math.sqrt(frequencies.size);
   }
+
+  /**
+   * The index as plain JSON, so it can be persisted with the workspace and
+   * reloaded after a restart instead of re-chunking (and re-embedding) the PDF.
+   * Only the two constructor inputs are stored; the term-frequency tables are
+   * derived and rebuilt on the way back in.
+   */
+  toJSON(): SerializedReferenceIndex {
+    return { chunks: this.chunks, vectors: this.vectors };
+  }
+
+  static fromJSON(data: SerializedReferenceIndex): ReferenceIndex {
+    return new ReferenceIndex(data.chunks ?? [], data.vectors ?? null);
+  }
+}
+
+/** The persisted form of a ReferenceIndex (a `reference_index` JSON column). */
+export interface SerializedReferenceIndex {
+  chunks: ReferenceChunk[];
+  vectors: number[][] | null;
 }
 
 function countTerms(text: string): Map<string, number> {
