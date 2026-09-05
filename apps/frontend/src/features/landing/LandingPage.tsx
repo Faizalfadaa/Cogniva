@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styles from '../../styles/LandingPage.module.css'
 import { LEARNERS } from '../../lib/Learner'
+import { LoginScreen } from '../auth/LoginScreen'
+import { useUserStore } from '../../state/UserStore'
 import { TeamSlider } from './TeamSlider'
 import { BackToTop } from './BackToTop'
 
@@ -123,6 +125,16 @@ function Tick({ on = true, dark = false }: { on?: boolean; dark?: boolean }) {
 
 export default function LandingPage() {
   const [annual, setAnnual] = useState(false)
+  const [signInOpen, setSignInOpen] = useState(false)
+  const navigate = useNavigate()
+  const { login, register, continueAsGuest } = useUserStore()
+  /** Index of the open FAQ row, or null when all are collapsed. */
+  const [openFaq, setOpenFaq] = useState<number | null>(0)
+
+  const howReveal = useReveal<HTMLDivElement>()
+  const studentsReveal = useReveal<HTMLDivElement>()
+  const faqReveal = useReveal<HTMLDivElement>()
+  const teamReveal = useReveal<HTMLDivElement>()
 
   const senseiPrice = annual ? '39.000' : '49.000'
   const senseiNote = annual ? 'Billed Rp 468.000 yearly' : 'Or Rp 39.000 on annual billing'
@@ -145,11 +157,15 @@ export default function LandingPage() {
             <a href="#about">About us</a>
           </nav>
           <div className={styles.navActions}>
-            <Link to={APP_ENTRY} className={styles.navSignIn}>
+            <button
+              type="button"
+              className={styles.navSignIn}
+              onClick={() => setSignInOpen(true)}
+            >
               Sign in
-            </Link>
+            </button>
             <Link to={APP_ENTRY} className={styles.btnLime}>
-              Start teaching — free
+              Start teaching for free
             </Link>
           </div>
         </div>
@@ -629,6 +645,27 @@ export default function LandingPage() {
       </section>
 
       <BackToTop />
+
+      {/* The same LoginScreen HomePage uses, opened here as an overlay. No
+          route change: the landing page stays mounted underneath, and closing
+          returns to it. Signing in lands on the dashboard. */}
+      {signInOpen && (
+        <LoginScreen
+          onLogin={async (u, p) => {
+            await login(u, p)
+            navigate('/home')
+          }}
+          onRegister={async (u, p) => {
+            await register(u, p)
+            navigate('/home')
+          }}
+          onGuest={() => {
+            continueAsGuest()
+            navigate('/home')
+          }}
+          onClose={() => setSignInOpen(false)}
+        />
+      )}
     </div>
   )
 }

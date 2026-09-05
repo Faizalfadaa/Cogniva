@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import { useUserStore } from '../../state/UserStore'
+import { LoginScreen } from '../auth/LoginScreen'
 import Onboarding from './Onboarding'
 import type { WorkspaceDTO, WorkspaceState } from '../../dto/WorkspaceDTO'
 import styles from '../../styles/HomePage.module.css'
@@ -216,106 +217,6 @@ function DeleteConfirmModal({
 // ─── Profile Modal ────────────────────────────────────────────────────────────
 // Opened from the sidebar profile button. The name is the only thing stored
 // about a user today, so this is where it gets changed.
-
-function LoginScreen({
-  onLogin,
-  onRegister,
-  onGuest,
-}: {
-  onLogin: (username: string, password: string) => Promise<void>
-  onRegister: (username: string, password: string) => Promise<void>
-  onGuest: () => void
-}) {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function handleSubmit() {
-    if (submitting) return
-    setSubmitting(true)
-    setError(null)
-    try {
-      if (mode === 'login') {
-        await onLogin(username, password)
-      } else {
-        await onRegister(username, password)
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const canSubmit = username.trim().length > 0 && password.length > 0
-
-  return (
-    <div className={styles.modalOverlay}>
-      <div
-        className={styles.modal}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="login-title"
-      >
-        <div className={styles.loginLogo}>
-          <img src="/cogniva_logo.png" alt="" />
-        </div>
-        <h2 id="login-title" className={styles.modalTitle}>
-          {mode === 'login' ? 'Sign in to Cogniva' : 'Create your account'}
-        </h2>
-        <p className={styles.modalBody}>
-          Keep your teaching workspaces attached to your username.
-        </p>
-
-        <input
-          className={styles.modalInput}
-          type="text"
-          value={username}
-          placeholder="Username"
-          autoComplete="username"
-          onChange={e => setUsername(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          maxLength={24}
-          aria-label="Username"
-        />
-        <input
-          className={styles.modalInput}
-          type="password"
-          value={password}
-          placeholder="Password"
-          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          onChange={e => setPassword(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          aria-label="Password"
-        />
-        {error && <p className={styles.authError}>{error}</p>}
-
-        <button className={styles.modalBtn} onClick={handleSubmit} disabled={!canSubmit || submitting}>
-          {submitting
-            ? 'Please wait...'
-            : mode === 'login'
-              ? 'Sign in'
-              : 'Create account'}
-        </button>
-        <button
-          className={styles.modalBtnGhost}
-          onClick={() => {
-            setMode(mode === 'login' ? 'register' : 'login')
-            setError(null)
-          }}
-          disabled={submitting}
-        >
-          {mode === 'login' ? 'Create a new account' : 'I already have an account'}
-        </button>
-        <button className={styles.guestBtn} onClick={onGuest} disabled={submitting}>
-          Continue as guest
-        </button>
-      </div>
-    </div>
-  )
-}
 
 function ProfileModal({
   userName,
