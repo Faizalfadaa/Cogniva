@@ -105,7 +105,7 @@ export default function EvaluationPage() {
     <div className={styles.reportPage}>
       {/* Minimal top bar */}
       <header className={styles.reportHeader}>
-        <button className={styles.reportBack} onClick={() => navigate('/')}>
+        <button className={styles.reportBack} onClick={() => navigate('/home')}>
           ← Home
         </button>
         <div className={styles.reportHeaderCenter}>

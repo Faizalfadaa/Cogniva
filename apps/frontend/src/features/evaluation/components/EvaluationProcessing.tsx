@@ -44,7 +44,7 @@ export function EvaluationProcessing({ workspaceId, workspaceTitle }: Evaluation
   return (
     <div className={styles.processingPage}>
       {/* Back to home — user can leave and come back */}
-      <button className={styles.processingBack} onClick={() => navigate('/')}>
+      <button className={styles.processingBack} onClick={() => navigate('/home')}>
         ← Back to Home
       </button>
 

@@ -80,7 +80,7 @@ export function WorkspaceHeader({
   return (
     <header className={styles.header}>
       <div className={styles.headerLeft}>
-        <button className={styles.backBtn} onClick={() => navigate('/')} aria-label="Back to Home">
+        <button className={styles.backBtn} onClick={() => navigate('/home')} aria-label="Back to Home">
           ←
         </button>
 
