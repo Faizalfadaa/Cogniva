@@ -12,7 +12,7 @@
  * `await` it — see GAPS_VISION.md for the exact diff.
  */
 
-import type { BoardSnapshot, VisionInterpretation } from "../../contracts/board.js";
+import type { BoardSnapshot, Element, VisionInterpretation } from "../../contracts/board.js";
 import { runVisionTurn } from "./vision.agent.js";
 import type { RunVisionOptions } from "./vision.types.js";
 
@@ -28,10 +28,17 @@ export class VisionAgent {
     this.options = options;
   }
 
+  /**
+   * `previousElements` is what the board showed at the end of the previous
+   * turn. Teachers build a board incrementally while they talk, so handing
+   * the reader last turn's elements lets it spot what was just added instead
+   * of re-reading the whole board cold each time (§3.4).
+   */
   async interpret(
     snapshot: BoardSnapshot,
     typedText: string | null | undefined,
     topic = "",
+    previousElements?: Element[],
     onUsage?: RunVisionOptions["onUsage"],
   ): Promise<VisionInterpretation> {
     // Typed-text fallback (§5.3, §6.6 typedInput) — unchanged from the M1
@@ -65,6 +72,7 @@ export class VisionAgent {
         topic,
         imageBase64: snapshot.image,
         mimeType: `image/${snapshot.format || "png"}`,
+        previousElements,
       },
       { ...this.options, onUsage },
     );

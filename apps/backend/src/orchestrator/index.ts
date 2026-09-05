@@ -22,7 +22,7 @@ import { LearnerAgent, VisionAgent, AsrAgent, seedLearnerState, type LearnerTool
 import type { AudioClip } from "../agents/asr/asr.types.js";
 import { focusInterpretation } from "../agents/vision/vision.focus.js";
 import * as config from "../config/index.js";
-import type { BoardSnapshot, VisionInterpretation } from "../contracts/board.js";
+import type { BoardSnapshot, Element, VisionInterpretation } from "../contracts/board.js";
 import { utcNowIso } from "../contracts/common.js";
 import type { LearnerResponse, LearnerState } from "../contracts/learner.js";
 import type { Session } from "../contracts/session.js";
@@ -47,6 +47,8 @@ export interface Vision {
     snapshot: BoardSnapshot,
     typedText: string | null | undefined,
     topic?: string,
+    /** What the board showed at the end of the previous turn (§3.4). */
+    previousElements?: Element[],
     onUsage?: UsageReporter,
   ): Promise<VisionInterpretation>;
 }
@@ -126,10 +128,19 @@ export class Orchestrator {
     };
     sessions.saveSnapshot(snapshot);
 
+    // Continuity between turns (§3.4): the board is drawn incrementally, so
+    // Vision is told what it read last time. Only completed turns are stored,
+    // so a turn that paused for confirmation leaves no stale context behind.
+    const previousTurns = sessions.listTurns(session.sessionId);
+    const previousElements = previousTurns.length
+      ? previousTurns[previousTurns.length - 1].interpretation.elements
+      : undefined;
+
     const interpretation = await this.vision.interpret(
       snapshot,
       typedText,
       topic.title,
+      previousElements,
       onUsage,
     );
     if (interpretation.needsConfirmation) {

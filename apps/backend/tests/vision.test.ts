@@ -14,7 +14,7 @@ import {
   normalizeVisionLLMOutput,
   toVisionInterpretation,
 } from "../src/agents/vision/vision.guard.js";
-import type { BoardSnapshot } from "../src/contracts/board.js";
+import type { BoardSnapshot, Element } from "../src/contracts/board.js";
 
 function snapshot(image = ""): BoardSnapshot {
   return {
@@ -51,6 +51,44 @@ describe("VisionAgent.interpret (typed-text fallback, §5.3)", () => {
 
     expect(result.snapshotId).toBe("snap_1");
     expect(result.needsConfirmation).toBe(false);
+    expect(result.elements.length).toBeGreaterThan(0);
+  });
+
+  it("accepts the previous turn's elements as continuity context (§3.4)", async () => {
+    const vision = new VisionAgent({ confidenceThreshold: 0.6, useMock: true });
+    const previousElements: Element[] = [
+      { type: "text", content: "Fotosintesis", confidence: 0.9 },
+      { type: "arrow", content: "cahaya -> kloroplas", confidence: 0.8 },
+    ];
+
+    const withContext = await vision.interpret(
+      snapshot("ZmFrZS1iYXNlNjQ="),
+      undefined,
+      "Fotosintesis",
+      previousElements,
+    );
+    const without = await vision.interpret(
+      snapshot("ZmFrZS1iYXNlNjQ="),
+      undefined,
+      "Fotosintesis",
+    );
+
+    // The context only enriches the prompt; the mock ignores it, so the shape
+    // of the result must be unchanged either way.
+    expect(withContext).toEqual(without);
+    expect(withContext.needsConfirmation).toBe(false);
+  });
+
+  it("still reads the board when there is no previous turn to carry over", async () => {
+    const vision = new VisionAgent({ confidenceThreshold: 0.6, useMock: true });
+
+    const result = await vision.interpret(
+      snapshot("ZmFrZS1iYXNlNjQ="),
+      undefined,
+      "Fotosintesis",
+      undefined,
+    );
+
     expect(result.elements.length).toBeGreaterThan(0);
   });
 });

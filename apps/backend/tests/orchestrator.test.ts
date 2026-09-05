@@ -181,6 +181,35 @@ describe("orchestrator", () => {
   });
 });
 
+describe("orchestrator board continuity", () => {
+  it("passes the previous turn's elements into the next turn's board reading", async () => {
+    const session = newSession();
+    const topic = topics.get("topic_photosynthesis")!;
+    const vision = new VisionAgent({ confidenceThreshold: 0.6 });
+    const interpret = vi.spyOn(vision, "interpret");
+    const orch = new Orchestrator({ learner: new FakeLearner(), vision });
+
+    const first = await orch.runTeachingTurn(session, topic, {
+      image: "base64data",
+      typedText: null,
+    });
+    expect(first.kind).toBe("learner");
+    const firstElements = first.interpretation?.elements ?? [];
+    expect(firstElements.length).toBeGreaterThan(0);
+
+    await orch.runTeachingTurn(session, topic, {
+      image: "base64data",
+      typedText: null,
+    });
+
+    expect(interpret).toHaveBeenCalledTimes(2);
+    // Turn 1 had no earlier board to carry over.
+    expect(interpret.mock.calls[0][3]).toBeUndefined();
+    // Turn 2 is told what turn 1 read, so the model can spot what was added.
+    expect(interpret.mock.calls[1][3]).toEqual(firstElements);
+  });
+});
+
 /**
  * Token budget (§7.3). A fake Vision reports usage directly, so the meter is
  * exercised without any LLM call — the mock agents spend nothing.
@@ -189,7 +218,7 @@ describe("orchestrator token budget", () => {
   /** Vision that reads the board fine and reports a fixed token cost. */
   function meteredVision(inputTokens: number, outputTokens: number): Vision {
     return {
-      interpret: async (snapshot, _typedText, _topic, onUsage) => {
+      interpret: async (snapshot, _typedText, _topic, _previousElements, onUsage) => {
         onUsage?.({ inputTokens, outputTokens });
         const interpretation: VisionInterpretation = {
           snapshotId: snapshot.snapshotId,
@@ -223,7 +252,7 @@ describe("orchestrator token budget", () => {
     // early. Those tokens were spent regardless and must still be counted,
     // otherwise a session that keeps pausing never approaches its cap.
     const vision: Vision = {
-      interpret: async (snapshot, _typedText, _topic, onUsage) => {
+      interpret: async (snapshot, _typedText, _topic, _previousElements, onUsage) => {
         onUsage?.({ inputTokens: 70, outputTokens: 30 });
         return {
           snapshotId: snapshot.snapshotId,
