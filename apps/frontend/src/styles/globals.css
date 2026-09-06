@@ -64,7 +64,7 @@
   --badge-completed-text: #1a5e2e;
 
   /* Typography */
-  --font-display: 'Syne', sans-serif;
+  --font-display: '', sans-serif;
   --font-body: 'Plus Jakarta Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
@@ -117,5 +117,10 @@ input, textarea { font-family: inherit; }
 /* Guard against accidental horizontal scroll on phones. Scoped to ≤768px so
    the desktop layout is untouched. */
 @media (max-width: 768px) {
-  html, body { max-width: 100%; overflow-x: hidden; }
+  /* `clip`, not `hidden`. Both stop sideways scrolling, but `hidden` turns the
+   element into a scroll container, and on <html> that is what breaks
+   `position: sticky` for everything inside (the landing page nav). `clip` has
+   no scroll container, so sticky keeps working. It also does not force the
+   other axis to `auto` the way `hidden` does. */
+html, body { max-width: 100%; overflow-x: clip; }
 }

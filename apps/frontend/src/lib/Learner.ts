@@ -6,6 +6,13 @@ import type { LearnerDTO } from '../dto/LearnerDTO';
 export interface LearnerCharacter extends Omit<LearnerDTO, 'firstMessage' | 'introVideoUrl'> {
   firstMessages: string[];
   introImageUrl: string;
+  /** Short temperament label, e.g. "Anxious, thorough". Rendered uppercase by
+   *  CSS rather than stored that way, so it stays readable in code. */
+  traits: string;
+  /** One or two sentences on how this student behaves while being taught. */
+  description: string;
+  /** A line they might actually say, used as flavour on cards. */
+  catchphrase: string;
 }
 
 export const LEARNERS: readonly LearnerCharacter[] = [
@@ -20,6 +27,10 @@ export const LEARNERS: readonly LearnerCharacter[] = [
       'Finally... I get to meet you.',
       'Lets learn something new today, sensei...'
     ],
+    traits: 'Anxious, thorough',
+    description:
+      "Apologises before every question, then asks the sharpest one in the session. She'll admit when she only copied your diagram.",
+    catchphrase: '“E-Etto… sensei, sorry, one more thing?”',
   },
   {
     id: 'reina',
@@ -30,11 +41,15 @@ export const LEARNERS: readonly LearnerCharacter[] = [
       'Eh?',
       'A-Are you really...',
       '{userName}-sensei?',
-      'KYAA—!',
+      'KYAA...!',
       'Finally!! I found you!',
       "...Don't disappear on me, okay?",
       '...Promise?',
     ],
+    traits: 'Loud, delighted',
+    description:
+      'Enthusiastic to the point of chaos. Jumps three steps ahead, which is exactly how you find out your explanation had no step two.',
+    catchphrase: '“KYAA...! Wait, so does that mean...”',
   },
   {
     id: 'akira',
@@ -50,6 +65,10 @@ export const LEARNERS: readonly LearnerCharacter[] = [
       'Remember my name.',
       "...You're going to hear it a lot from now on.",
     ],
+    traits: 'Blunt, unimpressed',
+    description:
+      'Says the quiet part out loud. If a section of your explanation was filler, his letter will name it. The most useful one to draw.',
+    catchphrase: '“…You’re late. And that part made no sense.”',
   },
 ];
 

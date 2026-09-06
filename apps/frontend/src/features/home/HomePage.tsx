@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import { useUserStore } from '../../state/UserStore'
+import { LoginScreen } from '../auth/LoginScreen'
 import Onboarding from './Onboarding'
 import type { WorkspaceDTO, WorkspaceState } from '../../dto/WorkspaceDTO'
 import styles from '../../styles/HomePage.module.css'
@@ -176,6 +177,51 @@ function EmptyState({ filter, onNew, loading }: { filter: ViewFilter; onNew: () 
 
 // ─── Delete Confirm Modal ─────────────────────────────────────────────────────
 
+/**
+ * Second step before leaving a session. Not styled as a danger action: signing
+ * out destroys nothing, it just ends the session. The wording differs for a
+ * guest because "exit guest" sounds more final than it is.
+ */
+function LogoutConfirmModal({
+  isGuest,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  isGuest: boolean
+  busy: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div className={styles.modalOverlay} onClick={() => !busy && onCancel()}>
+      <div
+        className={styles.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="logout-modal-title"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={styles.modalMark}>?</div>
+        <h2 id="logout-modal-title" className={styles.modalTitle}>
+          {isGuest ? 'Exit guest session?' : 'Sign out?'}
+        </h2>
+        <p className={styles.modalBody}>
+          {isGuest
+            ? 'You will go back to the Cogniva home page. Your workspaces stay on this device, so continuing as a guest again brings them back.'
+            : 'You will go back to the Cogniva home page. Sign in again any time to pick up where you left off.'}
+        </p>
+        <button className={styles.modalBtn} onClick={onConfirm} disabled={busy}>
+          {busy ? 'Signing out...' : isGuest ? 'Yes, exit guest' : 'Yes, sign out'}
+        </button>
+        <button className={styles.modalBtnGhost} onClick={onCancel} disabled={busy}>
+          Stay signed in
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function DeleteConfirmModal({
   ws,
   deleting,
@@ -216,106 +262,6 @@ function DeleteConfirmModal({
 // ─── Profile Modal ────────────────────────────────────────────────────────────
 // Opened from the sidebar profile button. The name is the only thing stored
 // about a user today, so this is where it gets changed.
-
-function LoginScreen({
-  onLogin,
-  onRegister,
-  onGuest,
-}: {
-  onLogin: (username: string, password: string) => Promise<void>
-  onRegister: (username: string, password: string) => Promise<void>
-  onGuest: () => void
-}) {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function handleSubmit() {
-    if (submitting) return
-    setSubmitting(true)
-    setError(null)
-    try {
-      if (mode === 'login') {
-        await onLogin(username, password)
-      } else {
-        await onRegister(username, password)
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const canSubmit = username.trim().length > 0 && password.length > 0
-
-  return (
-    <div className={styles.modalOverlay}>
-      <div
-        className={styles.modal}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="login-title"
-      >
-        <div className={styles.loginLogo}>
-          <img src="/cogniva_logo.png" alt="" />
-        </div>
-        <h2 id="login-title" className={styles.modalTitle}>
-          {mode === 'login' ? 'Sign in to Cogniva' : 'Create your account'}
-        </h2>
-        <p className={styles.modalBody}>
-          Keep your teaching workspaces attached to your username.
-        </p>
-
-        <input
-          className={styles.modalInput}
-          type="text"
-          value={username}
-          placeholder="Username"
-          autoComplete="username"
-          onChange={e => setUsername(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          maxLength={24}
-          aria-label="Username"
-        />
-        <input
-          className={styles.modalInput}
-          type="password"
-          value={password}
-          placeholder="Password"
-          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          onChange={e => setPassword(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          aria-label="Password"
-        />
-        {error && <p className={styles.authError}>{error}</p>}
-
-        <button className={styles.modalBtn} onClick={handleSubmit} disabled={!canSubmit || submitting}>
-          {submitting
-            ? 'Please wait...'
-            : mode === 'login'
-              ? 'Sign in'
-              : 'Create account'}
-        </button>
-        <button
-          className={styles.modalBtnGhost}
-          onClick={() => {
-            setMode(mode === 'login' ? 'register' : 'login')
-            setError(null)
-          }}
-          disabled={submitting}
-        >
-          {mode === 'login' ? 'Create a new account' : 'I already have an account'}
-        </button>
-        <button className={styles.guestBtn} onClick={onGuest} disabled={submitting}>
-          Continue as guest
-        </button>
-      </div>
-    </div>
-  )
-}
 
 function ProfileModal({
   userName,
@@ -405,6 +351,7 @@ const FILTER_OPTIONS: Array<{ label: string; value: ViewFilter }> = [
 export default function HomePage() {
   const bridge = useBridge()
   const navigate = useNavigate()
+
   const {
     user,
     userName,
@@ -417,6 +364,28 @@ export default function HomePage() {
     logout,
     setUserName,
   } = useUserStore()
+
+  const [logoutConfirm, setLogoutConfirm] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  /**
+   * Leaving a session drops you at the public landing page, not at the sign-in
+   * panel. Without the navigate, clearing `user` just re-triggers the
+   * `if (!user)` guard below and the login form appears in place, which reads
+   * as "sign in again" rather than "you have signed out".
+   */
+  const handleLogout = useCallback(async () => {
+    if (loggingOut) return
+    setLoggingOut(true)
+    try {
+      await logout()
+      navigate('/')
+    } finally {
+      // The component usually unmounts on navigate; resetting keeps the dialog
+      // usable again if logout threw and we are still here.
+      setLoggingOut(false)
+    }
+  }, [loggingOut, logout, navigate])
 
   const [workspaces, setWorkspaces] = useState<WorkspaceDTO[]>([])
   const [loading, setLoading] = useState(true)
@@ -534,10 +503,11 @@ export default function HomePage() {
       {/* ── Sidebar ── */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarTop}>
-          <div className={styles.logo}>
+          {/* The mark doubles as the way back to the public site. */}
+          <Link to="/" className={styles.logo} title="Back to the Cogniva home page">
             <span className={styles.logoMark}><img src="/cogniva_logo.png" alt="Cogniva Logo" className={styles.logoImg} /></span>
             <span className={styles.logoText}>Cogniva</span>
-          </div>
+          </Link>
 
           <button
             data-tour="new-workspace"
@@ -574,7 +544,7 @@ export default function HomePage() {
         </nav>
 
         <div className={styles.sidebarBottom}>
-          <button className={styles.logoutBtn} onClick={logout}>
+          <button className={styles.logoutBtn} onClick={() => setLogoutConfirm(true)}>
             {user.isGuest ? 'Exit guest' : 'Sign out'}
           </button>
           <button
@@ -679,6 +649,15 @@ export default function HomePage() {
           userName={userName ?? ''}
           onSave={setUserName}
           onClose={() => setProfileOpen(false)}
+        />
+      )}
+
+      {logoutConfirm && (
+        <LogoutConfirmModal
+          isGuest={Boolean(user.isGuest)}
+          busy={loggingOut}
+          onConfirm={handleLogout}
+          onCancel={() => !loggingOut && setLogoutConfirm(false)}
         />
       )}
 

@@ -671,6 +671,9 @@
   /* auto margins (not align-items) do the centering, so a card taller than the
      viewport stays fully scrollable instead of having its top clipped. */
   margin: auto;
+  /* Anchor for .loginClose. Only matters when LoginScreen is opened with an
+     onClose (from the landing page); harmless otherwise. */
+  position: relative;
   background: var(--card-bg);
   border-radius: var(--radius-xl);
   padding: 40px 36px;
@@ -992,3 +995,39 @@
      the logo mark alone still identifies the app. */
   .logoText { display: none; }
 }
+
+/* ─── Sign-in dismiss controls ───
+   Only rendered when LoginScreen receives an onClose, i.e. when it is opened
+   as an overlay from the landing page. On HomePage there is nowhere to go
+   back to, so neither of these exists. */
+.loginClose {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  border: none;
+  background: none;
+  padding: 6px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--dur-fast);
+}
+
+.loginClose:hover:not(:disabled) { color: var(--text-primary); }
+.loginClose:disabled { opacity: 0.4; cursor: default; }
+
+.loginBackLink {
+  margin-top: 2px;
+  border: none;
+  background: none;
+  padding: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--dur-fast);
+}
+
+.loginBackLink:hover:not(:disabled) { color: var(--text-secondary); }
+.loginBackLink:disabled { opacity: 0.4; cursor: default; }
