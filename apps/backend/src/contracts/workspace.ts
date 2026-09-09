@@ -36,7 +36,7 @@ export interface Workspace {
   /** Endpoint URL for an uploaded reference PDF, if any. */
   pdfUrl?: string;
   state: WorkspaceState;
-  /** Latest autosaved tldraw document, so the canvas restores on reopen. */
+  /** Latest autosaved Excalidraw scene, so the canvas restores on reopen. */
   currentWhiteboardSnapshot?: unknown;
   /** Small raster preview (data URL) shown on the Home grid. */
   thumbnailUrl?: string;
@@ -49,7 +49,7 @@ export interface TeachingCheckpoint {
   id: string;
   /** The board snapshot sent to Vision, echoed back as a data URL. */
   snapshotImageUrl: string;
-  /** The tldraw document captured at this checkpoint. */
+  /** The Excalidraw scene captured at this checkpoint. */
   whiteboardSnapshot: unknown;
   /** The spoken explanation recorded during editing, as a data URL. */
   audioUrl?: string;
@@ -106,7 +106,7 @@ export const updateMetaSchema = z.object({
 });
 
 export const saveDraftSchema = z.object({
-  /** Opaque tldraw document JSON. */
+  /** Opaque Excalidraw scene JSON. */
   snapshot: z.unknown(),
   /** Optional thumbnail as a data URL (already rasterized by the client). */
   thumbnail: z.string().optional(),

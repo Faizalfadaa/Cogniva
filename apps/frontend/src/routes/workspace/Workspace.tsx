@@ -175,7 +175,7 @@ export default function WorkspacePage() {
       <div className={styles.workspaceBody}>
         {/* Canvas takes remaining space; sidebar is a flex sibling */}
         {/* data-tour sits on the canvas area rather than inside Whiteboard:
-            the engine is swapped at build time (tldraw vs Excalidraw), and this
+            the whiteboard implementation can evolve, and this
             wrapper is the one element both render into. */}
         <div className={styles.canvasArea} data-tour="whiteboard-area">
           <Whiteboard

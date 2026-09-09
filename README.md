@@ -25,7 +25,7 @@ offline development and testing.
 
 ## Tech Stack
 
-- Frontend: React, TypeScript, Vite, tldraw
+- Frontend: React, TypeScript, Vite, Excalidraw
 - Backend: Node.js, TypeScript, Fastify, Zod
 - Database: PostgreSQL via Prisma
 - AI provider: Gemini via `@google/genai`
