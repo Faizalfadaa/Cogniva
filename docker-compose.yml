@@ -61,13 +61,15 @@ services:
     networks:
       - cogniva
 
-  # Learner voice (XTTS v2). Opt-in: it adds a ~2 GB model download and, on CPU,
-  # 10-30s per reply. Start it explicitly with a profile:
+  # Learner voice (Chatterbox, MIT). Opt-in: it adds a ~3.2 GB model download
+  # and, on CPU, 10-30s per reply. Start it explicitly with a profile:
   #
   #   docker compose --profile voice up -d --build
   #
   # The backend degrades to silence when it is absent, so the default stack is
-  # unaffected. XTTS v2 is licensed for NON-COMMERCIAL use only (CPML).
+  # unaffected. The XTTS v2 engine is still selectable with TTS_ENGINE=xtts, but
+  # it is licensed for NON-COMMERCIAL use only (CPML) — Chatterbox is the
+  # default for that reason.
   tts:
     profiles: ["voice"]
     build:
