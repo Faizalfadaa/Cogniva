@@ -46,7 +46,7 @@ import {
   type ReferenceExcerpt,
 } from "../retrieval/index.js";
 import { newId, sessions } from "../storage/sessionStore.js";
-import { synthesizeSpeech, ttsVoiceForWorkspace } from "../tts/index.js";
+import { synthesizeSpeech, voiceForWorkspace } from "../tts/index.js";
 import { buildEvaluationReport } from "./evaluationReport.js";
 import { newWorkspaceId, workspaces } from "./workspaceStore.js";
 
@@ -105,12 +105,15 @@ export async function deleteWorkspace(id: string): Promise<boolean> {
 
 export async function updateMeta(
   id: string,
-  meta: { title?: string; description?: string },
+  meta: { title?: string; description?: string; learnerId?: string },
 ): Promise<Workspace | undefined> {
   const ws = await workspaces.get(id);
   if (!ws) return undefined;
   if (meta.title !== undefined) ws.title = meta.title;
   if (meta.description !== undefined) ws.description = meta.description;
+  // The picked student, so speech can be synthesized in the voice the user is
+  // actually looking at (§TTS). Validated where it is used, not here.
+  if (meta.learnerId !== undefined) ws.learnerId = meta.learnerId;
   return touch(ws);
 }
 
@@ -762,14 +765,17 @@ function learnerMessage(content: string, learnerAudioUrl?: string): ChatMessage 
  * Render a learner reply to speech and store it, returning the URL the UI can
  * play — or undefined when speech is off or the voice service is unavailable.
  *
- * The character is derived from the workspace id exactly as the frontend does,
- * so the voice always matches the face on screen.
+ * The voice is the character the user picked, so it matches the face on screen.
+ * That pick is read here rather than passed in: this runs from a background job
+ * that can outlive the request which started it, and reading late means a
+ * character switched mid-turn is still heard correctly.
  */
 async function speakLearnerReply(
   workspaceId: string,
   text: string,
 ): Promise<string | undefined> {
-  const speech = await synthesizeSpeech(text, ttsVoiceForWorkspace(workspaceId));
+  const ws = await workspaces.get(workspaceId);
+  const speech = await synthesizeSpeech(text, voiceForWorkspace(ws?.learnerId, workspaceId));
   if (!speech) return undefined;
 
   const audioId = newId("aud");

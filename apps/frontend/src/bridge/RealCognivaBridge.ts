@@ -126,7 +126,7 @@ export class RealCognivaBridge implements CognivaBridge {
 
   updateWorkspaceMeta(
     workspaceId: string,
-    meta: { title?: string; description?: string }
+    meta: { title?: string; description?: string; learnerId?: string }
   ): Promise<WorkspaceDTO> {
     return sendJson<WorkspaceDTO>(`/api/workspaces/${workspaceId}`, 'PATCH', meta);
   }

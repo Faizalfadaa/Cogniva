@@ -21,22 +21,25 @@ export interface SynthesizedSpeech {
 }
 
 /**
- * Voice ids, in the order the frontend's `deriveLearner` picks them.
- *
- * The character is chosen client-side from the workspace id (lib/Learner.ts), so
- * the backend reproduces that choice rather than inventing its own — otherwise
- * the voice would not match the face on screen. `ttsVoiceForWorkspace` below is
- * the mirror, and tests/tts.test.ts locks the two implementations together.
+ * Voice ids, in the order the frontend's `deriveLearner` picks them, and named
+ * to match the character ids in apps/frontend/src/lib/Learner.ts.
  */
 export const LEARNER_VOICES = ["yuzuki", "reina", "akira"] as const;
 
 export type LearnerVoice = (typeof LEARNER_VOICES)[number];
 
 /**
- * Reproduce the frontend's deterministic character pick.
+ * The default character for a workspace nobody has chosen for.
  *
  * MUST stay identical to `deriveLearner` in
  * apps/frontend/src/lib/Learner.ts — same hash, same array order.
+ *
+ * This used to be the whole story, and for a while it was right: the character
+ * was purely a function of the workspace id, so both sides could compute it
+ * independently. Then the picker (LearnerSelect) let the user override it, and
+ * the override lived only in the browser — which is how a workspace showing
+ * Yuzuki came back speaking in Akira's voice. Prefer `voiceForWorkspace` below;
+ * this is only the fallback it uses.
  */
 export function ttsVoiceForWorkspace(workspaceId: string): LearnerVoice {
   let hash = 0;
@@ -44,6 +47,26 @@ export function ttsVoiceForWorkspace(workspaceId: string): LearnerVoice {
     hash = (hash * 31 + workspaceId.charCodeAt(i)) >>> 0;
   }
   return LEARNER_VOICES[hash % LEARNER_VOICES.length];
+}
+
+/**
+ * The voice to speak in: the character the user picked, or the id-derived
+ * default when they never picked one.
+ *
+ * Mirrors `resolveLearner` on the frontend, which is what actually draws the
+ * face on screen — that is the thing the voice has to agree with.
+ * `tests/tts.test.ts` locks the two together.
+ *
+ * An unrecognized id falls back rather than throwing. It reaches here straight
+ * from a client, and a voice nobody can render is not worth failing a whole
+ * teaching turn over.
+ */
+export function voiceForWorkspace(
+  learnerId: string | undefined,
+  workspaceId: string,
+): LearnerVoice {
+  const chosen = LEARNER_VOICES.find((voice) => voice === learnerId);
+  return chosen ?? ttsVoiceForWorkspace(workspaceId);
 }
 
 /**

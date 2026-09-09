@@ -64,7 +64,13 @@ export default function WorkspacePage() {
   const [chosenLearnerId, setChosenLearnerId] = useState<string | null>(() =>
     getStoredLearnerId(id ?? '')
   )
-  const learner = useMemo(() => resolveLearner(id ?? ''), [id, chosenLearnerId])
+  const learner = useMemo(
+    () => resolveLearner(id ?? '', workspace?.learnerId),
+    // chosenLearnerId is not read here — it is in the list so that picking a
+    // student re-runs the memo instead of keeping the previous character.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [id, chosenLearnerId, workspace?.learnerId],
+  )
   const titleField = useWorkspaceTitleAutosave(id ?? '', workspace?.title, bridge)
   const intro = useIntroSeen(id ?? '')
   const setup = useSessionSetup(id ?? '')
@@ -142,15 +148,25 @@ export default function WorkspacePage() {
    * already met a student here, the choice was effectively made.
    */
   const needsLearnerPick =
-    !chosenLearnerId && workspace?.state === 'Draft' && !intro.seen
+    !chosenLearnerId && !workspace?.learnerId && workspace?.state === 'Draft' && !intro.seen
 
   const handleSelectLearner = useCallback(
     (learnerId: string) => {
       if (!id) return
       setStoredLearnerId(id, learnerId)
       setChosenLearnerId(learnerId)
+
+      // Also tell the backend, which cannot see localStorage and synthesizes the
+      // learner's speech itself — without this the voice is picked from the
+      // workspace id and stops matching the face on screen. Fire-and-forget: a
+      // failed write costs the voice, not the session, and the choice is still
+      // correct in this browser.
+      void bridge
+        .updateWorkspaceMeta(id, { learnerId })
+        .then(setWorkspace)
+        .catch((err) => console.error('[Workspace] saving the picked learner failed', err))
     },
-    [id]
+    [bridge, id]
   )
 
   /**

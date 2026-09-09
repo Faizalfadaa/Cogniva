@@ -3,16 +3,27 @@
  *
  * Two things are worth locking down, and neither needs the Python service:
  *
- *  1. The backend picks the same character the frontend draws. The two derive it
- *     independently from the workspace id, so a drift would give the learner
- *     someone else's voice — visible only by ear, and only in production.
+ *  1. The backend speaks in the character the frontend draws. Both sides resolve
+ *     it independently, so a drift gives the learner someone else's voice —
+ *     noticeable only by ear, and only in production.
+ *
+ *     This test used to compare against `deriveLearner` alone, which is the
+ *     id-derived DEFAULT. That was right until the picker let the user override
+ *     it, after which the test kept passing while a workspace showing Yuzuki
+ *     spoke as Akira. It now mirrors `resolveLearner` — pick first, hash second
+ *     — which is what actually decides the face on screen.
  *  2. Speech degrades to silence. A missing, slow, or broken voice service must
  *     never cost the user their learner reply.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LEARNER_VOICES, synthesizeSpeech, ttsVoiceForWorkspace } from "../src/modules/tts/index.js";
+import {
+  LEARNER_VOICES,
+  synthesizeSpeech,
+  ttsVoiceForWorkspace,
+  voiceForWorkspace,
+} from "../src/modules/tts/index.js";
 
 /**
  * Verbatim copy of `deriveLearner` from apps/frontend/src/lib/Learner.ts, kept
@@ -28,6 +39,47 @@ function frontendDeriveLearner(workspaceId: string): string {
   }
   return FRONTEND_LEARNERS[hash % FRONTEND_LEARNERS.length];
 }
+
+/**
+ * Verbatim copy of `resolveLearner` from the same file — the function the UI
+ * actually renders from. `storedId` stands in for the localStorage pick, which
+ * now reaches the backend as `workspace.learnerId`.
+ */
+function frontendResolveLearner(workspaceId: string, storedId?: string): string {
+  const chosen = FRONTEND_LEARNERS.find((id) => id === storedId);
+  return chosen ?? frontendDeriveLearner(workspaceId);
+}
+
+describe("voiceForWorkspace", () => {
+  it("speaks as the character the user picked, not the id-derived default", () => {
+    // The regression, exactly: this workspace hashes to akira, and a user who
+    // picked Yuzuki heard a man's voice coming out of her.
+    expect(ttsVoiceForWorkspace("ws_f94dcc46")).toBe("akira");
+    expect(voiceForWorkspace("yuzuki", "ws_f94dcc46")).toBe("yuzuki");
+  });
+
+  it("matches what the frontend renders, picked or not", () => {
+    const ids = ["ws_1a2b3c4d", "ws_deadbeef", "ws_f94dcc46", "ws_00000000", "workspace-42"];
+
+    for (const id of ids) {
+      // Nobody picked: both sides fall back to the hash.
+      expect(voiceForWorkspace(undefined, id)).toBe(frontendResolveLearner(id));
+
+      // Somebody picked: the pick wins on both sides, whichever it was.
+      for (const picked of LEARNER_VOICES) {
+        expect(voiceForWorkspace(picked, id)).toBe(frontendResolveLearner(id, picked));
+      }
+    }
+  });
+
+  it("falls back rather than throwing on an id it does not recognize", () => {
+    // Arrives straight from a client, so it can be anything at all. A voice
+    // nobody can render must not cost the user their whole teaching turn.
+    for (const bad of ["", "  ", "Yuzuki", "sakura", "../etc/passwd", "yuzuki "]) {
+      expect(voiceForWorkspace(bad, "ws_1a2b3c4d")).toBe(ttsVoiceForWorkspace("ws_1a2b3c4d"));
+    }
+  });
+});
 
 describe("ttsVoiceForWorkspace", () => {
   it("matches the character the frontend derives, for every voice", () => {

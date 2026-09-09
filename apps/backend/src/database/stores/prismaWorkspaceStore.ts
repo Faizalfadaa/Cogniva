@@ -64,6 +64,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
         state: workspace.state,
         whiteboard_snapshot: toJson(workspace.currentWhiteboardSnapshot),
         thumbnail_url: workspace.thumbnailUrl ?? null,
+        learner_id: workspace.learnerId ?? null,
         updated_at: new Date(workspace.updatedAt),
       },
     });
@@ -419,6 +420,7 @@ function toWorkspace(row: WorkspaceRow): Workspace {
     state: row.state as WorkspaceState,
     currentWhiteboardSnapshot: row.whiteboard_snapshot ?? undefined,
     thumbnailUrl: row.thumbnail_url ?? undefined,
+    learnerId: row.learner_id ?? undefined,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };

@@ -19,7 +19,7 @@ export interface CognivaBridge {
   getWorkspace(workspaceId: string): Promise<WorkspaceDTO>;
   updateWorkspaceMeta(
     workspaceId: string,
-    meta: { title?: string; description?: string }
+    meta: { title?: string; description?: string; learnerId?: string }
   ): Promise<WorkspaceDTO>;
   uploadWorkspacePdf(workspaceId: string, file: File): Promise<WorkspaceDTO>;
 

@@ -161,6 +161,10 @@ model workspace {
   whiteboard_snapshot Json?
   /// Small raster preview, as a data URL.
   thumbnail_url       String?
+  /// Which student the user picked (§TTS). Null on workspaces created before
+  /// the picker existed, and on any the user never chose for — both fall back
+  /// to the id-derived default.
+  learner_id          String?
   /// The uploaded reference PDF, served back by GET /workspaces/:id/pdf.
   pdf_data            Bytes?
   pdf_mime            String?

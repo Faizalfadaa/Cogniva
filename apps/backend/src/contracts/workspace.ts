@@ -46,6 +46,15 @@ export interface Workspace {
   currentWhiteboardSnapshot?: unknown;
   /** Small raster preview (data URL) shown on the Home grid. */
   thumbnailUrl?: string;
+  /**
+   * The student the user picked for this workspace ("yuzuki" | "reina" |
+   * "akira").
+   *
+   * On the wire because the backend has to speak in that character's voice
+   * (§TTS), and it cannot see the browser's localStorage. Absent on workspaces
+   * made before the picker existed; the id-derived default covers those.
+   */
+  learnerId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -127,6 +136,10 @@ export interface EvaluationReport {
 export const updateMetaSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
+  /** Bounded, not enumerated: the guard in the TTS module decides what is a
+   * usable voice, so an unknown id degrades to the default instead of 400ing a
+   * request whose only fault is a newer client. */
+  learnerId: z.string().max(40).optional(),
 });
 
 export const saveDraftSchema = z.object({

@@ -174,7 +174,7 @@ export class MockCognivaBridge implements CognivaBridge {
 
   async updateWorkspaceMeta(
     workspaceId: string,
-    meta: { title?: string; description?: string }
+    meta: { title?: string; description?: string; learnerId?: string }
   ): Promise<WorkspaceDTO> {
     await delay(200);
     const ws = store.workspaces.get(workspaceId);

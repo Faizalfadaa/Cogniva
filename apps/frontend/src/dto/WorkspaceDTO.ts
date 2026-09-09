@@ -22,6 +22,14 @@ export interface WorkspaceDTO {
   currentWhiteboardSnapshot?: unknown;
   /** Small raster thumbnail of the whiteboard, used as a preview on the Home card */
   thumbnailUrl?: string;
+  /**
+   * The student picked for this workspace ('yuzuki' | 'reina' | 'akira').
+   *
+   * On the wire because the backend speaks the learner's replies in that
+   * character's voice and cannot read this browser's localStorage. Absent on
+   * workspaces made before the picker existed.
+   */
+  learnerId?: string;
   createdAt: string;
   updatedAt: string;
 }

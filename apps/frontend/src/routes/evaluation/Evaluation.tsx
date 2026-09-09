@@ -26,7 +26,10 @@ export default function EvaluationPage() {
   // Same resolution as Workspace.tsx: the user's pick when there is one, the
   // hash-derived default otherwise — so the debrief comes from the student they
   // actually taught.
-  const learner = useMemo(() => resolveLearner(id ?? ''), [id])
+  const learner = useMemo(
+    () => resolveLearner(id ?? '', workspace?.learnerId),
+    [id, workspace?.learnerId],
+  )
 
   // Initial load
   useEffect(() => {
