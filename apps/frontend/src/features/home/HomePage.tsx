@@ -476,7 +476,10 @@ export default function HomePage() {
 
   const hasAny = workspaces.length > 0
 
+  // Must run before the early returns below: a hook skipped on the logged-out
+  // render would change the hook order and blow up on the next one.
   const tour = useAppTour('home')
+
   if (authLoading) {
     return (
       <div className={styles.layout}>

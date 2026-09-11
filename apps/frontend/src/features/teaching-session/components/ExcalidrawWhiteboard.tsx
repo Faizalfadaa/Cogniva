@@ -18,7 +18,7 @@ const AUTOSAVE_DEBOUNCE_MS = 1500
 // save at least this often so a long session is never left unsaved.
 const AUTOSAVE_MAX_INTERVAL_MS = 8000
 
-// Parchment tone to match the app's look (tldraw uses the same #f5f0e4).
+// Parchment tone to match the app's look.
 const CANVAS_BG = '#f5f0e4'
 
 // Pull the exact types straight off the component's props so we never depend on
@@ -34,7 +34,7 @@ interface ExcalidrawSnapshot {
 }
 
 // Excalidraw editor — used for PRODUCTION deployments (any non-localhost HTTPS
-// domain), where it is a safe drop-in for tldraw, which would otherwise demand a
+// domain), where it is a safe whiteboard engine without domain enforcement.
 // paid license and blank the canvas. MIT-licensed, no domain/license enforcement.
 const ExcalidrawWhiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function ExcalidrawWhiteboard(
   { initialSnapshot, onAutosave, readOnly = false },
@@ -44,7 +44,7 @@ const ExcalidrawWhiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(funct
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Only adopt a stored snapshot if it actually looks like an Excalidraw scene —
-  // a tldraw snapshot from a different deployment must not crash the load.
+  // an incompatible snapshot from an older deployment must not crash the load.
   const initialData = useMemo<ComponentProps<typeof Excalidraw>['initialData']>(() => {
     const s = initialSnapshot as ExcalidrawSnapshot | undefined
     const elements = s && Array.isArray(s.elements) ? s.elements : []

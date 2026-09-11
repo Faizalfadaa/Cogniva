@@ -91,7 +91,7 @@ describe("workspace persistence", () => {
     // Timestamps survive the DateTime column as the same ISO instant.
     expect(new Date(loaded!.createdAt).getTime()).toBe(new Date(ws.createdAt).getTime());
 
-    const snapshot = { store: "tldraw", shapes: [{ id: "shape:a", x: 1.5 }] };
+    const snapshot = { store: "excalidraw", elements: [{ id: "shape:a", x: 1.5 }] };
     await workspaces.save({
       ...loaded!,
       title: "Fotosintesis",

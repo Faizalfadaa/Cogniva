@@ -4,7 +4,7 @@ export interface TeachingCheckpointDTO {
   id: string;
   /** Snapshot image of the canvas, sent to Vision when the Teach button is pressed */
   snapshotImageUrl: string;
-  /** The tldraw document snapshot (JSON) so the whiteboard can be restored exactly */
+  /** The Excalidraw scene snapshot (JSON) so the whiteboard can be restored exactly */
   whiteboardSnapshot: unknown;
   /** URL of the user's spoken-explanation audio recorded during editing, uploaded with the Teach press */
   audioUrl?: string;
