@@ -543,8 +543,8 @@ export async function resumeSession(id: string): Promise<Workspace | undefined> 
 /** Shown in the chat when the session runs out of token budget (§7.3). The
  * workspace UI has no separate banner, so this speaks in the student's voice. */
 const BUDGET_EXCEEDED_REPLY =
-  "Waduh, sesi ini sudah mencapai batas token untuk babak ini. " +
-  "Yuk akhiri dulu babak ini supaya aku bisa kasih evaluasinya.";
+  "Ah, this session has hit its token limit for this round. " +
+  "Let's wrap it up here so I can give you my evaluation!";
 
 /**
  * What one teaching turn produced. `text` is always readable prose so a client

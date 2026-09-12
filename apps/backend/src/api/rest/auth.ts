@@ -17,7 +17,7 @@ const credentialsSchema = z.object({
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post("/auth/register", async (req, reply) => {
     const parsed = credentialsSchema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send({ detail: "Username dan password wajib diisi" });
+    if (!parsed.success) return reply.code(400).send({ detail: "Username and password are required" });
 
     try {
       const user = await registerUser(parsed.data);
@@ -25,9 +25,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       reply.code(201);
       return { user };
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Register gagal";
+      const message = err instanceof Error ? err.message : "Registration failed";
       if (message.includes("Unique constraint")) {
-        return reply.code(409).send({ detail: "Username sudah dipakai" });
+        return reply.code(409).send({ detail: "That username is already taken" });
       }
       return reply.code(400).send({ detail: message });
     }
@@ -35,10 +35,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/auth/login", async (req, reply) => {
     const parsed = credentialsSchema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send({ detail: "Username dan password wajib diisi" });
+    if (!parsed.success) return reply.code(400).send({ detail: "Username and password are required" });
 
     const user = await loginUser(parsed.data);
-    if (!user) return reply.code(401).send({ detail: "Username atau password salah" });
+    if (!user) return reply.code(401).send({ detail: "Wrong username or password" });
     setSessionCookie(reply, user);
     return { user };
   });
