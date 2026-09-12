@@ -245,6 +245,37 @@ export const REFERENCER_MAX_FETCH_CHARS: number = num(
   60_000,
 );
 
+/**
+ * Extra hosts this deployment refuses to offer, on top of the built-in list in
+ * agents/referencer/referencer.trust.ts. Comma-separated bare domains; each one
+ * also covers its subdomains ("example.org" blocks "id.example.org").
+ *
+ * The built-in list is the policy; this is for a site that has to add to it —
+ * a local content farm, or a source a school has ruled out.
+ */
+export const REFERENCER_BLOCKED_HOSTS: readonly string[] = (
+  process.env.COGNIVA_REFERENCER_BLOCKED_HOSTS ?? ""
+)
+  .split(",")
+  .map((host) => host.trim().toLowerCase().replace(/^www\./, ""))
+  .filter((host) => host.includes("."));
+
+/**
+ * Lowest trust tier still offered: "high" (universities, government bodies,
+ * journals, open textbooks), "medium" (publishers with a real editorial
+ * process), or "low" (anything not on the blocklist).
+ *
+ * "low" is the default, and it is not a weak setting — the blocklist has already
+ * removed the sources that have no accountability at all. What is left at "low"
+ * is an unrecognised host, which is usually a departmental page rather than a
+ * bad one; it is ranked last and labelled so the user can judge it. Raise this
+ * to "medium" when the list has to be defensible without the user looking.
+ */
+export const REFERENCER_MIN_TRUST: "high" | "medium" | "low" = ((): "high" | "medium" | "low" => {
+  const raw = (process.env.COGNIVA_REFERENCER_MIN_TRUST ?? "").trim().toLowerCase();
+  return raw === "high" || raw === "medium" || raw === "low" ? raw : "low";
+})();
+
 // --- ASR (§3.5) ------------------------------------------------------------
 
 /**

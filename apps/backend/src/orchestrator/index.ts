@@ -338,12 +338,12 @@ export class Orchestrator {
         const focus =
           step.focus?.trim() ||
           ctx.interpretation?.suggestedClarification ||
-          "bagian yang tidak terbaca";
+          "the part that could not be read";
         try {
           const second = await this.vision.interpret(
             snapshot,
             null,
-            `${topic.title} — verifikasi baca ulang: ${focus}`,
+            `${topic.title} — reread check: ${focus}`,
             ctx.interpretation?.elements,
             args.onUsage,
           );

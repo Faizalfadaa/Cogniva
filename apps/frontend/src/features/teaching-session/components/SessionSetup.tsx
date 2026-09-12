@@ -79,7 +79,7 @@ export function SessionSetup({
       return true
     } catch (err) {
       console.error('[SessionSetup] updateWorkspaceMeta failed', err)
-      if (alive.current) setError('Judul materi gagal disimpan. Coba lagi.')
+      if (alive.current) setError('Could not save the topic. Try again.')
       return false
     }
   }, [bridge, workspaceId, trimmedTopic, scope, onWorkspaceChange])
@@ -92,10 +92,10 @@ export function SessionSetup({
         const ws = await bridge.uploadWorkspacePdf(workspaceId, file)
         if (!alive.current) return
         onWorkspaceChange(ws)
-        setAttached(`PDF terpasang: ${file.name}`)
+        setAttached(`PDF attached: ${file.name}`)
       } catch (err) {
         console.error('[SessionSetup] uploadWorkspacePdf failed', err)
-        if (alive.current) setError('PDF gagal diunggah. Coba berkas lain.')
+        if (alive.current) setError('Could not upload the PDF. Try another file.')
       } finally {
         if (alive.current) setBusy(false)
       }
@@ -111,10 +111,10 @@ export function SessionSetup({
       const result = await bridge.saveReferenceText(workspaceId, pasted)
       if (!alive.current) return
       onWorkspaceChange(result.workspace)
-      setAttached(`Materi tersimpan (${result.chars.toLocaleString('id-ID')} karakter).`)
+      setAttached(`Material saved (${result.chars.toLocaleString('en-US')} characters).`)
     } catch (err) {
       console.error('[SessionSetup] saveReferenceText failed', err)
-      if (alive.current) setError('Materi gagal disimpan. Coba lagi.')
+      if (alive.current) setError('Could not save the material. Try again.')
     } finally {
       if (alive.current) setBusy(false)
     }
@@ -146,25 +146,25 @@ export function SessionSetup({
 
   return (
     <>
-      <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="Siapkan sesi">
+      <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="Set up the session">
         <div className={styles.panel}>
           <div className={styles.intro}>
             <img src={learner.avatarUrl} alt="" aria-hidden="true" className={styles.avatar} />
             <div>
-              <h2 className={styles.title}>Mau mengajarkan apa hari ini?</h2>
+              <h2 className={styles.title}>What are you teaching today?</h2>
               <p className={styles.subtitle}>
-                {learner.name} akan belajar dari penjelasanmu. Tulis materinya dulu, supaya
-                penilaian di akhir sesi menyorot hal yang memang ingin kamu uji.
+                {learner.name} will learn from your explanation. Write the topic down first, so
+                the evaluation at the end highlights what you actually meant to test.
               </p>
             </div>
           </div>
 
           <label className={styles.field}>
-            <span className={styles.label}>Materi yang ingin diuji</span>
+            <span className={styles.label}>Topic to be assessed</span>
             <input
               className={styles.input}
               value={topic}
-              placeholder="Misalnya: Fotosintesis, Hukum Newton, Struktur Data Stack"
+              placeholder="For example: Photosynthesis, Newton's laws, the stack data structure"
               onChange={(event) => setTopic(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && trimmedTopic && !busy) void handleStart()
@@ -176,13 +176,13 @@ export function SessionSetup({
 
           <label className={styles.field}>
             <span className={styles.label}>
-              Bagian mana yang mau ditekankan? <em className={styles.optional}>opsional</em>
+              Which part should it focus on? <em className={styles.optional}>optional</em>
             </span>
             <textarea
               className={styles.textarea}
               value={scope}
               rows={2}
-              placeholder="Misalnya: cukup reaksi terang saja, sampai peran klorofil"
+              placeholder="For example: just the light-dependent reactions, up to the role of chlorophyll"
               onChange={(event) => setScope(event.target.value)}
               disabled={busy}
             />
@@ -192,11 +192,11 @@ export function SessionSetup({
               answer key still runs, it is simply graded on the explanation alone. */}
           <div className={styles.referenceBlock}>
             <div className={styles.label}>
-              Bahan acuan penilaian <em className={styles.optional}>opsional</em>
+              Reference material for grading <em className={styles.optional}>optional</em>
             </div>
             <p className={styles.hint}>
-              Dipakai penilai di akhir sesi untuk mengecek penjelasanmu. {learner.name} tidak
-              pernah melihatnya.
+              Used by the evaluator at the end of the session to check your explanation.
+              {learner.name} never sees it.
             </p>
 
             <div className={styles.modes}>
@@ -206,11 +206,11 @@ export function SessionSetup({
                 onClick={() => setMode(mode === 'paste' ? 'none' : 'paste')}
                 disabled={busy}
               >
-                ✍️ Tulis / tempel materi
+                ✍️ Write / paste material
               </button>
 
               <label className={styles.mode} aria-disabled={busy}>
-                📎 Unggah PDF
+                📎 Upload PDF
                 <input
                   type="file"
                   accept="application/pdf,.pdf"
@@ -231,11 +231,11 @@ export function SessionSetup({
                 disabled={busy || !trimmedTopic}
                 title={
                   trimmedTopic
-                    ? 'Cari sumber untuk topik ini'
-                    : 'Tulis materinya dulu supaya pencarian tahu harus mencari apa'
+                    ? 'Find sources for this topic'
+                    : 'Write the topic first so the search knows what to look for'
                 }
               >
-                🔎 Carikan referensi
+                🔎 Find reference material
               </button>
             </div>
 
@@ -245,13 +245,13 @@ export function SessionSetup({
                   className={styles.pasteArea}
                   value={pasted}
                   rows={7}
-                  placeholder="Tempel catatan, ringkasan bab, atau poin-poin yang harus kamu sebutkan…"
+                  placeholder="Paste notes, a chapter summary, or the points you need to cover…"
                   onChange={(event) => setPasted(event.target.value)}
                   disabled={busy}
                 />
                 <div className={styles.pasteFoot}>
                   <span className={styles.counter}>
-                    {pasted.trim().length.toLocaleString('id-ID')} karakter
+                    {pasted.trim().length.toLocaleString('en-US')} characters
                   </span>
                   <button
                     type="button"
@@ -259,7 +259,7 @@ export function SessionSetup({
                     onClick={() => void handleSavePaste()}
                     disabled={busy || !pasted.trim()}
                   >
-                    Simpan materi
+                    Save material
                   </button>
                 </div>
               </div>
@@ -270,8 +270,8 @@ export function SessionSetup({
                 ✓{' '}
                 {attached ||
                   (workspace?.pdfUrl
-                    ? 'PDF acuan sudah terpasang.'
-                    : `Acuan: ${workspace?.referenceSource?.title}`)}
+                    ? 'Reference PDF attached.'
+                    : `Reference: ${workspace?.referenceSource?.title}`)}
               </p>
             )}
           </div>
@@ -282,7 +282,7 @@ export function SessionSetup({
             {/* Skipping is a real answer: someone who wants to start explaining
                 immediately can, and the header keeps every one of these controls. */}
             <button type="button" className={styles.ghostBtn} onClick={onDone} disabled={busy}>
-              Lewati
+              Skip
             </button>
             <button
               type="button"
@@ -290,7 +290,7 @@ export function SessionSetup({
               onClick={() => void handleStart()}
               disabled={busy || !trimmedTopic}
             >
-              {busy ? 'Menyimpan…' : 'Mulai mengajar'}
+              {busy ? 'Saving…' : 'Start teaching'}
             </button>
           </footer>
         </div>

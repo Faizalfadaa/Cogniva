@@ -21,12 +21,47 @@ const KIND_ICON: Record<ReferenceOptionDTO['kind'], string> = {
 }
 
 /**
+ * What the trust tier means, in the user's words.
+ *
+ * Two different claims sit side by side on each card and the labels have to keep
+ * them apart: 'confirmed' means the link is real (a search returned it),
+ * while these say who is answerable for its contents. A link can be perfectly
+ * real and still be a source nobody stands behind.
+ */
+const TRUST_BADGE: Record<
+  ReferenceOptionDTO['trust'],
+  { label: string; title: string; className: keyof typeof styles }
+> = {
+  high: {
+    label: 'institutional',
+    title: 'A university, government body, journal, or open-textbook publisher',
+    className: 'badgeHigh',
+  },
+  medium: {
+    label: 'edited',
+    title: 'A publisher with a named editorial process',
+    className: 'badgeMid',
+  },
+  low: {
+    label: 'unrecognised',
+    title: 'Not a publisher this app recognises — open it and check before using it',
+    className: 'badgeLow',
+  },
+}
+
+/**
  * Finds reference material for a user who has none.
  *
  * The whole point of the dialog is that the user *chooses*: the agent searches
  * and describes, but a suggestion only becomes this session's answer key when
  * someone picks it. So every option keeps its real link, openable in a new tab
- * before deciding, and the corroboration flag is shown rather than hidden.
+ * before deciding, and both flags on a card are shown rather than hidden: who
+ * answers for the source, and whether a search actually returned the link.
+ *
+ * The list can therefore come back shorter than the user asked for. That is the
+ * backend refusing to offer a page nobody is accountable for, and the notice
+ * above the list says so — a short list here is a filtered one, not a failed
+ * search.
  *
  * Adopting is the slow step — the page has to be fetched and turned into notes —
  * so it reports its own outcome instead of closing optimistically. A source that
@@ -65,7 +100,7 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       setSelected(result.options[0]?.id ?? null)
     } catch (err) {
       console.error('[ReferenceFinder] suggestReferences failed', err)
-      if (alive.current) setError('Pencarian gagal. Coba lagi sebentar.')
+      if (alive.current) setError('The search failed. Try again in a moment.')
     } finally {
       if (alive.current) setSearching(false)
     }
@@ -103,14 +138,14 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       })
       if (!alive.current) return
       if (!result.ok) {
-        setError(result.problem || 'Sumber itu tidak bisa dipakai.')
+        setError(result.problem || 'That source cannot be used.')
         return
       }
-      setDone(`Referensi tersimpan (${result.chars.toLocaleString('id-ID')} karakter).`)
+      setDone(`Reference saved (${result.chars.toLocaleString('en-US')} characters).`)
       onAdopted()
     } catch (err) {
       console.error('[ReferenceFinder] useReference failed', err)
-      if (alive.current) setError('Gagal menyimpan referensi. Coba lagi.')
+      if (alive.current) setError('Could not save the reference. Try again.')
     } finally {
       if (alive.current) setAdopting(false)
     }
@@ -123,7 +158,7 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       className={styles.overlay}
       role="dialog"
       aria-modal="true"
-      aria-label="Cari referensi"
+      aria-label="Find reference material"
       onClick={(event) => {
         // Backdrop click closes, but only the backdrop — a click that started
         // inside the panel and drifted out should not throw the list away.
@@ -133,13 +168,13 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       <div className={styles.panel}>
         <header className={styles.head}>
           <div>
-            <h2 className={styles.title}>Cari referensi</h2>
+            <h2 className={styles.title}>Find reference material</h2>
             <p className={styles.subtitle}>
-              Belum punya bahan sendiri? Pilih satu sumber untuk dipakai menilai penjelasanmu
-              nanti. Materinya tidak pernah dilihat murid — hanya penilai.
+              No material of your own? Pick one source to grade your explanation against
+              later. The learner never sees it — only the evaluator does.
             </p>
           </div>
-          <button className={styles.close} onClick={onClose} aria-label="Tutup" disabled={adopting}>
+          <button className={styles.close} onClick={onClose} aria-label="Close" disabled={adopting}>
             ✕
           </button>
         </header>
@@ -148,30 +183,30 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
           <input
             className={styles.hintInput}
             value={hint}
-            placeholder={`Topik: ${topic || 'belum ada judul'} — tambahkan arahan, misal "tingkat SMA"`}
+            placeholder={`Topic: ${topic || 'untitled'} — add a steer, e.g. "high school level"`}
             onChange={(event) => setHint(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !searching) void search()
             }}
             disabled={searching || adopting}
-            aria-label="Arahan pencarian"
+            aria-label="Search steer"
           />
           <button
             className={styles.searchBtn}
             onClick={() => void search()}
             disabled={searching || adopting}
           >
-            {searching ? 'Mencari…' : 'Cari lagi'}
+            {searching ? 'Searching…' : 'Search again'}
           </button>
         </div>
 
         {suggestions?.notice && <p className={styles.notice}>{suggestions.notice}</p>}
 
         <div className={styles.list}>
-          {searching && <p className={styles.status}>Mencari sumber untuk “{topic}”…</p>}
+          {searching && <p className={styles.status}>Searching for sources on “{topic}”…</p>}
 
           {!searching && options.length === 0 && (
-            <p className={styles.status}>Tidak ada sumber yang bisa ditawarkan.</p>
+            <p className={styles.status}>No sources can be offered.</p>
           )}
 
           {!searching &&
@@ -198,16 +233,22 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
 
                   <div className={styles.meta}>
                     <span className={styles.publisher}>{option.source}</span>
+                    <span
+                      className={styles[TRUST_BADGE[option.trust].className]}
+                      title={TRUST_BADGE[option.trust].title}
+                    >
+                      {TRUST_BADGE[option.trust].label}
+                    </span>
                     {option.verified ? (
-                      <span className={styles.badgeOk} title="Muncul di hasil pencarian">
-                        terkonfirmasi
+                      <span className={styles.badgeOk} title="Appeared in the search results">
+                        confirmed
                       </span>
                     ) : (
                       <span
                         className={styles.badgeWarn}
-                        title="Belum terkonfirmasi di hasil pencarian"
+                        title="Not confirmed in the search results"
                       >
-                        belum dicek
+                        unconfirmed
                       </span>
                     )}
                     <a
@@ -217,7 +258,7 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
                       rel="noreferrer"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      buka ↗
+                      open ↗
                     </a>
                   </div>
 
@@ -233,14 +274,14 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
 
         <footer className={styles.foot}>
           <button className={styles.ghostBtn} onClick={onClose} disabled={adopting}>
-            {done ? 'Selesai' : 'Batal'}
+            {done ? 'Done' : 'Cancel'}
           </button>
           <button
             className={styles.primaryBtn}
             onClick={() => void adopt()}
             disabled={!selected || adopting || searching}
           >
-            {adopting ? 'Menyiapkan…' : 'Pakai referensi ini'}
+            {adopting ? 'Preparing…' : 'Use this source'}
           </button>
         </footer>
       </div>
