@@ -81,7 +81,7 @@ function generateMockReport(workspaceId: string): EvaluationReportDTO {
       ? [
           'The main concept you explained early in the session',
           'The step-by-step reasoning you drew on the whiteboard',
-          'The concrete example you gave — that\'s what made it click for me',
+          'The concrete example you gave, that\'s what made it click for me',
         ]
       : ['A first introduction to the topic'];
 
@@ -89,7 +89,7 @@ function generateMockReport(workspaceId: string): EvaluationReportDTO {
     count < 2
       ? [
           'The connection between the first and second concepts is still a bit fuzzy',
-          'Edge cases — we didn\'t get to them yet',
+          'Edge cases, we didn\'t get to them yet',
         ]
       : [
           'Implementation details in special cases',
@@ -100,13 +100,16 @@ function generateMockReport(workspaceId: string): EvaluationReportDTO {
   const date = now().slice(0, 10);
 
   return {
-    letter: `Hi!\n\nThank you so much for teaching me about ${topic} earlier. Seriously, I really tried to understand everything you explained — and a lot of it clicked!\n\nWhat I liked most is that you didn't jump straight to the hard stuff. You started from the basics, slowly, until I could picture the big picture. The whiteboard diagrams helped a ton too — sometimes seeing it written/drawn lands better than just hearing it.\n\nHonestly, there are a few parts I still need time to absorb. It's not your fault — I think my brain just needs a few repeats, haha. But overall, this session felt like real progress.\n\nTeach me again sometime, okay? I want to know what comes next!\n\nSee you again~\n— Your learner 🌱\n\n(${date})`,
+    letter: `Hi!\n\nThank you so much for teaching me about ${topic} earlier. Seriously, I really tried to understand everything you explained, and a lot of it clicked!\n\nWhat I liked most is that you didn't jump straight to the hard stuff. You started from the basics, slowly, until I could picture the big picture. The whiteboard diagrams helped a ton too. Sometimes seeing it written or drawn lands better than just hearing it.\n\nHonestly, there are a few parts I still need time to absorb. It's not your fault. I think my brain just needs a few repeats, haha. But overall, this session felt like real progress.\n\nTeach me again sometime, okay? I want to know what comes next!\n\nSee you again,
+Your learner
+
+(${date})`,
     notebook: {
       learned,
       stillConfused,
       reflection:
         count >= 3
-          ? 'Your explanation flowed well and had a concrete example in each part — that\'s what made it easy to follow. If you can cover the edge cases next time, it\'ll be even more complete!'
+          ? 'Your explanation flowed well and had a concrete example in each part, that\'s what made it easy to follow. If you can cover the edge cases next time, it\'ll be even more complete!'
           : count >= 1
           ? 'The foundation is there. I feel like with a longer session I could catch even more. The whiteboard diagrams were a big help!'
           : 'This session was short, but I caught where it was heading. Let\'s go deeper next time!',
@@ -114,13 +117,73 @@ function generateMockReport(workspaceId: string): EvaluationReportDTO {
     continueLearning:
       count > 0
         ? [
-            `${topic} — advanced cases & edge cases`,
+            `${topic}: advanced cases and edge cases`,
             'Comparison with alternative approaches',
             'Real implementations / real-world examples',
           ]
         : ['VSEPR Theory', 'Molecular Orbital Diagrams'],
+    score: count > 0 ? Math.min(95, 55 + count * 10) : 0,
+    // Deliberately below score: the mock teacher names things correctly without
+    // explaining the mechanism, which is exactly the gap depthScore exists for.
+    depthScore: count > 0 ? Math.min(70, 25 + count * 8) : 0,
+    findings: mockFindings,
+    // Always both turns: the findings below cite turn 1, and trimming the
+    // transcript to the checkpoint count would leave them pointing at a turn
+    // this report does not contain.
+    transcript: mockTranscript,
   };
 }
+
+/**
+ * A board that the findings below can actually be highlighted against. The
+ * quotes are exact substrings of these turns, which is the same contract the
+ * backend guard enforces on the real Evaluator.
+ */
+const mockTranscript = [
+  {
+    turnIndex: 0,
+    boardText: 'Photosynthesis converts light, water and CO2 into glucose and oxygen.',
+  },
+  {
+    turnIndex: 1,
+    boardText: 'The light reactions run in the thylakoid membrane and make ATP.',
+    speech: 'The oxygen released comes from splitting water, not from the CO2.',
+  },
+];
+
+const mockFindings: EvaluationReportDTO['findings'] = [
+  {
+    category: 'CORRECT',
+    concept: 'Inputs and outputs',
+    detail: 'You named every input and output of the reaction accurately.',
+    evidenceTurnIndex: 0,
+    sourceQuote: 'converts light, water and CO2 into glucose and oxygen',
+  },
+  {
+    category: 'CONFUSING',
+    concept: 'Where the oxygen comes from',
+    detail: 'You said it twice in two different ways, which left me unsure.',
+    evidenceTurnIndex: 1,
+    sourceQuote: 'comes from splitting water, not from the CO2',
+    followUp: 'Say it once, in one direction: water is split, and the oxygen released comes from that water.',
+  },
+  {
+    // No sourceQuote: stands in for a finding whose quote the backend guard
+    // rejected, so the UI falls back to marking the whole turn.
+    category: 'WRONG',
+    concept: 'What ATP is for',
+    detail: 'ATP is the energy carrier, not the sugar the plant stores.',
+    evidenceTurnIndex: 1,
+    followUp: 'Separate the two next time: ATP powers the reaction, glucose is what gets stored.',
+  },
+  {
+    category: 'MISSED',
+    concept: 'The Calvin cycle',
+    detail: 'We never got to how the sugar is actually built.',
+    evidenceTurnIndex: null,
+    followUp: 'Open the next session with the Calvin cycle and walk through how carbon becomes sugar.',
+  },
+];
 
 // ---------------------------------------------------------------------------
 // MockCognivaBridge
@@ -216,44 +279,50 @@ export class MockCognivaBridge implements CognivaBridge {
   async suggestReferences(workspaceId: string, hint?: string): Promise<ReferenceSuggestionsDTO> {
     await delay(900);
     const ws = store.workspaces.get(workspaceId);
-    const topic = ws?.title?.trim() || 'topik ini';
+    const topic = ws?.title?.trim() || 'this topic';
     const query = encodeURIComponent([topic, hint].filter(Boolean).join(' ').trim());
 
     return {
       topic,
       source: 'offline',
       notice:
-        'Mode mock: ini pintu masuk ke perpustakaan terbuka, bukan judul dokumen tertentu.',
+        'Mock mode: these are entry points into open libraries, not specific document titles.',
       options: [
+        // Mirrors the backend's offline list, source policy included: no
+        // open-edit wiki appears here either, or the mock would show a card the
+        // real agent is no longer able to produce.
         {
-          id: 'wikipedia-1',
-          title: `Wikipedia: ${topic}`,
-          url: `https://en.wikipedia.org/wiki/Special:Search?search=${query}&go=Go`,
-          source: 'Wikipedia',
-          kind: 'article',
-          summary: 'Ringkasan ensiklopedis dengan definisi dan daftar rujukan.',
-          whyRelevant: 'Cakupan luas, cocok sebagai kerangka awal.',
-          verified: false,
-        },
-        {
-          id: 'khan-academy-2',
-          title: `Khan Academy — materi tentang ${topic}`,
-          url: `https://www.khanacademy.org/search?page_search_query=${query}`,
-          source: 'Khan Academy',
-          kind: 'course',
-          summary: 'Pelajaran singkat dan latihan bertingkat untuk pelajar.',
-          whyRelevant: 'Bahasanya dekat dengan cara menjelaskan ke pemula.',
-          verified: false,
-        },
-        {
-          id: 'openstax-3',
-          title: `OpenStax — buku teks terbuka tentang ${topic}`,
+          id: 'openstax-1',
+          title: `OpenStax — open textbook on ${topic}`,
           url: `https://openstax.org/search?q=${query}`,
           source: 'OpenStax',
           kind: 'pdf',
-          summary: 'Buku teks kuliah gratis, tersedia sebagai PDF per bab.',
-          whyRelevant: 'Pilihan terbaik kalau butuh PDF yang bisa diunduh.',
+          summary: 'Free university textbooks, available as a PDF per chapter.',
+          whyRelevant: 'The best option when you need a downloadable PDF.',
           verified: false,
+          trust: 'high',
+        },
+        {
+          id: 'libretexts-2',
+          title: `LibreTexts — textbook chapter on ${topic}`,
+          url: `https://libretexts.org/search.html?q=${query}`,
+          source: 'LibreTexts',
+          kind: 'book',
+          summary: 'Open textbooks run by a consortium of universities.',
+          whyRelevant: 'University-level depth, broken down by section.',
+          verified: false,
+          trust: 'high',
+        },
+        {
+          id: 'britannica-3',
+          title: `Encyclopaedia Britannica: ${topic}`,
+          url: `https://www.britannica.com/search?query=${query}`,
+          source: 'Encyclopaedia Britannica',
+          kind: 'article',
+          summary: 'Encyclopedia articles that are editorially reviewed and carry a named author.',
+          whyRelevant: 'Broad coverage, a good opening framework.',
+          verified: false,
+          trust: 'medium',
         },
       ],
     };
@@ -267,7 +336,7 @@ export class MockCognivaBridge implements CognivaBridge {
     const ws = store.workspaces.get(workspaceId);
     if (!ws) throw new Error(`[Mock] Workspace not found: ${workspaceId}`);
 
-    const text = `Catatan referensi tiruan dari ${choice.url}`;
+    const text = `Mock reference notes from ${choice.url}`;
     store.workspaces.set(workspaceId, {
       ...ws,
       referenceSource: {

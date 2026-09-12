@@ -250,7 +250,7 @@ export async function suggestReferences(
 /** The outcome of adopting a suggested source. */
 export interface UseReferenceResult {
   ok: boolean;
-  /** Empty when ok; otherwise why the source could not be used, in Indonesian. */
+  /** Empty when ok; otherwise why the source could not be used, in English. */
   problem: string;
   /** How much reference text was extracted. Useful signal for the UI. */
   chars: number;
@@ -555,8 +555,8 @@ export async function resumeSession(id: string): Promise<Workspace | undefined> 
 /** Shown in the chat when the session runs out of token budget (§7.3). The
  * workspace UI has no separate banner, so this speaks in the student's voice. */
 const BUDGET_EXCEEDED_REPLY =
-  "Waduh, sesi ini sudah mencapai batas token untuk babak ini. " +
-  "Yuk akhiri dulu babak ini supaya aku bisa kasih evaluasinya.";
+  "Ah, this session has hit its token limit for this round. " +
+  "Let's wrap it up here so I can give you my evaluation!";
 
 /**
  * What one teaching turn produced. `text` is always readable prose so a client
@@ -682,6 +682,13 @@ async function runEvaluation(ws: Workspace): Promise<void> {
       turnCount: session.turnCount,
       learnerState: await sessions.getLearnerState(session.sessionId),
       meaningfulScore: !usedMock,
+      // The same turns the Evaluator read, minus the student's own replies:
+      // the debrief highlights what the user taught, not what it answered.
+      transcript: transcript.map((turn) => ({
+        turnIndex: turn.turnIndex,
+        boardText: turn.boardText,
+        speech: turn.speech,
+      })),
     }),
   );
 }
@@ -843,6 +850,7 @@ function emptyEvaluation(sessionId: string) {
     evaluationId: newId("ev"),
     sessionId,
     score: 0,
+    depthScore: 0,
     findings: [],
     summary: "",
     strengths: [],

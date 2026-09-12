@@ -61,7 +61,9 @@ export async function runEvaluator(
       user,
       schema: EVALUATOR_LLM_OUTPUT_SCHEMA,
     });
-    return normalizeEvaluation(raw, input.sessionId, evaluationId);
+    // The turns go along so the guard can verify each finding's sourceQuote
+    // against the text it claims to come from.
+    return normalizeEvaluation(raw, input.sessionId, evaluationId, input.turns);
   } catch (error) {
     console.error("[EvaluatorAgent] Failed, using deterministic fallback:", error);
     return mockEvaluator(input, evaluationId);

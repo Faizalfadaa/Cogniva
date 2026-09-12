@@ -15,6 +15,14 @@
  * back empty, referencer.fetch.ts downloads the page directly; see its header
  * for why that fallback is not optional.
  *
+ * Every candidate then goes through the source policy in referencer.trust.ts
+ * before it is offered. What this agent produces is the Evaluator's marking key,
+ * so a page nobody is answerable for does not merely mislead the student — it
+ * marks a correct explanation wrong. Open-edit wikis, Q&A sites and note dumps
+ * are dropped there rather than ranked down, which is why a thin list can be a
+ * correct one, and why the search is allowed one retry that names the hosts it
+ * just lost.
+ *
  * Offline behavior matches every other agent: no credential, USE_MOCK_AI, or a
  * failed call all land on the deterministic list rather than an error. Nothing
  * here throws.
@@ -29,7 +37,12 @@ import {
   REFERENCER_LLM_OUTPUT_SCHEMA,
 } from "../../llm/prompts/referencer.prompt.js";
 import { fetchSourceText } from "./referencer.fetch.js";
-import { normalizeFetchedText, normalizeOptions, optionsFromSources } from "./referencer.guard.js";
+import {
+  normalizeFetchedText,
+  normalizeOptions,
+  optionsFromSources,
+  type GuardedOptions,
+} from "./referencer.guard.js";
 import { suggestOffline } from "./referencer.mock.js";
 import type {
   FetchedReference,
@@ -42,12 +55,17 @@ import type {
 const UNREADABLE = "UNREADABLE";
 
 const THIN_RESULT_NOTICE =
-  "Pencarian hanya menemukan sedikit sumber yang bisa dipakai. Kalau tidak ada yang cocok, " +
-  "kamu masih bisa mengunggah PDF sendiri.";
+  "The search found only a few usable sources. If none of them fit, you can still upload " +
+  "a PDF of your own.";
 
 const UNVERIFIED_NOTICE =
-  "Sebagian tautan di bawah belum terkonfirmasi muncul di hasil pencarian — periksa dulu " +
-  "sebelum dipakai.";
+  "Some of the links below were not confirmed to appear in the search results — open them " +
+  "and check before using one.";
+
+const REJECTED_NOTICE =
+  "Some results were skipped because nobody is answerable for what they say — open-edit " +
+  "wikis such as Wikipedia, Q&A sites, and personal uploads. This material becomes the " +
+  "marking key for your explanation, so its source has to be accountable.";
 
 function client(maxTokens: number = config.REFERENCER_MAX_TOKENS): LLMClient {
   return new LLMClient({
@@ -77,34 +95,72 @@ export async function suggestReferences(
   }
 }
 
-/** The grounded search + shaping pair. */
+/**
+ * The grounded search + shaping pair, plus at most one retry.
+ *
+ * The retry exists because of how this search fails in practice. It does not
+ * come back empty — it comes back with the encyclopedia article every search for
+ * a school topic surfaces first, which the source policy then removes, leaving a
+ * list too short to choose from. Telling the model which hosts it just lost and
+ * asking again is the cheapest way out of that, and it is skipped entirely when
+ * the first pass already produced enough. Costing a second call on every request
+ * to guard against an uncommon case would be the wrong trade.
+ */
 async function searchForReferences(args: SuggestReferencesArgs): Promise<ReferenceSuggestions> {
   const topic = args.topic.trim();
   const limit = args.count ?? config.REFERENCER_OPTIONS;
 
-  const search = buildReferenceSearchPrompt(args);
+  let { options, rejected } = await runSearch(args, limit);
+
+  if (options.length < Math.min(2, limit) && rejected.length > 0) {
+    const retry = await runSearch(args, limit, rejected);
+    if (retry.options.length > options.length) {
+      options = retry.options;
+      rejected = [...new Set([...rejected, ...retry.rejected])];
+    }
+  }
+
+  // Nothing survived: a genuine miss, and the offline libraries are a more
+  // useful answer than an empty list.
+  if (options.length === 0) {
+    const offline = suggestOffline(args);
+    return rejected.length > 0
+      ? { ...offline, notice: `${REJECTED_NOTICE} ${offline.notice}` }
+      : offline;
+  }
+
+  const notices: string[] = [];
+  if (options.length < Math.min(2, limit)) notices.push(THIN_RESULT_NOTICE);
+  // Worth saying only when it explains something the user can see — a list that
+  // came back shorter than they asked for.
+  if (rejected.length > 0 && options.length < limit) notices.push(REJECTED_NOTICE);
+  if (options.some((option) => !option.verified)) notices.push(UNVERIFIED_NOTICE);
+
+  return { topic, options, source: "search", notice: notices.join(" ") };
+}
+
+/** One grounded search, shaped and filtered. `avoid` is passed on to the prompt. */
+async function runSearch(
+  args: SuggestReferencesArgs,
+  limit: number,
+  avoid: readonly string[] = [],
+): Promise<GuardedOptions> {
+  const search = buildReferenceSearchPrompt(args, avoid);
   const searcher = client();
   const found = await searcher.grounded({ ...search, mode: "search" });
   if (args.onUsage && searcher.lastUsage) args.onUsage(searcher.lastUsage);
 
-  let options = await shapeIntoOptions(found.text, found.sources, limit, args.onUsage);
+  const shaped = await shapeIntoOptions(found.text, found.sources, limit, args.onUsage);
+  if (shaped.options.length > 0) return shaped;
 
   // The shaping pass produced nothing usable, but the search itself did find
-  // pages. Offer those rather than pretending the search failed.
-  if (options.length === 0) options = optionsFromSources(found.sources, limit);
-
-  // Still nothing: this is a genuine miss, and the offline libraries are a more
-  // useful answer than an empty list.
-  if (options.length === 0) return suggestOffline(args);
-
-  const notice =
-    options.length < Math.min(2, limit)
-      ? THIN_RESULT_NOTICE
-      : options.some((option) => !option.verified)
-        ? UNVERIFIED_NOTICE
-        : "";
-
-  return { topic, options, source: "search", notice };
+  // pages. Offer those rather than pretending the search failed — and keep the
+  // hosts it rejected, since the retry above is steered by them.
+  const direct = optionsFromSources(found.sources, limit);
+  return {
+    options: direct.options,
+    rejected: [...new Set([...shaped.rejected, ...direct.rejected])],
+  };
 }
 
 /** Second pass: prose -> JSON, with no tools attached so structured output works. */
@@ -113,8 +169,8 @@ async function shapeIntoOptions(
   sources: GroundedSource[],
   limit: number,
   onUsage: SuggestReferencesArgs["onUsage"],
-): Promise<ReferenceSuggestions["options"]> {
-  if (!prose.trim()) return [];
+): Promise<GuardedOptions> {
+  if (!prose.trim()) return { options: [], rejected: [] };
   try {
     const shaper = client();
     const data = await shaper.structured({
@@ -122,11 +178,18 @@ async function shapeIntoOptions(
       schema: REFERENCER_LLM_OUTPUT_SCHEMA,
     });
     if (onUsage && shaper.lastUsage) onUsage(shaper.lastUsage);
-    return normalizeOptions(data as unknown as ReferencerLLMOutput, sources, limit);
+    const guarded = normalizeOptions(data as unknown as ReferencerLLMOutput, sources, limit);
+    if (guarded.rejected.length > 0) {
+      console.warn(
+        "[ReferencerAgent] Dropped sources with no accountable publisher:",
+        guarded.rejected.join(", "),
+      );
+    }
+    return guarded;
   } catch (error) {
     // Non-fatal: the caller falls back to the grounded sources themselves.
     console.error("[ReferencerAgent] Failed to shape search results:", error);
-    return [];
+    return { options: [], rejected: [] };
   }
 }
 
@@ -177,7 +240,7 @@ export async function fetchReferenceText(
     ...base,
     problem:
       direct.problem ||
-      "Halaman itu tidak berisi teks yang cukup untuk dipakai sebagai referensi. Coba opsi lain.",
+      "That page does not hold enough text to use as reference material. Try another option.",
   };
 }
 

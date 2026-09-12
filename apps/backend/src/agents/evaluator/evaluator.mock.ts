@@ -39,12 +39,24 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
         concept,
         detail: "This key concept wasn't touched on at all during the session.",
         evidenceTurnIndex: null,
+        followUp: `Next session, open with ${concept} and walk through how it works before moving on.`,
       });
     }
   }
 
   const total = input.keyConcepts.length || 1;
   const score = input.turns.length === 0 ? 0 : Math.round((covered.length / total) * 100);
+
+  // Keyword coverage can say whether a concept was mentioned, never how deeply
+  // it was explained, so there is no honest offline measure of depth. What the
+  // transcript does support is a volume proxy, capped at 50: non-zero once the
+  // user actually wrote something, never high enough to pass for a judgement
+  // the offline path did not make.
+  const explained = input.turns
+    .map((turn) => `${turn.boardText ?? ""} ${turn.speech ?? ""}`.trim())
+    .join(" ");
+  const depthScore =
+    input.turns.length === 0 ? 0 : Math.min(50, Math.round(explained.length / 20));
 
   // Watch for any common misconception surfacing verbatim in the transcript.
   for (const belief of input.commonMisconceptions) {
@@ -55,6 +67,7 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
         concept: "Common misconception",
         detail: `Your explanation brushed against a common misconception: "${belief}".`,
         evidenceTurnIndex: idx,
+        followUp: `Check what the reference says about "${belief}", then say the correct version out loud before you teach it again.`,
       });
     }
   }
@@ -63,6 +76,7 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
     evaluationId,
     sessionId: input.sessionId,
     score,
+    depthScore,
     findings,
     summary:
       input.turns.length === 0

@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import styles from '../../../styles/Evaluation.module.css'
 import { useT } from '../../../i18n/LanguageProvider'
 import type { MessageKey } from '../../../i18n/messages'
+import styles from '../../../styles/Evaluation.module.css'
 
 interface EvaluationProcessingProps {
   workspaceId: string
@@ -11,6 +11,8 @@ interface EvaluationProcessingProps {
 
 const MESSAGES: MessageKey[] = [
   'evaluation.processing1',
+  'evaluation.processing2b',
+  'evaluation.processing2c',
   'evaluation.processing2',
   'evaluation.processing3',
   'evaluation.processing4',
@@ -42,7 +44,7 @@ export function EvaluationProcessing({ workspaceId, workspaceTitle }: Evaluation
     }, MESSAGE_INTERVAL_MS)
 
     return () => clearInterval(interval)
-  }, [t])
+  }, [])
 
   return (
     <div className={styles.processingPage}>

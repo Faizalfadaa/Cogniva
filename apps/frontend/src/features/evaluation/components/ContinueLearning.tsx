@@ -1,5 +1,5 @@
-import styles from '../../../styles/Evaluation.module.css'
 import { useT } from '../../../i18n/LanguageProvider'
+import styles from '../../../styles/Evaluation.module.css'
 
 interface ContinueLearningProps {
   topics: string[]
@@ -14,7 +14,6 @@ export function ContinueLearning({ topics, onNewSession, onResumeSession, resumi
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>
-        <span>🌱</span>
         <span>{t('evaluation.continueLearning')}</span>
       </div>
 
@@ -27,7 +26,6 @@ export function ContinueLearning({ topics, onNewSession, onResumeSession, resumi
               <li key={i} className={styles.continueTopic}>
                 <span className={styles.continueTopicIndex}>{String(i + 1).padStart(2, '0')}</span>
                 <span className={styles.continueTopicName}>{topic}</span>
-                <span className={styles.continueTopicArrow}>→</span>
               </li>
             ))}
           </ul>
@@ -41,10 +39,10 @@ export function ContinueLearning({ topics, onNewSession, onResumeSession, resumi
               onClick={onResumeSession}
               disabled={resuming}
             >
-              {resuming ? t('evaluation.opening') : `${t('evaluation.continueSession')} ↩`}
+              {resuming ? t('evaluation.opening') : t('evaluation.continueSession')}
             </button>
             <button className={styles.continueBtn} onClick={onNewSession} disabled={resuming}>
-              {t('evaluation.newSession')} ↗
+              {t('evaluation.newSession')}
             </button>
           </div>
         </div>

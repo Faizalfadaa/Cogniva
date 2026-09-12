@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import styles from '../../../styles/TeachingSession.module.css'
 import type { LearnerCharacter } from '../../../lib/Learner'
 import type { ChatMessageDTO } from '../../../dto/ChatMessageDTO'
@@ -14,6 +22,7 @@ import { useT, type Translate } from '../../../i18n/LanguageProvider'
 const STAGE_MIN_PX = 300
 const STAGE_MAX_RATIO = 0.5 // at most half the canvas
 const STAGE_DEFAULT_PX = 360
+const SCROLL_BOTTOM_THRESHOLD_PX = 48
 
 interface LearnerStageProps {
   learner: LearnerCharacter
@@ -30,6 +39,7 @@ function isSpeaking(message: ChatMessageDTO | undefined, playingUrl: string | nu
   return message.learnerAudioUrl === playingUrl
 }
 
+/** Availability is passed in: "this language has no voice" is not a fact about the message. */
 function hasAudio(message: ChatMessageDTO, voice: LearnerVoice): boolean {
   if (!voice.available) return false
   return message.speech
@@ -80,7 +90,7 @@ function TranscriptBubble({
 }
 
 /**
- * The learner as a presence rather than a chat log.
+ * Character portrait above a permanently visible conversation.
  *
  * The character stands on stage and moves with their own voice: `useVoiceLevel`
  * writes the live amplitude into `--voice-level`, and the CSS drives every
@@ -89,10 +99,9 @@ function TranscriptBubble({
  * clip ends.
  *
  * A reply is spoken one sentence at a time, and its words appear as they are
- * said: the line holds a thinking mark until the first clip starts, then grows a
- * sentence per clip. Only the current line is shown. The full transcript is
- * still one click away, because losing the ability to re-read what was said
- * would be a regression, not a simplification.
+ * said: a bubble holds a thinking mark until the first clip starts, then grows a
+ * sentence per clip. With no voice for this language there is nothing to wait
+ * for and every reply simply arrives whole.
  */
 export function LearnerStage({
   learner,
@@ -103,10 +112,12 @@ export function LearnerStage({
 }: LearnerStageProps) {
   const [width, setWidth] = useState(STAGE_DEFAULT_PX)
   const [draft, setDraft] = useState('')
-  const [showTranscript, setShowTranscript] = useState(false)
+  const [characterMinimized, setCharacterMinimized] = useState(false)
+  const characterId = useId()
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
+  const followMessagesRef = useRef(true)
   const seededRef = useRef(false)
 
   const voice = useLearnerVoice()
@@ -118,9 +129,7 @@ export function LearnerStage({
     () => [...messages].reverse().find((m) => m.sender === 'learner'),
     [messages],
   )
-  const latestProgress = useUtteranceProgress(latestLearnerLine?.speech)
   const speaking = isSpeaking(latestLearnerLine, voice.playingUrl)
-  const waitingForVoice = latestProgress?.phase === 'waiting'
 
   // Legacy single-clip messages: whatever is already on screen when this opens
   // counts as heard, so reopening a conversation does not replay it.
@@ -156,13 +165,53 @@ export function LearnerStage({
     }
   }, [messages, voice.speak]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (!showTranscript) return
-    transcriptRef.current?.scrollTo({
-      top: transcriptRef.current.scrollHeight,
-      behavior: 'smooth',
+  // Polling creates a new array even when nothing visible has changed. Speech is
+  // part of the signature because a bubble grows a sentence at a time, and the
+  // transcript has to keep following it down.
+  const transcriptVersion = useMemo(
+    () =>
+      JSON.stringify(
+        messages.map(({ id, content, learnerAudioUrl, speech }) => [
+          id,
+          content,
+          learnerAudioUrl,
+          speech?.status,
+          speech?.segments.length,
+        ]),
+      ),
+    [messages],
+  )
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      followMessagesRef.current = true
+      return
+    }
+    const transcript = transcriptRef.current
+    if (transcript && followMessagesRef.current) {
+      // Apply before paint, without a smooth animation that can fight manual scrolling.
+      transcript.scrollTop = transcript.scrollHeight
+    }
+  }, [isOpen, transcriptVersion, characterMinimized])
+
+  // Keep the latest message in view as the chat grows or shrinks during the transition.
+  useLayoutEffect(() => {
+    const transcript = transcriptRef.current
+    if (!isOpen || !transcript) return
+    const observer = new ResizeObserver(() => {
+      if (followMessagesRef.current) transcript.scrollTop = transcript.scrollHeight
     })
-  }, [showTranscript, messages])
+    observer.observe(transcript)
+    return () => observer.disconnect()
+  }, [isOpen])
+
+  function handleTranscriptScroll() {
+    const transcript = transcriptRef.current
+    if (!transcript) return
+    followMessagesRef.current =
+      transcript.scrollHeight - transcript.clientHeight - transcript.scrollTop <=
+      SCROLL_BOTTOM_THRESHOLD_PX
+  }
 
   // --- drag to resize -------------------------------------------------------
   const dragging = useRef(false)
@@ -220,24 +269,30 @@ export function LearnerStage({
       <div className={styles.stageHandle} onMouseDown={onDragStart} aria-hidden="true" />
 
       <div className={styles.stageHeader}>
-        <span className={styles.stageName}>{learner.name}</span>
+        <div className={styles.stageIdentity}>
+          <img src={learner.avatarUrl} alt="" className={styles.stageHeaderAvatar} />
+          <span className={styles.stageName}>{learner.name}</span>
+        </div>
         <div className={styles.stageHeaderActions}>
           <button
-            className={showTranscript ? styles.stageIconBtnOn : styles.stageIconBtn}
-            onClick={() => setShowTranscript((open) => !open)}
-            aria-pressed={showTranscript}
-            aria-label={showTranscript ? t('stage.hideTranscript') : t('stage.showTranscript')}
-            title={showTranscript ? t('stage.hideTranscript') : t('stage.showTranscript')}
-          >
-            ☰
-          </button>
-          <button
+            type="button"
             className={styles.stageIconBtn}
             onClick={onToggle}
-            aria-label={t('common.close')}
-            title={t('common.close')}
+            aria-label={t('stage.closeChat')}
+            title={t('stage.closeChat')}
           >
-            ×
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
           </button>
         </div>
       </div>
@@ -245,7 +300,9 @@ export function LearnerStage({
       {/* Everything below reads --voice-level, set on this node each frame. */}
       <div
         ref={stageRef}
-        className={`${styles.stageBody} ${speaking ? styles.stageBodySpeaking : ''}`}
+        id={characterId}
+        aria-hidden={characterMinimized}
+        className={`${styles.stageBody} ${speaking ? styles.stageBodySpeaking : ''} ${characterMinimized ? styles.stageBodyMinimized : ''}`}
       >
         <div className={styles.stageGlow} aria-hidden="true" />
         <img
@@ -262,46 +319,55 @@ export function LearnerStage({
         </div>
       </div>
 
-      {latestLearnerLine ? (
-        <div className={styles.stageLine}>
-          <p className={styles.stageLineText} aria-live="polite">
-            {waitingForVoice
-              ? '…'
-              : spokenText(latestLearnerLine.content, latestLearnerLine.speech, latestProgress)}
-          </p>
-          {!waitingForVoice && hasAudio(latestLearnerLine, voice) && (
-            <button
-              className={styles.stageReplay}
-              onClick={() => replayOrStop(latestLearnerLine, speaking, voice)}
-              aria-label={
-                speaking ? t('stage.stopPlayback') : t('stage.replayVoice', { name: learner.name })
-              }
-            >
-              {speaking ? `◼ ${t('stage.stop')}` : `▶ ${t('stage.replay')}`}
-            </button>
-          )}
-        </div>
-      ) : (
-        <p className={styles.stageIdle}>{t('stage.idle', { name: learner.name })}</p>
-      )}
+      <div className={styles.stageChatToolbar}>
+        <button
+          type="button"
+          className={styles.stageIconBtn}
+          onClick={() => setCharacterMinimized((minimized) => !minimized)}
+          aria-expanded={!characterMinimized}
+          aria-controls={characterId}
+          aria-label={
+            characterMinimized ? t('stage.showCharacter') : t('stage.minimizeCharacter')
+          }
+          title={characterMinimized ? t('stage.showCharacter') : t('stage.minimizeCharacter')}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d={characterMinimized ? 'M12 5v14m-6-6 6 6 6-6' : 'M12 19V5m-6 6 6-6 6 6'} />
+          </svg>
+        </button>
+      </div>
 
-      {showTranscript && (
-        <div className={styles.stageTranscript} ref={transcriptRef}>
-          {messages.length === 0 ? (
-            <p className={styles.chatSidebarEmpty}>{t('stage.nothingSaid')}</p>
-          ) : (
-            messages.map((m) => (
-              <TranscriptBubble
-                key={m.id}
-                message={m}
-                learnerName={learner.name}
-                voice={voice}
-                t={t}
-              />
-            ))
-          )}
-        </div>
-      )}
+      <div
+        className={styles.stageTranscript}
+        ref={transcriptRef}
+        onScroll={handleTranscriptScroll}
+        role="log"
+        aria-label={t('stage.conversationWith', { name: learner.name })}
+      >
+        {messages.length === 0 ? (
+          <p className={styles.chatSidebarEmpty}>{t('stage.nothingSaid')}</p>
+        ) : (
+          messages.map((m) => (
+            <TranscriptBubble
+              key={m.id}
+              message={m}
+              learnerName={learner.name}
+              voice={voice}
+              t={t}
+            />
+          ))
+        )}
+      </div>
 
       <div className={styles.chatSidebarInputRow}>
         <input

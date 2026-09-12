@@ -6,13 +6,17 @@ import type { EvaluationReportDTO } from '../../dto/EvaluationReportDTO'
 import { resolveLearner } from '../../lib/Learner'
 import { EvaluationProcessing } from '../../features/evaluation/components/EvaluationProcessing'
 import { LetterFromLearner } from '../../features/evaluation/components/LetterFromLearner'
-import { Notebook } from '../../features/evaluation/components/Notebook'
 import { ContinueLearning } from '../../features/evaluation/components/ContinueLearning'
+import { ScoreBreakdown } from '../../features/evaluation/components/ScoreBreakdown'
+import { EvaluatorNotes } from '../../features/evaluation/components/EvaluatorNotes'
+import { TranscriptReview } from '../../features/evaluation/components/TranscriptReview'
 import { useLocale, usePinnedLocale, useT } from '../../i18n/LanguageProvider'
 import { LanguageToggle } from '../../i18n/LanguageToggle'
 import styles from '../../styles/Evaluation.module.css'
 
 const POLL_INTERVAL_MS = 3000
+
+type ReportTab = 'summary' | 'detail'
 
 export default function EvaluationPage() {
   const { id } = useParams<{ id: string }>()
@@ -24,6 +28,7 @@ export default function EvaluationPage() {
   const [report, setReport] = useState<EvaluationReportDTO | null>(null)
   const [loading, setLoading] = useState(true)
   const [resuming, setResuming] = useState(false)
+  const [tab, setTab] = useState<ReportTab>('summary')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // The report is written in the language the session ran in, so the page
@@ -139,9 +144,70 @@ export default function EvaluationPage() {
 
       {/* Sections */}
       <div className={styles.reportContent}>
-        <LetterFromLearner learner={learner} letter={report!.letter} />
-        <Notebook notebook={report!.notebook} learnerName={learner.name} />
-        <ContinueLearning topics={report!.continueLearning} onNewSession={handleNewSession} onResumeSession={handleResumeSession} resuming={resuming} />
+        <ScoreBreakdown
+          score={report!.score}
+          depthScore={report!.depthScore}
+          findings={report!.findings}
+          learner={learner}
+        />
+
+        <div className={styles.tabBar} role="tablist" aria-label={t('evaluation.reportView')}>
+          <button
+            type="button"
+            role="tab"
+            id="report-tab-summary"
+            aria-selected={tab === 'summary'}
+            aria-controls="report-panel-summary"
+            className={`${styles.tabButton} ${tab === 'summary' ? styles.tabButtonActive : ''}`}
+            onClick={() => setTab('summary')}
+          >
+            {t('evaluation.tabSummary')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="report-tab-detail"
+            aria-selected={tab === 'detail'}
+            aria-controls="report-panel-detail"
+            className={`${styles.tabButton} ${tab === 'detail' ? styles.tabButtonActive : ''}`}
+            onClick={() => setTab('detail')}
+          >
+            {t('evaluation.tabDetail')}
+          </button>
+        </div>
+
+        {tab === 'summary' ? (
+          <div
+            id="report-panel-summary"
+            role="tabpanel"
+            aria-labelledby="report-tab-summary"
+            className={styles.tabPanel}
+          >
+            {/* Assessment, then the learner's own words about it, then where
+                to go next. Continue Learning closes the tab because it is the
+                step out of this screen. */}
+            <EvaluatorNotes findings={report!.findings} />
+            <LetterFromLearner learner={learner} letter={report!.letter} />
+            <ContinueLearning
+              topics={report!.continueLearning}
+              onNewSession={handleNewSession}
+              onResumeSession={handleResumeSession}
+              resuming={resuming}
+            />
+          </div>
+        ) : (
+          <div
+            id="report-panel-detail"
+            role="tabpanel"
+            aria-labelledby="report-tab-detail"
+            className={styles.tabPanel}
+          >
+            <TranscriptReview
+              transcript={report!.transcript ?? []}
+              findings={report!.findings}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

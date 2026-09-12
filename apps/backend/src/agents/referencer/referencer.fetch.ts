@@ -61,13 +61,13 @@ export async function fetchSourceText(url: string): Promise<DirectFetchResult> {
   try {
     parsed = new URL(url);
   } catch {
-    return { text: "", problem: "Tautan itu tidak valid." };
+    return { text: "", problem: "That link is not valid." };
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return { text: "", problem: "Tautan itu bukan alamat web." };
+    return { text: "", problem: "That link is not a web address." };
   }
   if (isPrivateHost(parsed.hostname)) {
-    return { text: "", problem: "Alamat itu tidak boleh diambil." };
+    return { text: "", problem: "That address is not allowed to be fetched." };
   }
 
   const controller = new AbortController();
@@ -79,13 +79,13 @@ export async function fetchSourceText(url: string): Promise<DirectFetchResult> {
       headers: { "user-agent": USER_AGENT, accept: "text/html,application/pdf,text/plain,*/*" },
     });
     if (!response.ok) {
-      return { text: "", problem: `Sumber itu menolak dibuka (${response.status}).` };
+      return { text: "", problem: `That source refused to open (${response.status}).` };
     }
 
     const type = (response.headers.get("content-type") ?? "").toLowerCase();
     const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.byteLength > MAX_BYTES) {
-      return { text: "", problem: "Berkasnya terlalu besar untuk diproses." };
+      return { text: "", problem: "That file is too large to process." };
     }
 
     if (type.includes("pdf") || buffer.subarray(0, 5).toString("latin1") === "%PDF-") {
@@ -97,10 +97,10 @@ export async function fetchSourceText(url: string): Promise<DirectFetchResult> {
     if (type.startsWith("text/")) {
       return { text: buffer.toString("utf8"), problem: "" };
     }
-    return { text: "", problem: "Jenis berkas itu tidak bisa dibaca." };
+    return { text: "", problem: "That file type cannot be read." };
   } catch (error) {
     const aborted = error instanceof Error && error.name === "AbortError";
-    return { text: "", problem: aborted ? "Sumber itu terlalu lambat dibuka." : "Gagal membuka sumber itu." };
+    return { text: "", problem: aborted ? "That source took too long to open." : "Could not open that source." };
   } finally {
     clearTimeout(timer);
   }

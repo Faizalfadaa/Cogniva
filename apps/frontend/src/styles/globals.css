@@ -64,7 +64,7 @@
   --badge-completed-text: #1a5e2e;
 
   /* Typography */
-  --font-display: '', sans-serif;
+  --font-display: 'Fredoka', var(--font-body);
   --font-body: 'Plus Jakarta Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 

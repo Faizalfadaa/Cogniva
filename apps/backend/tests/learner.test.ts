@@ -73,6 +73,7 @@ describe("seedLearnerStateFromEvaluation (adaptive resume)", () => {
       evaluationId: "ev_1",
       sessionId: "ses_1",
       score: 60,
+      depthScore: 40,
       findings,
       summary: "ringkasan",
       strengths: [],

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { LearnerCharacter } from '../../../lib/Learner'
-import styles from '../../../styles/Evaluation.module.css'
 import { useT } from '../../../i18n/LanguageProvider'
+import styles from '../../../styles/Evaluation.module.css'
 
 interface LetterFromLearnerProps {
   learner: LearnerCharacter
@@ -15,7 +15,6 @@ export function LetterFromLearner({ learner, letter }: LetterFromLearnerProps) {
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>
-        <span>📩</span>
         <span>{t('evaluation.letterTitle')}</span>
       </div>
 
@@ -32,7 +31,6 @@ export function LetterFromLearner({ learner, letter }: LetterFromLearnerProps) {
             </p>
             <p className={styles.letterSealHint}>{t('evaluation.clickToOpen')}</p>
           </div>
-          <span className={styles.letterSealIcon}>✉</span>
         </div>
       ) : (
         // Opened letter

@@ -46,15 +46,13 @@ function useReveal<T extends HTMLElement>() {
   return { ref, className: shown ? `${styles.reveal} ${styles.revealIn}` : styles.reveal }
 }
 
-/** Where every call-to-action lands. Authentication is a separate workstream,
- *  so "Sign in" points at the same place as "Start teaching" for now. */
+/** Dashboard destination for returning users. */
 const APP_ENTRY = '/home'
 
 interface Step {
   num: string
   title: MessageKey
   body: (t: Translate) => ReactNode
-  dark?: boolean
 }
 
 const STEPS: Step[] = [
@@ -68,7 +66,8 @@ const STEPS: Step[] = [
     title: 'landing.step2Title',
     body: (t) => (
       <>
-        {t('landing.step2BodyA')} <strong>{t('header.teach')}</strong> {t('landing.step2BodyB')}
+        {t('landing.step2BodyA')}
+        <strong> {t('header.teach')}</strong> {t('landing.step2BodyB')}
       </>
     ),
   },
@@ -76,16 +75,15 @@ const STEPS: Step[] = [
     num: '03',
     title: 'landing.step3Title',
     body: (t) => t('landing.step3Body'),
-    dark: true,
   },
   {
     num: '04',
     title: 'landing.step4Title',
     body: (t) => (
       <>
-        {t('landing.step4BodyA')} <em>{t('evaluation.learned').toLowerCase()}</em>{' '}
-        {t('landing.step4BodyB')} <em>{t('evaluation.stillConfused').toLowerCase()}</em>,{' '}
-        {t('landing.step4BodyC')}
+        {t('landing.step4BodyA')}
+        <em> {t('evaluation.learned').toLowerCase()}</em> {t('landing.step4BodyB')}{' '}
+        <em>{t('evaluation.stillConfused').toLowerCase()}</em> {t('landing.step4BodyC')}
       </>
     ),
   },
@@ -104,11 +102,76 @@ const TEAM = [
   'Muh. Hartawan Haidir',
 ]
 
-/** Question and answer pairs for the FAQ accordion, as message keys. */
-const FAQS: Array<{ q: MessageKey; a: MessageKey }> = [
-  { q: 'landing.faq1Q', a: 'landing.faq1A' },
-  { q: 'landing.faq2Q', a: 'landing.faq2A' },
-  { q: 'landing.faq3Q', a: 'landing.faq3A' },
+/**
+ * Question and answer pairs for the FAQ accordion.
+ *
+ * The ids are anchors, not copy: the footer and the Sekolah card both link to a
+ * single row by id and open it, so they stay in English however the page reads.
+ */
+const FAQS: Array<{ id: string; q: MessageKey; a: MessageKey }> = [
+  { id: 'what-is-cogniva', q: 'landing.faqWhatQ', a: 'landing.faqWhatA' },
+  { id: 'who-is-it-for', q: 'landing.faqWhoQ', a: 'landing.faqWhoA' },
+  { id: 'getting-started', q: 'landing.faqStartQ', a: 'landing.faqStartA' },
+  { id: 'guest-and-account', q: 'landing.faqGuestQ', a: 'landing.faqGuestA' },
+  { id: 'choose-student', q: 'landing.faqStudentQ', a: 'landing.faqStudentA' },
+  { id: 'reference-material', q: 'landing.faqPdfQ', a: 'landing.faqPdfA' },
+  { id: 'voice-and-board', q: 'landing.faqVoiceQ', a: 'landing.faqVoiceA' },
+  { id: 'teach-button', q: 'landing.faqTeachQ', a: 'landing.faqTeachA' },
+  { id: 'session-report', q: 'landing.faqReportQ', a: 'landing.faqReportA' },
+  { id: 'continue-learning', q: 'landing.faqAgainQ', a: 'landing.faqAgainA' },
+  { id: 'ai-feedback', q: 'landing.faqGradeQ', a: 'landing.faqGradeA' },
+  { id: 'plans-and-access', q: 'landing.faqPlansQ', a: 'landing.faqPlansA' },
+]
+
+/** One FAQ row takes an interpolation; the rest are plain. */
+const FAQ_VALUES: Partial<Record<MessageKey, Record<string, string>>> = {
+  'landing.faqStudentA': { names: LEARNERS.map((student) => student.name).join(', ') },
+}
+
+const FOOTER_GROUPS: Array<{
+  title: MessageKey
+  links: Array<{ label: MessageKey; target: string }>
+}> = [
+  {
+    title: 'landing.footerExplore',
+    links: [
+      { label: 'landing.navHow', target: 'how' },
+      { label: 'landing.footerMeetStudents', target: 'students' },
+      { label: 'landing.footerFeedback', target: 'feedback' },
+      { label: 'landing.footerAccess', target: 'pricing' },
+      { label: 'landing.footerAllQuestions', target: 'faq' },
+    ],
+  },
+  {
+    title: 'landing.footerFirstSession',
+    links: [
+      { label: 'landing.footerGettingStarted', target: 'faq-getting-started' },
+      { label: 'landing.footerChooseStudent', target: 'faq-choose-student' },
+      { label: 'landing.footerPrepareRefs', target: 'faq-reference-material' },
+      { label: 'landing.footerBoardVoice', target: 'faq-voice-and-board' },
+      { label: 'landing.footerTeachButton', target: 'faq-teach-button' },
+    ],
+  },
+  {
+    title: 'landing.footerKeepLearning',
+    links: [
+      { label: 'landing.footerGuestOrAccount', target: 'faq-guest-and-account' },
+      { label: 'landing.footerReadReport', target: 'faq-session-report' },
+      { label: 'landing.footerAnotherRound', target: 'faq-continue-learning' },
+      { label: 'landing.footerAiFeedback', target: 'faq-ai-feedback' },
+      { label: 'landing.footerPlanAvailability', target: 'faq-plans-and-access' },
+    ],
+  },
+  {
+    title: 'landing.footerAboutCogniva',
+    links: [
+      { label: 'landing.footerApproach', target: 'about' },
+      { label: 'landing.footerLbt', target: 'faq-what-is-cogniva' },
+      { label: 'landing.footerWhoFor', target: 'faq-who-is-it-for' },
+      { label: 'landing.footerTeam', target: 'team' },
+      { label: 'landing.backToTop', target: 'top' },
+    ],
+  },
 ]
 
 /** Feature bullet marker. `on={false}` renders the muted "not included" dash. */
@@ -133,7 +196,7 @@ export default function LandingPage() {
   const teamReveal = useReveal<HTMLDivElement>()
 
   const senseiPrice = annual ? '39.000' : '49.000'
-  const senseiNote = annual ? t('landing.billedYearly') : t('landing.orAnnual')
+  const senseiNote = annual ? t('landing.proposedAnnual') : t('landing.proposedMonthly')
   const schoolPrice = annual ? '19.000' : '24.000'
 
   return (
@@ -158,14 +221,11 @@ export default function LandingPage() {
             <LanguageToggle />
             <button
               type="button"
-              className={styles.navSignIn}
+              className={styles.btnLime}
               onClick={() => setSignInOpen(true)}
             >
               {t('auth.signIn')}
             </button>
-            <Link to={APP_ENTRY} className={styles.btnLime}>
-              {t('landing.startFree')}
-            </Link>
           </div>
         </div>
       </header>
@@ -260,9 +320,7 @@ export default function LandingPage() {
             {STEPS.map((step) => (
               <div
                 key={step.num}
-                className={
-                  step.dark ? `${styles.stepCard} ${styles.stepCardDark}` : styles.stepCard
-                }
+                className={styles.stepCard}
               >
                 <span className={styles.stepNum}>{step.num}</span>
                 <h3 className={styles.stepTitle}>{t(step.title)}</h3>
@@ -271,7 +329,7 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <div className={styles.letterRow}>
+          <div id="feedback" className={styles.letterRow}>
             <div className={styles.letterCard}>
               <span className={styles.letterKicker}>{t('landing.letterKicker')}</span>
               <p className={styles.letterQuote}>{t('landing.letterQuote')}</p>
@@ -279,17 +337,17 @@ export default function LandingPage() {
             </div>
             <div className={styles.statCard}>
               <div className={styles.stat}>
-                <span className={styles.statNum}>3</span>
+                <span className={styles.statNum}>{LEARNERS.length}</span>
                 <span className={styles.statLabel}>{t('landing.stat1')}</span>
               </div>
               <div className={styles.statRule} />
               <div className={styles.stat}>
-                <span className={styles.statNum}>0</span>
+                <span className={styles.statNum}>1</span>
                 <span className={styles.statLabel}>{t('landing.stat2')}</span>
               </div>
               <div className={styles.statRule} />
               <div className={styles.stat}>
-                <span className={styles.statNum}>∞</span>
+                <span className={styles.statNum}>4</span>
                 <span className={styles.statLabel}>{t('landing.stat3')}</span>
               </div>
             </div>
@@ -305,7 +363,11 @@ export default function LandingPage() {
               <span className={styles.eyebrowOnDark}>{t('landing.studentsEyebrow')}</span>
               <h2 className={styles.h2OnDark}>{t('landing.studentsTitle')}</h2>
             </div>
-            <p className={styles.sectionHeadAsideOnDark}>{t('landing.studentsAside')}</p>
+            <p className={styles.sectionHeadAsideOnDark}>
+              {t('landing.studentsAside', {
+                names: LEARNERS.map((student) => student.name.split(' ')[0]).join(', '),
+              })}
+            </p>
           </div>
 
           <div ref={studentsReveal.ref} className={`${styles.studentGrid} ${studentsReveal.className}`}>
@@ -331,7 +393,7 @@ export default function LandingPage() {
       <section id="pricing" className={styles.pricing}>
         <div className={styles.container}>
           <div className={styles.pricingHead}>
-            <span className={styles.eyebrow}>{t('landing.navPricing')}</span>
+            <span className={styles.eyebrow}>{t('landing.pricingEyebrow')}</span>
             <h2 className={styles.h2Centered}>{t('landing.pricingTitle')}</h2>
             <p className={styles.pricingLead}>{t('landing.pricingLead')}</p>
             <div
@@ -373,11 +435,15 @@ export default function LandingPage() {
               </div>
               <div className={styles.priceRow}>
                 <span className={styles.price}>Rp 0</span>
-                <span className={styles.priceUnit}>{t('landing.forever')}</span>
+                <span className={styles.priceUnit}>{t('landing.toGetStarted')}</span>
               </div>
-              <Link to={APP_ENTRY} className={styles.planCtaGhost}>
+              <button
+                type="button"
+                className={styles.planCtaGhost}
+                onClick={() => setSignInOpen(true)}
+              >
                 {t('landing.startNow')}
-              </Link>
+              </button>
               <div className={styles.planRule} />
               <div className={styles.featureList}>
                 <div className={styles.feature}>
@@ -393,15 +459,15 @@ export default function LandingPage() {
                   <span>{t('landing.freeFeature3')}</span>
                 </div>
                 <div className={styles.feature}>
-                  <Tick on={false} />
-                  <span className={styles.featureOff}>{t('landing.freeFeature4')}</span>
+                  <Tick />
+                  <span>{t('landing.freeFeature4')}</span>
                 </div>
               </div>
             </div>
 
             {/* ── Sensei ── */}
             <div className={styles.planFeatured}>
-              <span className={styles.planBadge}>{t('landing.mostChosen')}</span>
+              <span className={styles.planBadge}>{t('landing.planPreview')}</span>
               <div className={styles.planHead}>
                 <h3 className={styles.planNameOnDark}>Sensei</h3>
                 <p className={styles.planTagOnDark}>{t('landing.senseiTag')}</p>
@@ -413,9 +479,13 @@ export default function LandingPage() {
                 </div>
                 <span className={styles.priceNote}>{senseiNote}</span>
               </div>
-              <Link to={APP_ENTRY} className={styles.planCtaLime}>
+              <button
+                type="button"
+                className={styles.planCtaLime}
+                onClick={() => setSignInOpen(true)}
+              >
                 {t('landing.takeSensei')}
-              </Link>
+              </button>
               <div className={styles.planRuleDark} />
               <div className={styles.featureList}>
                 <div className={styles.feature}>
@@ -452,10 +522,10 @@ export default function LandingPage() {
                   <span className={styles.price}>Rp {schoolPrice}</span>
                   <span className={styles.priceUnit}>{t('landing.perStudent')}</span>
                 </div>
-                <span className={styles.priceNoteLight}>{t('landing.minStudents')}</span>
+                <span className={styles.priceNoteLight}>{t('landing.schoolNote')}</span>
               </div>
-              <a href="#about" className={styles.planCtaOutline}>
-                {t('landing.talkToUs')}
+              <a href="#faq-plans-and-access" className={styles.planCtaOutline} onClick={() => setOpenFaq(FAQS.findIndex((faq) => faq.id === 'plans-and-access'))}>
+                {t('landing.aboutAvailability')}
               </a>
               <div className={styles.planRule} />
               <div className={styles.featureList}>
@@ -488,15 +558,17 @@ export default function LandingPage() {
           <div className={styles.pricingHead}>
             <span className={styles.eyebrow}>{t('landing.navFaq')}</span>
             <h2 className={styles.h2Centered}>{t('landing.faqTitle')}</h2>
+            <p className={styles.pricingLead}>{t('landing.faqLead')}</p>
           </div>
 
           <div ref={faqReveal.ref} className={`${styles.faqList} ${faqReveal.className}`}>
             {FAQS.map((item, i) => {
               const open = openFaq === i
               return (
-                <div key={item.q} className={open ? `${styles.faq} ${styles.faqOpen}` : styles.faq}>
+                <div id={`faq-${item.id}`} key={item.id} className={open ? `${styles.faq} ${styles.faqOpen}` : styles.faq}>
                   <button
                     type="button"
+                    id={`faq-q-${item.id}`}
                     className={styles.faqQ}
                     aria-expanded={open}
                     aria-controls={`faq-a-${i}`}
@@ -509,8 +581,8 @@ export default function LandingPage() {
                   </button>
                   {/* Kept mounted and collapsed by max-height so the open/close
                       is animatable and the text stays findable by Ctrl+F. */}
-                  <div id={`faq-a-${i}`} className={styles.faqAWrap} role="region">
-                    <p className={styles.faqA}>{t(item.a)}</p>
+                  <div id={`faq-a-${i}`} className={styles.faqAWrap} role="region" aria-labelledby={`faq-q-${item.id}`} aria-hidden={!open}>
+                    <p className={styles.faqA}>{t(item.a, FAQ_VALUES[item.a])}</p>
                   </div>
                 </div>
               )
@@ -535,17 +607,17 @@ export default function LandingPage() {
                 <p className={styles.beliefBody}>{t('landing.believeBody')}</p>
               </div>
               <div className={styles.beliefCard}>
-                <span className={styles.beliefKicker}>{t('landing.wontKicker')}</span>
-                <p className={styles.beliefBody}>{t('landing.wontBody')}</p>
+                <span className={styles.beliefKicker}>{t('landing.conversationKicker')}</span>
+                <p className={styles.beliefBody}>{t('landing.conversationBody')}</p>
               </div>
               <div className={styles.beliefCard}>
-                <span className={styles.beliefKicker}>{t('landing.whereKicker')}</span>
-                <p className={styles.beliefBody}>{t('landing.whereBody')}</p>
+                <span className={styles.beliefKicker}>{t('landing.reflectKicker')}</span>
+                <p className={styles.beliefBody}>{t('landing.reflectBody')}</p>
               </div>
             </div>
           </div>
 
-          <div ref={teamReveal.ref} className={teamReveal.className}>
+          <div id="team" ref={teamReveal.ref} className={teamReveal.className}>
             <TeamSlider people={TEAM} />
           </div>
         </div>
@@ -557,43 +629,58 @@ export default function LandingPage() {
           <div className={styles.closingCta}>
             <h2 className={styles.closingTitle}>{t('landing.closingTitle')}</h2>
             <p className={styles.closingLead}>{t('landing.closingLead')}</p>
-            <Link to={APP_ENTRY} className={styles.btnLimeLarge}>
+            <button
+              type="button"
+              className={styles.btnLimeLarge}
+              onClick={() => setSignInOpen(true)}
+            >
               {t('landing.startFree')}
-            </Link>
+            </button>
           </div>
 
           <div className={styles.footerRule} />
 
-          <footer className={styles.footer}>
+          <footer className={styles.footer} aria-label={t('landing.footerLabel')}>
             <div className={styles.footerBrand}>
-              <div className={styles.brand}>
+              <a href="#top" className={styles.brand} aria-label={t('landing.footerHome')}>
                 <img src="/cogniva_logo.png" alt="" aria-hidden="true" className={styles.brandMarkImg} />
                 <span className={styles.brandNameOnDark}>Cogniva</span>
-              </div>
+              </a>
               <span className={styles.footerTagline}>{t('landing.tagline')}</span>
+              <button type="button" className={styles.btnLime} onClick={() => setSignInOpen(true)}>
+                {t('landing.startSession')}
+              </button>
+              <Link to={APP_ENTRY} className={styles.footerDashboard}>
+                {t('landing.goToDashboard')} →
+              </Link>
             </div>
-            <div className={styles.footerCols}>
-              <div className={styles.footerCol}>
-                <span className={styles.footerColTitle}>{t('landing.footerProduct')}</span>
-                <a href="#how">{t('landing.navHow')}</a>
-                <a href="#students">{t('landing.navStudents')}</a>
-                <a href="#pricing">{t('landing.navPricing')}</a>
-              </div>
-              <div className={styles.footerCol}>
-                <span className={styles.footerColTitle}>{t('landing.footerCompany')}</span>
-                <a href="#about">{t('landing.navAbout')}</a>
-                <a href="#about">{t('landing.footerContact')}</a>
-                <a href="#about">{t('landing.footerCareers')}</a>
-              </div>
-              <div className={styles.footerCol}>
-                <span className={styles.footerColTitle}>{t('landing.footerLegal')}</span>
-                <a href="#about">{t('landing.footerPrivacy')}</a>
-                <a href="#about">{t('landing.footerTerms')}</a>
-              </div>
-            </div>
+            <nav className={styles.footerCols} aria-label={t('landing.footerNavLabel')}>
+              {FOOTER_GROUPS.map((group) => (
+                <div key={group.title} className={styles.footerCol}>
+                  <h3 className={styles.footerColTitle}>{t(group.title)}</h3>
+                  {group.links.map((link) => (
+                    <a
+                      key={link.target}
+                      href={`#${link.target}`}
+                      onClick={() => {
+                        const index = FAQS.findIndex((faq) => `faq-${faq.id}` === link.target)
+                        if (index >= 0) setOpenFaq(index)
+                      }}
+                    >
+                      {t(link.label)}
+                    </a>
+                  ))}
+                </div>
+              ))}
+            </nav>
           </footer>
 
-          <span className={styles.copyright}>{t('landing.copyright')}</span>
+          <div className={styles.footerBottom}>
+            <span className={styles.copyright}>
+              {t('landing.copyright', { year: new Date().getFullYear() })}
+            </span>
+            <span className={styles.copyright}>{t('landing.motto')}</span>
+          </div>
         </div>
       </section>
 

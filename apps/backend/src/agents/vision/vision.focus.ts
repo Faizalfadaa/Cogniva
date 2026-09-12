@@ -27,7 +27,7 @@ export function focusInterpretation(
     .filter((w) => w.length >= 3);
 
   if (keywords.length === 0) {
-    return text || "(tidak ada detail tambahan yang terbaca di papan)";
+    return text || "(no further detail could be read from the board)";
   }
 
   const matches = interp.elements.filter((e) =>
@@ -38,5 +38,5 @@ export function focusInterpretation(
     return matches.map((e) => `${e.type}: ${e.content}`).join("; ");
   }
 
-  return text || "(tidak ada detail tambahan yang terbaca di bagian itu)";
+  return text || "(no further detail could be read from that part)";
 }

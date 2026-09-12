@@ -76,13 +76,13 @@ export function clearSessionCookie(reply: FastifyReply): void {
 export function normalizeUsername(username: string): string {
   const value = username.trim().toLowerCase();
   if (!/^[a-z0-9_]{3,24}$/.test(value)) {
-    throw new Error("Username harus 3-24 karakter: huruf kecil, angka, atau underscore");
+    throw new Error("Username must be 3-24 characters: lowercase letters, digits, or underscore");
   }
   return value;
 }
 
 function assertPassword(password: string): void {
-  if (password.length < 8) throw new Error("Password minimal 8 karakter");
+  if (password.length < 8) throw new Error("Password must be at least 8 characters");
 }
 
 async function hashPassword(password: string): Promise<string> {

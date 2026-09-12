@@ -123,8 +123,12 @@
 }
 
 .reportLogo {
-  height: 28px;
-  width: auto;
+  height: 40px;
+  width: 40px;
+  padding: 7.5px;
+  border-radius: 10px;
+  background: var(--forest-dark);
+  display: block;
   object-fit: contain;
 }
 
@@ -180,7 +184,10 @@
 
 /* ── Sections wrapper ── */
 .reportContent {
-  max-width: 720px;
+  /* 720px left a third of a desktop screen empty. 1080px is just under the
+     landing page's 1180px container, the widest this project uses; the prose
+     inside is capped separately so lines stay readable at this width. */
+  max-width: 1080px;
   width: 100%;
   margin: 0 auto;
   padding: 48px 24px 96px;
@@ -556,4 +563,942 @@
   .continueActions { flex-direction: column-reverse; }
   .continueSecondaryBtn,
   .continueBtn { width: 100%; text-align: center; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Score + axis breakdown
+═══════════════════════════════════════════════════════════ */
+.scoreCard {
+  background: var(--forest-dark);
+  border-radius: var(--radius-lg);
+  padding: 32px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* The one place on this page that gets display type at size: the score is what
+   the user came back for, so it is the single focal point of the screen. */
+.scoreHeadline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.scoreValue {
+  font-family: var(--font-display);
+  font-size: clamp(52px, 11vw, 76px);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--lime);
+}
+
+.scoreOutOf {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-on-forest-muted);
+}
+
+.scoreCaption {
+  flex-basis: 100%;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-on-forest-muted);
+  max-width: 46ch;
+}
+
+.axisGrid {
+  display: grid;
+  /* Two by two, not four across: the column is 616px here, so four would leave
+     each label wrapping in 143px. The axes are peers, so a balanced block reads
+     better than three plus an orphan. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.axisCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.axisLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-on-forest-muted);
+}
+
+.axisValue {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-on-forest);
+}
+
+/* Unmeasurable reads as a dash, never as zero: a short session has no accuracy,
+   which is not the same as scoring nothing. */
+.axisValueEmpty {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-on-forest-faint);
+}
+
+.axisBar {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.axisBarFill {
+  height: 100%;
+  background: var(--lime);
+  border-radius: inherit;
+}
+
+.axisCaption {
+  font-size: 11px;
+  line-height: 1.5;
+  /* --text-on-forest-faint reads 3.17:1 here, which fails AA for text this
+     small; the muted tone clears it at 7.97:1. */
+  color: var(--text-on-forest-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Summary / Detail tabs
+═══════════════════════════════════════════════════════════ */
+.tabBar {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: var(--parchment);
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-pill);
+  align-self: flex-start;
+}
+
+.tabButton {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 8px 20px;
+  border-radius: var(--radius-pill);
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.tabButton:hover {
+  color: var(--text-primary);
+}
+.tabButtonActive {
+  background: var(--forest-dark);
+  color: var(--text-on-dark);
+}
+.tabButtonActive:hover {
+  color: var(--text-on-dark);
+}
+
+.tabPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Findings list
+═══════════════════════════════════════════════════════════ */
+.findingsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.findingItem {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.findingHeader {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  text-align: left;
+  transition: background var(--dur-fast);
+}
+.findingHeader:hover {
+  background: var(--parchment);
+}
+.findingHeader:focus-visible {
+  outline: 2px solid var(--green-accent);
+  outline-offset: -2px;
+}
+
+.findingBadge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+}
+
+/* Four category colours. These are status, not decoration: each one is the only
+   way to tell a finding kind at a glance, and they reuse the badge tokens the
+   app already ships so the palette does not widen. */
+.badgeCorrect {
+  background: var(--badge-completed-bg);
+  color: var(--badge-completed-text);
+}
+.badgeWrong {
+  background: #fbe3e3;
+  color: #8f2020;
+}
+.badgeConfusing {
+  background: var(--badge-evaluating-bg);
+  color: var(--badge-evaluating-text);
+}
+.badgeMissed {
+  background: var(--badge-draft-bg);
+  color: var(--badge-draft-text);
+}
+
+.findingConcept {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.findingChevron {
+  flex-shrink: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.findingBody {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.findingDetail {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.findingJump {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.findingJump:focus-visible {
+  outline: 2px solid var(--green-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.findingNoEvidence {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.findingsEmpty {
+  background: var(--card-bg);
+  border: 1px dashed var(--border-sand);
+  border-radius: var(--radius-md);
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.findingsEmptyTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.findingsEmptyHint {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  max-width: 56ch;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Transcript with per-sentence highlights
+═══════════════════════════════════════════════════════════ */
+.transcriptList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.turnCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scroll-margin-block: 96px;
+}
+
+/* A finding cited this turn but the backend could not verify its quote, so the
+   whole block is the anchor instead of one sentence. */
+.turnCardFlagged {
+  border-color: var(--border-sand);
+  background: var(--cream);
+}
+
+.turnCardFocused {
+  border-color: var(--green-accent);
+  box-shadow: 0 0 0 3px rgba(127, 160, 58, 0.18);
+}
+
+.turnIndex {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.turnBody {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+.turnSpeech {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+.turnSpeechLabel {
+  display: inline-block;
+  margin-right: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.turnWholeNote {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--divider-warm);
+  padding-top: 8px;
+}
+
+/* Marks carry the same four category colours as the badges, at a lighter weight
+   so a long highlight does not overpower the sentence around it. */
+.markCorrect,
+.markWrong,
+.markConfusing,
+.markMissed {
+  border-radius: 3px;
+  /* The negative margin cancels the padding so the highlight bleeds past the
+     glyphs without pushing the punctuation after it away. */
+  padding: 1px 2px;
+  margin: 0 -2px;
+}
+.markCorrect {
+  background: var(--badge-completed-bg);
+  color: var(--badge-completed-text);
+}
+/* Weight and an underline on top of the colour: what needs fixing should not
+   rely on hue alone to separate itself from what does not. CORRECT stays flat
+   because emphasising it would compete with the things that need attention. */
+.markWrong {
+  background: #fbe3e3;
+  color: #8f2020;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+.markConfusing {
+  background: var(--badge-evaluating-bg);
+  color: var(--badge-evaluating-text);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+.markMissed {
+  background: var(--badge-draft-bg);
+  color: var(--badge-draft-text);
+}
+
+@media (max-width: 600px) {
+  .scoreCard {
+    padding: 24px 20px;
+  }
+  .axisGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tabBar {
+    align-self: stretch;
+  }
+  .tabButton {
+    flex: 1;
+    /* 8px padding around 13px type lands at 32px, under the 44px tap target. */
+    min-height: 44px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Evaluator notes slider
+═══════════════════════════════════════════════════════════ */
+.notesIntro {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  max-width: 64ch;
+  margin-top: -6px;
+}
+
+.notesSlider {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.notesTrack {
+  /* Makes the track the offsetParent of its cards, so their offsetLeft reads as
+     a scroll position. TeamSlider sets this for the same reason; without it the
+     offsets are measured against some outer ancestor and every centre
+     calculation is off by that ancestor's inset. */
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+.notesTrack::-webkit-scrollbar {
+  display: none;
+}
+
+.noteCard {
+  /* A fixed basis, plus min-width: 0.
+     Anything relative here feeds back into the runtime end padding: a
+     percentage resolves against the track's content box, which the padding
+     shrinks, which changes the padding again. And min-width defaults to auto on
+     a flex item, so the card's own text was widening it past its basis and
+     doing the same thing by another route. */
+  flex: 0 0 300px;
+  min-width: 0;
+  max-width: 100%;
+  /* Centre snapping, paired with the end padding EvaluatorNotes measures at
+     runtime. Without that padding the end cards could never reach the middle. */
+  scroll-snap-align: center;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Off-centre cards recede so the one being read is unambiguous. */
+  opacity: 0.55;
+  transition: opacity var(--dur-base), border-color var(--dur-base);
+}
+
+.noteCardActive {
+  opacity: 1;
+  border-color: var(--border-sand);
+}
+
+.noteCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.noteCardCount {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* The concept is the claim; the detail is the argument for it. */
+.noteConcept {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.noteDetail {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.notesArrow {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  line-height: 1;
+  border-radius: 50%;
+  border: 1px solid var(--border-sand);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  transition: background var(--dur-fast), opacity var(--dur-fast);
+}
+.notesArrow:hover:not(:disabled) {
+  background: var(--parchment);
+}
+.notesArrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.notesArrow:focus-visible {
+  outline: 2px solid var(--green-accent);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Follow-up suggestion
+═══════════════════════════════════════════════════════════ */
+.followUpBox {
+  margin-top: 2px;
+  background: var(--lime-tint);
+  border-left: 3px solid var(--lime-edge);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.followUpLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--green-deep);
+}
+
+.followUpText {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Transcript review: highlights that open their own note
+═══════════════════════════════════════════════════════════ */
+
+/* A highlight is a button now, so it has to shed the button defaults and keep
+   flowing as part of the sentence around it. */
+.markButton {
+  display: inline;
+  /* Individual inherits, never the `font` shorthand: it resets font-weight, and
+     this rule sits after .markWrong/.markConfusing, so the shorthand silently
+     erased the bold that separates a problem from a correct passage. */
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  text-align: left;
+  border-radius: 3px;
+  padding: 1px 2px;
+  margin: 0 -2px;
+  cursor: pointer;
+}
+.markButton:focus-visible {
+  outline: 2px solid var(--green-accent);
+  outline-offset: 1px;
+}
+.markButtonOpen {
+  box-shadow: inset 0 0 0 2px var(--green-accent);
+}
+
+.inlineDetail {
+  margin-top: 6px;
+  background: var(--parchment);
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inlineDetailTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inlineDetailConcept {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.inlineDetailClose {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-sand);
+}
+.inlineDetailClose:hover {
+  color: var(--text-primary);
+}
+.inlineDetailClose:focus-visible {
+  outline: 2px solid var(--green-accent);
+  outline-offset: 2px;
+}
+
+.turnWholeList {
+  border-top: 1px solid var(--divider-warm);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.turnWholeLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.turnWholeButton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 6px 6px;
+  border-radius: var(--radius-pill);
+  transition: background var(--dur-fast);
+}
+.turnWholeButton:hover {
+  background: var(--parchment);
+}
+.turnWholeButton:focus-visible {
+  outline: 2px solid var(--green-accent);
+  outline-offset: 1px;
+}
+
+.turnWholeConcept {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.orphanBlock {
+  background: var(--card-bg);
+  border: 1px dashed var(--border-sand);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+/* The shell is 1080px wide now; prose is capped so lines do not run long. */
+.turnBody,
+.turnSpeech {
+  max-width: 78ch;
+}
+
+@media (max-width: 720px) {
+  .noteCard {
+    /* Fixed, like the desktop basis. A percentage here resolves against the
+       track's content box, which the runtime end padding changes, so the card
+       and the padding would resize each other on every pass. */
+    flex-basis: 260px;
+  }
+  .notesArrow {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Session highlights: the best thing, and the first fix
+═══════════════════════════════════════════════════════════ */
+.highlightRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.highlightCard {
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* A left edge that carries meaning: lime for what worked, amber for what
+     needs the next session. Not decoration, it is the only difference between
+     the two cards once the labels are read. */
+  border-left: 3px solid transparent;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.highlightStrength {
+  border-left-color: var(--lime);
+}
+
+.highlightPriority {
+  border-left-color: #e0a92b;
+}
+
+.highlightTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.highlightAvatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.highlightLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-on-forest-muted);
+}
+
+.highlightHeadline {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-on-forest);
+}
+
+.highlightSupport {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-on-forest-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Axis layout: radar beside the numbered cards
+═══════════════════════════════════════════════════════════ */
+.axisLayout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
+}
+
+.radarWrap {
+  display: flex;
+  justify-content: center;
+}
+
+.radar {
+  width: 100%;
+  max-width: 210px;
+  height: auto;
+}
+
+.radarRing {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+}
+
+.radarSpoke {
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+}
+
+.radarShape {
+  fill: rgba(216, 255, 41, 0.22);
+  stroke: var(--lime);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.radarDot {
+  fill: var(--lime);
+}
+
+.radarLabel {
+  fill: var(--text-on-forest-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.axisIcon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--lime);
+}
+
+/* The label is a flex row now that it carries an icon. */
+.axisLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Coaching popover on a highlighted phrase
+═══════════════════════════════════════════════════════════ */
+.markWrap {
+  position: relative;
+}
+
+.coachPop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 5;
+  width: max-content;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-sand);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 28px rgba(30, 45, 8, 0.16);
+  /* Hidden without display:none so it keeps its size for positioning, and so
+     focus-within can reveal it for keyboard users too. */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--dur-fast);
+  text-align: left;
+  white-space: normal;
+}
+
+.markWrap:hover .coachPop,
+.markWrap:focus-within .coachPop {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* The badge is a flex item in a column here, so without this it stretches to
+   the popover's full width instead of hugging its label. */
+.coachPop .findingBadge {
+  align-self: flex-start;
+}
+
+.coachConcept {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.coachDetail {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.coachLink {
+  align-self: flex-start;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--green-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.coachLink:focus-visible {
+  outline: 2px solid var(--green-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Open state on a collapsible finding row
+═══════════════════════════════════════════════════════════ */
+.chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform var(--dur-fast);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* Colour, border and a rotated chevron together: one of them alone was too
+   quiet to answer "which row am I reading?" */
+.turnWholeButtonOpen {
+  background: var(--card-bg);
+  box-shadow: inset 0 0 0 2px var(--green-accent);
+}
+.turnWholeButtonOpen:hover {
+  background: var(--card-bg);
+}
+.turnWholeButtonOpen .chevron {
+  color: var(--green-deep);
+}
+
+.turnNoNotes {
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--divider-warm);
+  padding-top: 8px;
+}
+
+@media (max-width: 820px) {
+  .axisLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .radar {
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 600px) {
+  .coachPop {
+    max-width: 220px;
+  }
 }
