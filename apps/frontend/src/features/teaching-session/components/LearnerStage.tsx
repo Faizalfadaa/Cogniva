@@ -194,15 +194,21 @@ export function LearnerStage({
     }
   }, [isOpen, transcriptVersion, characterMinimized])
 
-  // Keep the latest message in view as the chat grows or shrinks during the transition.
+  // Follow both layout transitions and text revealed by per-sentence playback.
   useLayoutEffect(() => {
     const transcript = transcriptRef.current
     if (!isOpen || !transcript) return
-    const observer = new ResizeObserver(() => {
+    const followLatest = () => {
       if (followMessagesRef.current) transcript.scrollTop = transcript.scrollHeight
-    })
+    }
+    const observer = new ResizeObserver(followLatest)
+    const contentObserver = new MutationObserver(followLatest)
     observer.observe(transcript)
-    return () => observer.disconnect()
+    contentObserver.observe(transcript, { childList: true, characterData: true, subtree: true })
+    return () => {
+      observer.disconnect()
+      contentObserver.disconnect()
+    }
   }, [isOpen])
 
   function handleTranscriptScroll() {
