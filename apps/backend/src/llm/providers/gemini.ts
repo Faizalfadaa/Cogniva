@@ -59,6 +59,15 @@ export interface GenAILike {
         promptTokenCount?: number;
         candidatesTokenCount?: number;
       };
+      /** Present only on tool-assisted calls; see LLMClient.grounded(). */
+      candidates?: Array<{
+        groundingMetadata?: {
+          groundingChunks?: Array<{ web?: { title?: string; uri?: string; domain?: string } }>;
+        };
+        urlContextMetadata?: {
+          urlMetadata?: Array<{ retrievedUrl?: string; urlRetrievalStatus?: string }>;
+        };
+      }>;
     }>;
     /**
      * Optional so a stub that only implements generateContent still satisfies
@@ -167,6 +176,89 @@ export class LLMClient implements LLM {
       throw new LLMError(`model returned invalid JSON: ${errMsg(err)}`);
     }
   }
+
+  /**
+   * Call the model with a grounding tool and return prose plus the sources it
+   * consulted.
+   *
+   * Deliberately NOT structured output: Gemini rejects the combination outright
+   * with "Tool use with a response mime type: 'application/json' is
+   * unsupported". So grounded calls return prose, and a caller that needs JSON
+   * runs a second, tool-free structured() pass over this text. Two calls, both
+   * in a mode the API actually supports.
+   */
+  async grounded({ system, user, mode }: GroundedArgs): Promise<GroundedResult> {
+    let response: Awaited<ReturnType<GenAILike["models"]["generateContent"]>>;
+    try {
+      response = await this.client.models.generateContent({
+        model: this.model,
+        contents: user,
+        config: {
+          systemInstruction: system,
+          maxOutputTokens: this.maxTokens,
+          tools: [mode === "search" ? { googleSearch: {} } : { urlContext: {} }],
+          thinkingConfig: { thinkingBudget: this.thinkingBudget },
+        },
+      });
+    } catch (err) {
+      throw new LLMError(`grounded request failed: ${errMsg(err)}`);
+    }
+
+    this.lastUsage = {
+      inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
+      outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+    };
+
+    const blockReason = response.promptFeedback?.blockReason;
+    if (blockReason) throw new LLMError(`model blocked the request: ${blockReason}`);
+
+    // Empty text is NOT an error here, unlike structured(). A grounding tool can
+    // fetch a page and then return no candidate at all — a JS-only page, or one
+    // the model declines to write about. The caller has the retrieval metadata
+    // below and can tell the user which of those happened; throwing would erase
+    // exactly the information that makes the failure explainable.
+    const text = response.text ?? "";
+
+    const candidate = response.candidates?.[0];
+    const sources: GroundedSource[] = (candidate?.groundingMetadata?.groundingChunks ?? [])
+      .map((chunk) => ({
+        title: chunk.web?.title ?? chunk.web?.domain ?? "",
+        uri: chunk.web?.uri ?? "",
+      }))
+      .filter((source) => source.uri !== "");
+
+    const retrieved = (candidate?.urlContextMetadata?.urlMetadata ?? []).map((entry) => ({
+      url: entry.retrievedUrl ?? "",
+      ok: entry.urlRetrievalStatus === "URL_RETRIEVAL_STATUS_SUCCESS",
+    }));
+
+    return { text, sources, retrieved };
+  }
+}
+
+/** A source the model actually consulted, as reported by Gemini. */
+export interface GroundedSource {
+  title: string;
+  uri: string;
+}
+
+export interface GroundedArgs {
+  system: string;
+  user: string;
+  /**
+   * `search` lets the model run Google Search; `url` lets it fetch pages the
+   * prompt names. Both return real, checkable sources — which is the whole
+   * point: a model asked for references from memory invents plausible URLs.
+   */
+  mode: "search" | "url";
+}
+
+export interface GroundedResult {
+  /** May be empty — see the note in `grounded()`. */
+  text: string;
+  sources: GroundedSource[];
+  /** URLs the model was asked to read, and whether the fetch actually worked. */
+  retrieved: Array<{ url: string; ok: boolean }>;
 }
 
 /** What an embedding call is for. Gemini tunes the vector to the task. */

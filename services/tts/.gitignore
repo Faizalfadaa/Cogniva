@@ -1,0 +1,17 @@
+.cache/
+.venv/
+venv/
+__pycache__/
+
+# Reference recordings are personal data and are never committed. Each
+# contributor supplies their own -- see voices/README.md.
+voices/*.wav
+voices/*.mp3
+voices/*.flac
+voices/*.ogg
+smoketest_out/
+tune_out/
+models/
+fetch_progress.log
+tune_progress.log
+smoketest.log

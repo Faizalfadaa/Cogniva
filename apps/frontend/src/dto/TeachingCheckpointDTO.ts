@@ -10,6 +10,8 @@ export interface TeachingCheckpointDTO {
   audioUrl?: string;
   /** Respon learner setelah Vision + agent memproses snapshot. Kosong selagi diproses. */
   learnerResponse?: string;
+  /** Endpoint URL of the spoken learner response (TTS). Absent when voice is off. */
+  learnerAudioUrl?: string;
   /** Set when the turn ended in a handled condition (e.g. the session ran out of
    *  token budget) rather than a real reply. `learnerResponse` still carries
    *  readable text, so ignoring this field degrades gracefully. */

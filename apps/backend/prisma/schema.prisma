@@ -161,11 +161,19 @@ model workspace {
   whiteboard_snapshot Json?
   /// Small raster preview, as a data URL.
   thumbnail_url       String?
+  /// Which student the user picked (§TTS). Null on workspaces created before
+  /// the picker existed, and on any the user never chose for — both fall back
+  /// to the id-derived default.
+  learner_id          String?
   /// The uploaded reference PDF, served back by GET /workspaces/:id/pdf.
   pdf_data            Bytes?
   pdf_mime            String?
   /// Text extracted from that PDF — the Evaluator's answer key (§1.4, §3.7).
   reference_text      String?
+  /// Where reference_text came from when it was not an upload: the web source
+  /// the Referencer found and the user picked ({ url, title, source }). Null for
+  /// an uploaded PDF, whose provenance is pdf_data itself.
+  reference_source    Json?
   /// Chunked (and where possible embedded) form of reference_text, so the index
   /// survives a restart instead of being rebuilt at evaluation time.
   reference_index     Json?
@@ -178,6 +186,7 @@ model workspace {
   checkpoint   checkpoint[]
   chat_message chat_message[]
   report       report[]
+  voice_clip   voice_clip[]
 
   @@index([id_user, updated_at])
   @@map("workspace")
@@ -195,6 +204,9 @@ model checkpoint {
   audio_url           String?
   /// Filled in when the background teaching turn finishes.
   learner_response    String?
+  /// Endpoint URL of the spoken learner_response, attached once synthesis
+  /// finishes — minutes after the text on a slow GPU (§TTS).
+  learner_audio_url   String?
   /// Non-exceptional turn outcome (e.g. "budget_exceeded"); null on a normal reply.
   error_kind          String?
   /// Board-change timeline (Phase 1: stored only).
@@ -208,17 +220,38 @@ model checkpoint {
 }
 
 model chat_message {
-  id_chat      String   @id
-  id_workspace String
-  seq          Int      @unique @default(autoincrement())
-  sender       String
-  content      String
-  created_at   DateTime
+  id_chat           String   @id
+  id_workspace      String
+  seq               Int      @unique @default(autoincrement())
+  sender            String
+  content           String
+  /// Endpoint URL of the spoken form of this bubble; learner messages only.
+  learner_audio_url String?
+  created_at        DateTime
 
   workspace workspace @relation(fields: [id_workspace], references: [id_workspace], onDelete: Cascade)
 
   @@index([id_workspace, seq])
   @@map("chat_message")
+}
+
+/// A rendered voice clip, served by GET /workspaces/:id/audio/:audioId.
+///
+/// The bytes live here rather than in memory because the URL pointing at them
+/// is persisted on the checkpoint and the message: without the clip, a reload
+/// would show a play button that 404s. Cascades with the workspace, so clips
+/// never outlive what they belong to.
+model voice_clip {
+  id_clip      String   @id
+  id_workspace String
+  data         Bytes
+  mime         String
+  created_at   DateTime @default(now())
+
+  workspace workspace @relation(fields: [id_workspace], references: [id_workspace], onDelete: Cascade)
+
+  @@index([id_workspace])
+  @@map("voice_clip")
 }
 
 /// The debrief the Evaluation screen renders. One per workspace: finishing a

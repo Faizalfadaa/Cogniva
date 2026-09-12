@@ -12,10 +12,13 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import {
   saveDraftSchema,
+  saveReferenceTextSchema,
   sendMessageSchema,
   submitCheckpointSchema,
+  suggestReferencesSchema,
   updateMetaSchema,
   uploadPdfSchema,
+  useReferenceSchema,
 } from "../../contracts/workspace.js";
 import { getCurrentUser } from "../../modules/auth/authService.js";
 import * as service from "../../modules/workspace/workspaceService.js";
@@ -23,13 +26,16 @@ import { workspaces } from "../../modules/workspace/workspaceStore.js";
 
 export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
   // Per-device isolation: every /workspaces/:id route must belong to the calling
-  // device (x-client-id). The collection routes (no :id) and the PDF GET — which
-  // the browser loads via <img>/<iframe> and so can't carry a custom header — are
-  // exempt. Runs only for routes registered in this plugin.
+  // device (x-client-id). The collection routes (no :id) are exempt, as are the
+  // two binary GETs the browser fetches through an element — <iframe> for the
+  // PDF and <audio> for learner speech — which cannot carry a custom header.
+  // Both are addressed by unguessable random ids, matching the posture the PDF
+  // route already had.
   app.addHook("preHandler", async (req, reply) => {
     const id = (req.params as { id?: string })?.id;
     if (!id) return; // /workspaces collection
-    if (req.method === "GET" && req.url.split("?")[0].endsWith("/pdf")) return;
+    const path = req.url.split("?")[0];
+    if (req.method === "GET" && (path.endsWith("/pdf") || path.includes("/audio/"))) return;
     if (!(await service.isOwner(id, await ownerOf(req)))) return notFound(reply);
   });
 
@@ -80,10 +86,59 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     return ws ?? notFound(reply);
   });
 
+  // Reference material the user wrote or pasted. Unlike the two routes below it
+  // spends no tokens, so it answers as fast as any other write.
+  app.post("/workspaces/:id/reference-text", async (req, reply) => {
+    const parsed = saveReferenceTextSchema.safeParse(req.body);
+    if (!parsed.success) return badRequest(reply, "Invalid reference text payload");
+    const result = await service.setReferenceText(idOf(req.params), parsed.data.text);
+    return result ?? notFound(reply);
+  });
+
+  // --- Reference sourcing (§3.7) ------------------------------------------
+  //
+  // Both of these answer synchronously, unlike the teaching-turn routes: the
+  // user is waiting in a dialog, and a polled empty list would be worse than a
+  // spinner. Neither is a GET, because both spend model tokens — a GET that
+  // costs money is a route a browser or a crawler will happily re-run.
+
+  app.post("/workspaces/:id/references/suggest", async (req, reply) => {
+    const parsed = suggestReferencesSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return badRequest(reply, "Invalid suggestion payload");
+    const suggestions = await service.suggestReferences(idOf(req.params), parsed.data.hint);
+    return suggestions ?? notFound(reply);
+  });
+
+  app.post("/workspaces/:id/references/use", async (req, reply) => {
+    const parsed = useReferenceSchema.safeParse(req.body);
+    if (!parsed.success) return badRequest(reply, "Invalid reference payload");
+    const result = await service.useReference(idOf(req.params), parsed.data);
+    if (!result) return notFound(reply);
+    // A source that could not be read is a normal outcome, not a server fault:
+    // 422 lets the UI show `problem` and let the user pick another option.
+    if (!result.ok) reply.code(422);
+    return result;
+  });
+
   app.get("/workspaces/:id/pdf", async (req, reply) => {
     const blob = await workspaces.getPdf(idOf(req.params));
     if (!blob) return notFound(reply);
     return reply.type(blob.mime).send(blob.data);
+  });
+
+  // Synthesized learner speech (§TTS). Served by URL rather than inlined into
+  // the polled checkpoint/message lists, which would otherwise carry hundreds
+  // of kilobytes of audio on every poll.
+  app.get("/workspaces/:id/audio/:audioId", async (req, reply) => {
+    const { id, audioId } = req.params as { id: string; audioId: string };
+    const blob = await workspaces.getAudioClip(id, audioId);
+    if (!blob) return notFound(reply);
+    // Immutable: a clip's id is unique to its rendered content, so the browser
+    // can keep it for the life of the session and replay it without refetching.
+    return reply
+      .type(blob.mime)
+      .header("Cache-Control", "private, max-age=86400, immutable")
+      .send(blob.data);
   });
 
   // --- Teaching checkpoints ----------------------------------------------

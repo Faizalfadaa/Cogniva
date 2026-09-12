@@ -11,6 +11,7 @@
     "demo:learner": "tsx tests/learner.demo.ts",
     "demo:vision": "tsx tests/vision.demo.ts",
     "demo:asr": "tsx tests/asr.demo.ts",
+    "demo:referencer": "tsx tests/referencer.demo.ts",
     "chat:learner": "tsx tests/learner.chat.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",

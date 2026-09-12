@@ -17,9 +17,11 @@
 
 import {
   LearnerAgent,
+  ReferencerAgent,
   getEvaluator,
   seedLearnerState,
   seedLearnerStateFromEvaluation,
+  type ReferenceSuggestions,
   type TranscriptTurn,
 } from "../../agents/index.js";
 import * as config from "../../config/index.js";
@@ -31,6 +33,7 @@ import type { Topic } from "../../contracts/topic.js";
 import type {
   ChatMessage,
   CheckpointErrorKind,
+  ReferenceSource,
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
@@ -43,6 +46,7 @@ import {
   type ReferenceExcerpt,
 } from "../retrieval/index.js";
 import { newId, sessions } from "../storage/sessionStore.js";
+import { synthesizeSpeech, voiceForWorkspace } from "../tts/index.js";
 import { buildEvaluationReport } from "./evaluationReport.js";
 import { newWorkspaceId, workspaces } from "./workspaceStore.js";
 
@@ -101,12 +105,15 @@ export async function deleteWorkspace(id: string): Promise<boolean> {
 
 export async function updateMeta(
   id: string,
-  meta: { title?: string; description?: string },
+  meta: { title?: string; description?: string; learnerId?: string },
 ): Promise<Workspace | undefined> {
   const ws = await workspaces.get(id);
   if (!ws) return undefined;
   if (meta.title !== undefined) ws.title = meta.title;
   if (meta.description !== undefined) ws.description = meta.description;
+  // The picked student, so speech can be synthesized in the voice the user is
+  // actually looking at (§TTS). Validated where it is used, not here.
+  if (meta.learnerId !== undefined) ws.learnerId = meta.learnerId;
   return touch(ws);
 }
 
@@ -133,6 +140,12 @@ export async function setPdf(
   await workspaces.savePdf(id, { data, mime });
   ws.pdfUrl = `/api/workspaces/${id}/pdf`;
 
+  // An upload replaces whatever the Referencer had found: there is one answer
+  // key per session, and leaving the old provenance would label this PDF with
+  // someone else's URL.
+  await workspaces.saveReferenceSource(id, undefined);
+  ws.referenceSource = undefined;
+
   // Extract the text and keep it as this session's reference material — the
   // answer key the Evaluator grades against (§3.7). It flows ONLY to the
   // Evaluator, never to the Learner (§1.4). Extraction failures (e.g. a
@@ -149,6 +162,36 @@ export async function setPdf(
   return touch(ws);
 }
 
+/**
+ * Store reference material the user typed or pasted in themselves.
+ *
+ * The third source, beside an uploaded PDF (setPdf) and a page the Referencer
+ * found (useReference), and the only one that needs no extraction step — the
+ * text is already text. It lands in the same place as the other two and is read
+ * by the Evaluator alone (§1.4).
+ */
+export async function setReferenceText(
+  id: string,
+  raw: string,
+): Promise<{ workspace: Workspace; chars: number } | undefined> {
+  const ws = await workspaces.get(id);
+  if (!ws) return undefined;
+
+  const text = raw
+    .replace(/\r\n?/g, "\n")
+    .trim()
+    .slice(0, config.RAG_MAX_REFERENCE_CHARS);
+  await workspaces.saveReference(id, text);
+
+  // Pasted text has no provenance to show, and any previous chip would now be
+  // pointing at material that is no longer in use.
+  await workspaces.saveReferenceSource(id, undefined);
+  ws.referenceSource = undefined;
+
+  void indexReference(id, text);
+  return { workspace: await touch(ws), chars: text.length };
+}
+
 /** Build (or rebuild) the retrieval index for a workspace's reference text. */
 async function indexReference(id: string, text: string): Promise<void> {
   try {
@@ -162,6 +205,96 @@ async function indexReference(id: string, text: string): Promise<void> {
     // here means chunking itself failed, and the Evaluator falls back to the
     // full-text path.
     console.error("[workspace] reference indexing failed:", err);
+  }
+}
+
+// --- Reference sourcing (§3.7) ---------------------------------------------
+
+/**
+ * A single Referencer instance, matching how the chat Learner is held. Stateless
+ * between calls; it exists so tests have a seam and so the offline default is
+ * decided in one place.
+ */
+const referencer = new ReferencerAgent();
+
+/**
+ * Offer reading material for a workspace whose user has none.
+ *
+ * Synchronous on purpose, unlike the teaching-turn calls. Those return early
+ * because the UI polls a list that fills in later; this one answers a modal the
+ * user is sitting in front of, and there is nothing for them to do until the
+ * options arrive. Nothing is stored — the user hands back the option they chose.
+ */
+export async function suggestReferences(
+  id: string,
+  hint?: string,
+): Promise<ReferenceSuggestions | undefined> {
+  const ws = await workspaces.get(id);
+  if (!ws) return undefined;
+
+  return referencer.suggest({
+    topic: topicNameOf(ws),
+    description: ws.description,
+    hint,
+  });
+}
+
+/** The outcome of adopting a suggested source. */
+export interface UseReferenceResult {
+  ok: boolean;
+  /** Empty when ok; otherwise why the source could not be used, in Indonesian. */
+  problem: string;
+  /** How much reference text was extracted. Useful signal for the UI. */
+  chars: number;
+  workspace?: Workspace;
+}
+
+/**
+ * Adopt one suggested source as this session's reference material.
+ *
+ * Same destination as a PDF upload — reference text plus a retrieval index, read
+ * by the Evaluator alone (§1.4). The difference is only where the text came
+ * from, which is recorded so the UI can show it after a reload.
+ */
+export async function useReference(
+  id: string,
+  choice: { url: string; title?: string; source?: string },
+): Promise<UseReferenceResult | undefined> {
+  const ws = await workspaces.get(id);
+  if (!ws) return undefined;
+
+  const fetched = await referencer.read(choice.url, topicNameOf(ws));
+  if (!fetched.ok) return { ok: false, problem: fetched.problem, chars: 0 };
+
+  const text = fetched.text.slice(0, config.RAG_MAX_REFERENCE_CHARS);
+  await workspaces.saveReference(id, text);
+
+  const provenance: ReferenceSource = {
+    url: choice.url,
+    title: choice.title?.trim() || fetched.title,
+    source: choice.source?.trim() || hostLabel(choice.url),
+  };
+  await workspaces.saveReferenceSource(id, provenance);
+  ws.referenceSource = provenance;
+
+  // Same background indexing as an upload: the response stays fast, and
+  // evaluation rebuilds the index synchronously if it is somehow still missing.
+  void indexReference(id, text);
+
+  return { ok: true, problem: "", chars: text.length, workspace: await touch(ws) };
+}
+
+/** What the session is about, as the Referencer should search for it. */
+function topicNameOf(ws: Workspace): string {
+  return ws.title?.trim() || ws.description?.trim().slice(0, 120) || "";
+}
+
+/** "khanacademy.org" from a URL — the fallback publisher label. */
+function hostLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
   }
 }
 
@@ -240,14 +373,35 @@ export async function submitCheckpoint(
       };
     }
     if (!(await stillExists(id))) return;
+    // Publish the text immediately; the voice is attached once it is ready.
+    //
+    // Speech used to be rendered first so both landed on the same poll. That
+    // only held while a render took a few seconds — one was measured at over
+    // three minutes, well past the client timeout, and the reply would have
+    // been held back that long for audio that never arrived. Text is what the
+    // user is waiting for; the voice catches up on a later poll.
     await workspaces.updateCheckpoint(id, checkpoint.id, {
       learnerResponse: reply.text,
       errorKind: reply.errorKind,
     });
     // Still mirrored into chat: the text is written in the student's voice, and
     // dropping it would leave a silent gap in the conversation history.
-    await workspaces.addMessage(id, learnerMessage(reply.text));
+    const message = await workspaces.addMessage(id, learnerMessage(reply.text));
     await bump(id);
+
+    // A tagged turn is a system message, not something the student said —
+    // speaking "you are out of budget" in the learner's voice would be odd, and
+    // it would spend GPU time on a session that just hit its ceiling.
+    if (reply.errorKind) return;
+
+    const learnerAudioUrl = await speakLearnerReply(id, reply.text);
+    // Re-check: synthesis can take minutes, and the workspace may have been
+    // deleted while it ran.
+    if (learnerAudioUrl && (await stillExists(id))) {
+      await workspaces.updateCheckpoint(id, checkpoint.id, { learnerAudioUrl });
+      await workspaces.updateMessage(id, message.id, { learnerAudioUrl });
+      await bump(id);
+    }
   });
 
   return checkpoint;
@@ -287,8 +441,15 @@ export async function sendChatMessage(
       reply = "Oh, sorry, I blanked for a second there... could you say that again?";
     }
     if (!(await stillExists(id))) return;
-    await workspaces.addMessage(id, learnerMessage(reply));
+    const message = await workspaces.addMessage(id, learnerMessage(reply));
     await bump(id);
+
+    // Same as the checkpoint path: the text does not wait on the voice.
+    const learnerAudioUrl = await speakLearnerReply(id, reply);
+    if (learnerAudioUrl && (await stillExists(id))) {
+      await workspaces.updateMessage(id, message.id, { learnerAudioUrl });
+      await bump(id);
+    }
   });
 
   return userMsg;
@@ -590,8 +751,39 @@ async function requireSession(ws: Workspace): Promise<Session> {
   return session;
 }
 
-function learnerMessage(content: string): ChatMessage {
-  return { id: newId("msg"), sender: "learner", content, createdAt: utcNowIso() };
+function learnerMessage(content: string, learnerAudioUrl?: string): ChatMessage {
+  return {
+    id: newId("msg"),
+    sender: "learner",
+    content,
+    learnerAudioUrl,
+    createdAt: utcNowIso(),
+  };
+}
+
+/**
+ * Render a learner reply to speech and store it, returning the URL the UI can
+ * play — or undefined when speech is off or the voice service is unavailable.
+ *
+ * The voice is the character the user picked, so it matches the face on screen.
+ * That pick is read here rather than passed in: this runs from a background job
+ * that can outlive the request which started it, and reading late means a
+ * character switched mid-turn is still heard correctly.
+ */
+async function speakLearnerReply(
+  workspaceId: string,
+  text: string,
+): Promise<string | undefined> {
+  const ws = await workspaces.get(workspaceId);
+  const speech = await synthesizeSpeech(text, voiceForWorkspace(ws?.learnerId, workspaceId));
+  if (!speech) return undefined;
+
+  const audioId = newId("aud");
+  await workspaces.saveAudioClip(workspaceId, audioId, {
+    data: speech.audio,
+    mime: speech.mime,
+  });
+  return `/api/workspaces/${workspaceId}/audio/${audioId}`;
 }
 
 function emptyEvaluation(sessionId: string) {

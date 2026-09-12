@@ -124,8 +124,15 @@ export function setStoredLearnerId(workspaceId: string, learnerId: string): void
  * has always shown. An unknown stored id (a character since removed) falls
  * back the same way rather than throwing.
  */
-export function resolveLearner(workspaceId: string): LearnerCharacter {
-  const storedId = getStoredLearnerId(workspaceId);
+export function resolveLearner(
+  workspaceId: string,
+  serverLearnerId?: string,
+): LearnerCharacter {
+  // This browser's pick first, then the one recorded on the workspace, then the
+  // id-derived default. The server value is what makes the choice survive a
+  // cleared localStorage or a different device — and it is the same value the
+  // backend synthesizes speech from, so face and voice cannot disagree.
+  const storedId = getStoredLearnerId(workspaceId) ?? serverLearnerId;
   const chosen = storedId ? LEARNERS.find((l) => l.id === storedId) : undefined;
   return chosen ?? deriveLearner(workspaceId);
 }

@@ -15,6 +15,7 @@ import type {
   ChatSender,
   CheckpointErrorKind,
   EvaluationReport,
+  ReferenceSource,
   TeachingCheckpoint,
   Workspace,
   WorkspaceState,
@@ -63,6 +64,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
         state: workspace.state,
         whiteboard_snapshot: toJson(workspace.currentWhiteboardSnapshot),
         thumbnail_url: workspace.thumbnailUrl ?? null,
+        learner_id: workspace.learnerId ?? null,
         updated_at: new Date(workspace.updatedAt),
       },
     });
@@ -117,6 +119,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
         whiteboard_snapshot: toJson(checkpoint.whiteboardSnapshot),
         audio_url: checkpoint.audioUrl ?? null,
         learner_response: checkpoint.learnerResponse ?? null,
+        learner_audio_url: checkpoint.learnerAudioUrl ?? null,
         error_kind: checkpoint.errorKind ?? null,
         timeline: toJson(checkpoint.timeline),
         created_at: new Date(checkpoint.createdAt),
@@ -136,6 +139,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
       whiteboardSnapshot: row.whiteboard_snapshot ?? undefined,
       audioUrl: row.audio_url ?? undefined,
       learnerResponse: row.learner_response ?? undefined,
+      learnerAudioUrl: row.learner_audio_url ?? undefined,
       errorKind: (row.error_kind as CheckpointErrorKind | null) ?? undefined,
       timeline: (row.timeline as Timeline | null) ?? undefined,
       createdAt: row.created_at.toISOString(),
@@ -152,6 +156,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
     if ("whiteboardSnapshot" in patch) data.whiteboard_snapshot = toJson(patch.whiteboardSnapshot);
     if ("audioUrl" in patch) data.audio_url = patch.audioUrl ?? null;
     if ("learnerResponse" in patch) data.learner_response = patch.learnerResponse ?? null;
+    if ("learnerAudioUrl" in patch) data.learner_audio_url = patch.learnerAudioUrl ?? null;
     if ("errorKind" in patch) data.error_kind = patch.errorKind ?? null;
     if ("timeline" in patch) data.timeline = toJson(patch.timeline);
     if (patch.createdAt !== undefined) data.created_at = new Date(patch.createdAt);
@@ -174,10 +179,40 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
         id_workspace: workspaceId,
         sender: message.sender,
         content: message.content,
+        learner_audio_url: message.learnerAudioUrl ?? null,
         created_at: new Date(message.createdAt),
       },
     });
     return message;
+  }
+
+  async updateMessage(
+    workspaceId: string,
+    messageId: string,
+    patch: Partial<ChatMessage>,
+  ): Promise<ChatMessage | undefined> {
+    const data: Prisma.chat_messageUncheckedUpdateManyInput = {};
+    if (patch.content !== undefined) data.content = patch.content;
+    if ("learnerAudioUrl" in patch) data.learner_audio_url = patch.learnerAudioUrl ?? null;
+    if (Object.keys(data).length === 0) return undefined;
+
+    // Scoped by workspace as well as id, mirroring the in-memory store.
+    const { count } = await prisma.chat_message.updateMany({
+      where: { id_chat: messageId, id_workspace: workspaceId },
+      data,
+    });
+    if (count === 0) return undefined;
+
+    const row = await prisma.chat_message.findUnique({ where: { id_chat: messageId } });
+    return row
+      ? {
+          id: row.id_chat,
+          sender: row.sender as ChatSender,
+          content: row.content,
+          learnerAudioUrl: row.learner_audio_url ?? undefined,
+          createdAt: row.created_at.toISOString(),
+        }
+      : undefined;
   }
 
   async listMessages(workspaceId: string): Promise<ChatMessage[]> {
@@ -189,6 +224,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
       id: row.id_chat,
       sender: row.sender as ChatSender,
       content: row.content,
+      learnerAudioUrl: row.learner_audio_url ?? undefined,
       createdAt: row.created_at.toISOString(),
     }));
   }
@@ -286,6 +322,24 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
     return row?.reference_text ?? undefined;
   }
 
+  async saveReferenceSource(
+    workspaceId: string,
+    source: ReferenceSource | undefined,
+  ): Promise<void> {
+    await prisma.workspace.updateMany({
+      where: { id_workspace: workspaceId },
+      data: { reference_source: toJson(source) },
+    });
+  }
+
+  async getReferenceSource(workspaceId: string): Promise<ReferenceSource | undefined> {
+    const row = await prisma.workspace.findUnique({
+      where: { id_workspace: workspaceId },
+      select: { reference_source: true },
+    });
+    return readReferenceSource(row?.reference_source);
+  }
+
   // --- Reference index --------------------------------------------------
 
   async saveReferenceIndex(workspaceId: string, index: ReferenceIndex): Promise<void> {
@@ -304,6 +358,33 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
     return ReferenceIndex.fromJSON(
       row.reference_index as unknown as SerializedReferenceIndex,
     );
+  }
+
+  // --- Synthesized learner speech (§TTS) ---------------------------------
+
+  async saveAudioClip(workspaceId: string, audioId: string, blob: StoredBlob): Promise<void> {
+    await prisma.voice_clip.create({
+      data: {
+        id_clip: audioId,
+        id_workspace: workspaceId,
+        // Prisma's Bytes maps to Uint8Array; a Node Buffer is one, but with a
+        // wider ArrayBufferLike, so it is narrowed here rather than cast.
+        data: new Uint8Array(blob.data),
+        mime: blob.mime,
+      },
+    });
+  }
+
+  async getAudioClip(workspaceId: string, audioId: string): Promise<StoredBlob | undefined> {
+    // Scoped by workspace as well as clip id: the audio route is exempt from the
+    // ownership check (an <audio> element cannot send x-client-id), so this
+    // scoping is what stops a clip id from reaching across workspaces.
+    const row = await prisma.voice_clip.findFirst({
+      where: { id_clip: audioId, id_workspace: workspaceId },
+      select: { data: true, mime: true },
+    });
+    if (!row) return undefined;
+    return { data: Buffer.from(row.data), mime: row.mime };
   }
 }
 
@@ -335,9 +416,11 @@ function toWorkspace(row: WorkspaceRow): Workspace {
     description: row.description ?? undefined,
     // Rebuilt rather than stored: it is a route on this server, not data.
     pdfUrl: row.pdf_mime ? `/api/workspaces/${row.id_workspace}/pdf` : undefined,
+    referenceSource: readReferenceSource(row.reference_source),
     state: row.state as WorkspaceState,
     currentWhiteboardSnapshot: row.whiteboard_snapshot ?? undefined,
     thumbnailUrl: row.thumbnail_url ?? undefined,
+    learnerId: row.learner_id ?? undefined,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -351,4 +434,22 @@ function toWorkspace(row: WorkspaceRow): Workspace {
 function toJson(value: unknown): Prisma.InputJsonValue | typeof Prisma.DbNull {
   if (value === undefined || value === null) return Prisma.DbNull;
   return value as Prisma.InputJsonValue;
+}
+/**
+ * Read the reference_source Json column back into a typed value.
+ *
+ * The column is opaque to Postgres, so a row written by an older build (or by
+ * hand) can hold anything. Anything that is not the expected shape is treated as
+ * absent rather than surfaced half-filled.
+ */
+function readReferenceSource(value: unknown): ReferenceSource | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const url = typeof record.url === "string" ? record.url : "";
+  if (!url) return undefined;
+  return {
+    url,
+    title: typeof record.title === "string" ? record.title : "",
+    source: typeof record.source === "string" ? record.source : "",
+  };
 }

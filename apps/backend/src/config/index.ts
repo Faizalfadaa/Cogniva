@@ -200,6 +200,51 @@ export const RAG_MAX_REFERENCE_CHARS: number = num(
   400_000,
 );
 
+// --- Referencer (§3.7, reference sourcing) ---------------------------------
+
+/**
+ * The Referencer proposes reading material when the user has none of their own.
+ * It runs with a grounding tool (Google Search / URL context) rather than from
+ * the model's memory, because a model asked for sources from memory invents
+ * plausible-looking URLs that lead nowhere.
+ */
+export const REFERENCER_MODEL: string =
+  process.env.COGNIVA_REFERENCER_MODEL ?? "gemini-2.5-flash";
+
+/**
+ * The grounded pass writes a short candidate list, and a second, tool-free pass
+ * turns it into JSON. Both are small; the ceiling is here to stop a runaway
+ * search summary, not to fit a document.
+ */
+export const REFERENCER_MAX_TOKENS: number = num(
+  process.env.COGNIVA_REFERENCER_MAX_TOKENS,
+  2048,
+);
+
+/** How many options the user is offered. Enough to choose from, few enough to read. */
+export const REFERENCER_OPTIONS: number = num(process.env.COGNIVA_REFERENCER_OPTIONS, 4);
+
+/**
+ * Output ceiling for the read pass, which is far larger than the search pass:
+ * that one writes four short entries, this one writes notes covering a whole
+ * article. Gemini stops at MAX_TOKENS rather than failing, so a page longer than
+ * this yields notes that end early instead of no notes at all.
+ */
+export const REFERENCER_READ_MAX_TOKENS: number = num(
+  process.env.COGNIVA_REFERENCER_READ_MAX_TOKENS,
+  16_384,
+);
+
+/**
+ * Sanity bound on the text pulled out of a chosen source. Larger than a typical
+ * article so nothing useful is lost, far below RAG_MAX_REFERENCE_CHARS because a
+ * fetched page is not an uploaded textbook.
+ */
+export const REFERENCER_MAX_FETCH_CHARS: number = num(
+  process.env.COGNIVA_REFERENCER_MAX_FETCH_CHARS,
+  60_000,
+);
+
 // --- ASR (§3.5) ------------------------------------------------------------
 
 /**
@@ -247,6 +292,39 @@ export const SESSION_TOKEN_BUDGET: number = num(
  * want to be able to answer "how many tokens did that cost?" afterwards.
  */
 export const DEMO_MODE: boolean = bool(process.env.COGNIVA_DEMO_MODE, false);
+
+// --- Text-to-speech (voice sidecar, services/tts) ---------------------------
+
+/**
+ * Give the Learner a voice. Off by default: the service is a separate Python
+ * process that has to be started deliberately, and the app must run end to end
+ * without it.
+ */
+export const TTS_ENABLED: boolean = bool(process.env.COGNIVA_TTS_ENABLED, false);
+
+/** Base URL of the voice service. */
+export const TTS_URL: string = (
+  process.env.COGNIVA_TTS_URL ?? "http://localhost:8020"
+).replace(/\/+$/, "");
+
+/**
+ * Request timeout in seconds.
+ *
+ * Deliberately large. Render time on a laptop GPU is far less stable than it
+ * looks: the same sentence took 8 s in one run and over three minutes in
+ * another, with the GPU parked at idle clocks rather than overheating. 45 s was
+ * cutting off renders that would have finished. Nothing on screen waits for
+ * this — the reply text is published before synthesis starts and the voice is
+ * attached on a later poll.
+ */
+export const TTS_TIMEOUT: number = num(process.env.COGNIVA_TTS_TIMEOUT, 150);
+
+/**
+ * Language handed to the voice model. The Learner answers in English
+ * (llm/prompts/learner.prompt.ts), and neither engine speaks Indonesian, so
+ * "en" is both the correct and the only sensible default here.
+ */
+export const TTS_LANGUAGE: string = process.env.COGNIVA_TTS_LANGUAGE ?? "en";
 
 // --- Server ----------------------------------------------------------------
 

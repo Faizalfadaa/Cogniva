@@ -11,6 +11,7 @@ import { randomUUID } from "node:crypto";
 import type {
   ChatMessage,
   EvaluationReport,
+  ReferenceSource,
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
@@ -35,7 +36,11 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
   private reports = new Map<string, EvaluationReport>();
   private pdfs = new Map<string, StoredBlob>();
   private references = new Map<string, string>();
+  private referenceSources = new Map<string, ReferenceSource>();
   private referenceIndexes = new Map<string, ReferenceIndex>();
+  /** Synthesized learner speech, keyed by audio id and served by URL so the
+   * polled checkpoint/message lists stay small. */
+  private audioClips = new Map<string, StoredBlob>();
   private owners = new Map<string, string>();
 
   // --- Workspaces -------------------------------------------------------
@@ -75,6 +80,7 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
     this.pdfs.delete(id);
     this.references.delete(id);
     this.referenceIndexes.delete(id);
+    this.deleteAudioClips(id);
     this.owners.delete(id);
   }
 
@@ -118,6 +124,21 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
     return message;
   }
 
+  /**
+   * Patch a message after it was published — used to attach the learner's
+   * synthesized voice, which arrives long after the text (§TTS).
+   */
+  async updateMessage(
+    workspaceId: string,
+    messageId: string,
+    patch: Partial<ChatMessage>,
+  ): Promise<ChatMessage | undefined> {
+    const message = this.messages.get(workspaceId)?.find((m) => m.id === messageId);
+    if (!message) return undefined;
+    Object.assign(message, patch);
+    return message;
+  }
+
   async listMessages(workspaceId: string): Promise<ChatMessage[]> {
     return [...(this.messages.get(workspaceId) ?? [])];
   }
@@ -153,6 +174,18 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
     return this.references.get(workspaceId);
   }
 
+  async saveReferenceSource(
+    workspaceId: string,
+    source: ReferenceSource | undefined,
+  ): Promise<void> {
+    if (source) this.referenceSources.set(workspaceId, source);
+    else this.referenceSources.delete(workspaceId);
+  }
+
+  async getReferenceSource(workspaceId: string): Promise<ReferenceSource | undefined> {
+    return this.referenceSources.get(workspaceId);
+  }
+
   // --- Reference index --------------------------------------------------
 
   async saveReferenceIndex(workspaceId: string, index: ReferenceIndex): Promise<void> {
@@ -162,6 +195,29 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
   async getReferenceIndex(workspaceId: string): Promise<ReferenceIndex | undefined> {
     return this.referenceIndexes.get(workspaceId);
   }
+
+  // --- Synthesized learner speech (§TTS) ---------------------------------
+
+  async saveAudioClip(workspaceId: string, audioId: string, blob: StoredBlob): Promise<void> {
+    this.audioClips.set(audioKey(workspaceId, audioId), blob);
+  }
+
+  async getAudioClip(workspaceId: string, audioId: string): Promise<StoredBlob | undefined> {
+    return this.audioClips.get(audioKey(workspaceId, audioId));
+  }
+
+  /** Drop every clip belonging to a workspace (called on delete). */
+  private deleteAudioClips(workspaceId: string): void {
+    const prefix = `${workspaceId}:`;
+    for (const key of this.audioClips.keys()) {
+      if (key.startsWith(prefix)) this.audioClips.delete(key);
+    }
+  }
+}
+
+/** Clips are namespaced by workspace so one device can never read another's. */
+function audioKey(workspaceId: string, audioId: string): string {
+  return `${workspaceId}:${audioId}`;
 }
 
 /** The store the whole backend writes through. */

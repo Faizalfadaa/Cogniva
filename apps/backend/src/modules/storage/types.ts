@@ -20,6 +20,7 @@ import type { TeachingTurn } from "../../contracts/teaching.js";
 import type {
   ChatMessage,
   EvaluationReport,
+  ReferenceSource,
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
@@ -112,6 +113,16 @@ export interface WorkspaceStore {
 
   // --- Chat messages ----------------------------------------------------
   addMessage(workspaceId: string, message: ChatMessage): Promise<ChatMessage>;
+  /**
+   * Patch a message after it was published. Speech is synthesized long after
+   * the text is already on screen, so the voice is attached this way rather
+   * than held back until it is ready (§TTS).
+   */
+  updateMessage(
+    workspaceId: string,
+    messageId: string,
+    patch: Partial<ChatMessage>,
+  ): Promise<ChatMessage | undefined>;
   listMessages(workspaceId: string): Promise<ChatMessage[]>;
 
   // --- Evaluation report ------------------------------------------------
@@ -127,7 +138,21 @@ export interface WorkspaceStore {
   saveReference(workspaceId: string, text: string): Promise<void>;
   getReference(workspaceId: string): Promise<string | undefined>;
 
+  // --- Where that reference came from, when it was not an upload ---------
+  // Set by the Referencer flow; `undefined` clears it (e.g. a later PDF upload
+  // replaces a web source).
+  saveReferenceSource(workspaceId: string, source: ReferenceSource | undefined): Promise<void>;
+  getReferenceSource(workspaceId: string): Promise<ReferenceSource | undefined>;
+
   // --- Reference index (chunked/embedded reference, §3.7 retrieval) -------
   saveReferenceIndex(workspaceId: string, index: ReferenceIndex): Promise<void>;
   getReferenceIndex(workspaceId: string): Promise<ReferenceIndex | undefined>;
+
+  // --- Synthesized learner speech (§TTS) ---------------------------------
+  // Clips are stored rather than regenerated because the URL that points at
+  // them is persisted on the message; without the bytes, a reload would leave
+  // a play button that 404s. Namespaced by workspace so one device can never
+  // read another's, and removed with the workspace.
+  saveAudioClip(workspaceId: string, audioId: string, blob: StoredBlob): Promise<void>;
+  getAudioClip(workspaceId: string, audioId: string): Promise<StoredBlob | undefined>;
 }
