@@ -13,6 +13,7 @@
  */
 
 import { z } from "zod";
+import type { Finding } from "./evaluation.js";
 import { timelineSchema, type Timeline } from "./timeline.js";
 
 /**
@@ -118,7 +119,15 @@ export interface ChatMessage {
   createdAt: string;
 }
 
-/** Debrief content rendered on the Evaluation screen (EvaluationReportDTO). */
+/**
+ * Debrief content rendered on the Evaluation screen (EvaluationReportDTO).
+ *
+ * Two layers. The narrative one (letter, notebook, continueLearning) is what the
+ * Learner says back to the user. Under it sits the Evaluator's own output, which
+ * this report used to flatten away: the scores, the categorized findings, and
+ * the turns those findings point at, so the screen can break a result down per
+ * axis and highlight the sentence behind each judgement.
+ */
 export interface EvaluationReport {
   /** A warm letter from the Learner to the user. */
   letter: string;
@@ -129,6 +138,26 @@ export interface EvaluationReport {
   };
   /** Suggested next topics to keep learning. */
   continueLearning: string[];
+  /** Overall correctness and completeness, 0..100 (§6.9). */
+  score: number;
+  /** How deeply the mechanism was explained, scored apart from correctness. */
+  depthScore: number;
+  /** The Evaluator's per-concept findings, uncollapsed. */
+  findings: Finding[];
+  /**
+   * The turns the findings cite, so a finding can be shown in context.
+   *
+   * Optional: the failure path builds a report without ever reading the
+   * transcript, and an empty debrief is better than no debrief (§10).
+   */
+  transcript?: EvaluationTranscriptTurn[];
+}
+
+/** One transcript turn as the debrief screen needs it (§6.6, projected). */
+export interface EvaluationTranscriptTurn {
+  turnIndex: number;
+  boardText: string;
+  speech?: string;
 }
 
 // --- Request bodies (validated at the REST boundary) ----------------------

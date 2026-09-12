@@ -264,6 +264,17 @@ model report {
   continue_learning String[]
   created_at        DateTime @default(now())
 
+  /// The Evaluator's own numbers, kept beside the narrative the letter tells.
+  /// Nullable because reports written before this column existed have no value
+  /// to give, and a debrief missing its breakdown must still render (§10).
+  score             Int?
+  /// Depth of explanation, scored apart from correctness (§6.9).
+  depth_score       Int?
+  /// Finding[] — categorized per concept, each with an optional verbatim quote.
+  findings          Json?
+  /// EvaluationTranscriptTurn[] — the turns those findings cite.
+  transcript        Json?
+
   workspace workspace  @relation(fields: [id_workspace], references: [id_workspace], onDelete: Cascade)
   learned   learned[]
   confused  confused[]
