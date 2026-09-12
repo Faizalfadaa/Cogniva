@@ -12,6 +12,10 @@
  * persona must not hold the answer key it is supposed to be taught from.
  */
 
+import type { SourceTrust } from "./referencer.trust.js";
+
+export type { SourceTrust } from "./referencer.trust.js";
+
 /** What kind of thing a suggestion points at. Drives the icon the UI shows. */
 export const REFERENCE_KINDS = ["article", "pdf", "course", "video", "book"] as const;
 export type ReferenceKind = (typeof REFERENCE_KINDS)[number];
@@ -36,6 +40,13 @@ export interface ReferenceOption {
    * fetch step is what ultimately decides whether a link is real.
    */
   verified: boolean;
+  /**
+   * How much institutional accountability stands behind the host — the reason
+   * this source is fit to be an answer key at all. Sources with none (open-edit
+   * wikis, Q&A sites, note dumps) never reach this list; see referencer.trust.ts
+   * for where the line is drawn and why.
+   */
+  trust: SourceTrust;
 }
 
 /** A whole set of options, plus how it was produced. */

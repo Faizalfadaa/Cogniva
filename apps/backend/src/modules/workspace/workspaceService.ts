@@ -242,7 +242,7 @@ export async function suggestReferences(
 /** The outcome of adopting a suggested source. */
 export interface UseReferenceResult {
   ok: boolean;
-  /** Empty when ok; otherwise why the source could not be used, in Indonesian. */
+  /** Empty when ok; otherwise why the source could not be used, in English. */
   problem: string;
   /** How much reference text was extracted. Useful signal for the UI. */
   chars: number;

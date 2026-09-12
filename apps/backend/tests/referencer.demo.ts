@@ -21,7 +21,10 @@ async function main() {
   result.options.forEach((option, i) => {
     console.log(`${i + 1}. [${option.kind}] ${option.title}`);
     console.log(`   ${option.url}`);
-    console.log(`   penerbit: ${option.source} | terkonfirmasi: ${option.verified ? "ya" : "belum"}`);
+    console.log(
+      `   penerbit: ${option.source} | tingkat sumber: ${option.trust} | ` +
+        `terkonfirmasi: ${option.verified ? "ya" : "belum"}`,
+    );
     if (option.summary) console.log(`   ${option.summary}`);
     if (option.whyRelevant) console.log(`   -> ${option.whyRelevant}`);
     console.log();
