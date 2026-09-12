@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import styles from '../../../styles/TeachingSession.module.css'
+import { useT } from '../../../i18n/LanguageProvider'
 import type { LearnerCharacter } from '../../../lib/Learner'
 import type { ChatMessageDTO } from '../../../dto/ChatMessageDTO'
 
@@ -15,6 +16,7 @@ interface LearnerDockProps {
 export function LearnerDock({ learner, messages, isOpen, unreadCount, onToggle, onSend }: LearnerDockProps) {
   const [draft, setDraft] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
+  const t = useT()
 
   // Auto-scroll to the bottom whenever a new message arrives / the panel opens.
   useEffect(() => {
@@ -31,7 +33,11 @@ export function LearnerDock({ learner, messages, isOpen, unreadCount, onToggle, 
 
   if (!isOpen) {
     return (
-      <button className={styles.dockCollapsed} onClick={onToggle} aria-label={`Open chat with ${learner.name}`}>
+      <button
+        className={styles.dockCollapsed}
+        onClick={onToggle}
+        aria-label={t('stage.openChat', { name: learner.name })}
+      >
         <img src={learner.avatarUrl} alt={learner.name} className={styles.dockAvatar} />
         {unreadCount > 0 && (
           <span className={styles.dockBadge}>{unreadCount > 9 ? '9+' : unreadCount}</span>
@@ -45,14 +51,14 @@ export function LearnerDock({ learner, messages, isOpen, unreadCount, onToggle, 
       <div className={styles.dockHeader}>
         <img src={learner.avatarUrl} alt={learner.name} className={styles.dockHeaderAvatar} />
         <span className={styles.dockHeaderName}>{learner.name}</span>
-        <button className={styles.dockClose} onClick={onToggle} aria-label="Close chat">
+        <button className={styles.dockClose} onClick={onToggle} aria-label={t('stage.closeChat')}>
           ×
         </button>
       </div>
 
       <div className={styles.dockMessages} ref={listRef}>
         {messages.length === 0 ? (
-          <p className={styles.dockEmpty}>No messages yet. Say hi to {learner.name}!</p>
+          <p className={styles.dockEmpty}>{t('dock.empty', { name: learner.name })}</p>
         ) : (
           messages.map((m) => (
             <div
@@ -71,10 +77,15 @@ export function LearnerDock({ learner, messages, isOpen, unreadCount, onToggle, 
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-          placeholder={`Message ${learner.name}...`}
-          aria-label="Write a message"
+          placeholder={t('dock.message', { name: learner.name })}
+          aria-label={t('stage.writeMessage')}
         />
-        <button className={styles.dockSend} onClick={handleSubmit} disabled={!draft.trim()} aria-label="Send">
+        <button
+          className={styles.dockSend}
+          onClick={handleSubmit}
+          disabled={!draft.trim()}
+          aria-label={t('common.send')}
+        >
           ↑
         </button>
       </div>

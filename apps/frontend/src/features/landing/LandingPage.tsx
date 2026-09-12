@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styles from '../../styles/LandingPage.module.css'
-import { LEARNERS } from '../../lib/Learner'
+import { LEARNERS, learnerCopy } from '../../lib/Learner'
 import { LoginScreen } from '../auth/LoginScreen'
 import { useUserStore } from '../../state/UserStore'
 import { TeamSlider } from './TeamSlider'
 import { BackToTop } from './BackToTop'
+import { useLocale, useT, type Translate } from '../../i18n/LanguageProvider'
+import { LanguageToggle } from '../../i18n/LanguageToggle'
+import type { MessageKey } from '../../i18n/messages'
 
 /**
  * Fade-and-lift sections in as they scroll into view.
@@ -49,40 +52,40 @@ const APP_ENTRY = '/home'
 
 interface Step {
   num: string
-  title: string
-  body: ReactNode
+  title: MessageKey
+  body: (t: Translate) => ReactNode
   dark?: boolean
 }
 
 const STEPS: Step[] = [
   {
     num: '01',
-    title: 'Open a board',
-    body: "Name a topic, or don't. Attach a reference PDF if you have one. Your student never sees it, so she can't cheat off the answer key.",
+    title: 'landing.step1Title',
+    body: (t) => t('landing.step1Body'),
   },
   {
     num: '02',
-    title: 'Explain it',
-    body: (
+    title: 'landing.step2Title',
+    body: (t) => (
       <>
-        Draw, write, record your voice. Press <strong>Teach</strong> whenever you want her to look
-        at what's on the board.
+        {t('landing.step2BodyA')} <strong>{t('header.teach')}</strong> {t('landing.step2BodyB')}
       </>
     ),
   },
   {
     num: '03',
-    title: 'She pushes back',
-    body: '“E-Etto… is the rubisco in the first box or the second one?” Answer in chat, or go draw it properly. Her questions stay put until you deal with them.',
+    title: 'landing.step3Title',
+    body: (t) => t('landing.step3Body'),
     dark: true,
   },
   {
     num: '04',
-    title: 'Read her letter',
-    body: (
+    title: 'landing.step4Title',
+    body: (t) => (
       <>
-        A letter, a notebook split into <em>learned</em> and <em>still confused</em>, and three
-        topics she'd like next. Then teach it again, better.
+        {t('landing.step4BodyA')} <em>{t('evaluation.learned').toLowerCase()}</em>{' '}
+        {t('landing.step4BodyB')} <em>{t('evaluation.stillConfused').toLowerCase()}</em>,{' '}
+        {t('landing.step4BodyC')}
       </>
     ),
   },
@@ -101,20 +104,11 @@ const TEAM = [
   'Muh. Hartawan Haidir',
 ]
 
-/** Question and answer pairs for the FAQ accordion. */
-const FAQS = [
-  {
-    q: 'What happens to my free workspaces?',
-    a: 'They stay. Upgrading only lifts the limits, and nothing is deleted or migrated.',
-  },
-  {
-    q: 'Is my board used for training?',
-    a: 'No. Your boards, voice and PDFs are used to run your session and nothing else.',
-  },
-  {
-    q: 'Do I need an account to pay?',
-    a: "Only from Sensei upwards. That is the point where your reports need somewhere to live.",
-  },
+/** Question and answer pairs for the FAQ accordion, as message keys. */
+const FAQS: Array<{ q: MessageKey; a: MessageKey }> = [
+  { q: 'landing.faq1Q', a: 'landing.faq1A' },
+  { q: 'landing.faq2Q', a: 'landing.faq2A' },
+  { q: 'landing.faq3Q', a: 'landing.faq3A' },
 ]
 
 /** Feature bullet marker. `on={false}` renders the muted "not included" dash. */
@@ -124,6 +118,8 @@ function Tick({ on = true, dark = false }: { on?: boolean; dark?: boolean }) {
 }
 
 export default function LandingPage() {
+  const t = useT()
+  const { locale } = useLocale()
   const [annual, setAnnual] = useState(false)
   const [signInOpen, setSignInOpen] = useState(false)
   const navigate = useNavigate()
@@ -137,7 +133,7 @@ export default function LandingPage() {
   const teamReveal = useReveal<HTMLDivElement>()
 
   const senseiPrice = annual ? '39.000' : '49.000'
-  const senseiNote = annual ? 'Billed Rp 468.000 yearly' : 'Or Rp 39.000 on annual billing'
+  const senseiNote = annual ? t('landing.billedYearly') : t('landing.orAnnual')
   const schoolPrice = annual ? '19.000' : '24.000'
 
   return (
@@ -150,22 +146,25 @@ export default function LandingPage() {
             <span className={styles.brandName}>Cogniva</span>
           </a>
           <nav className={styles.navLinks}>
-            <a href="#how">How it works</a>
-            <a href="#students">Your students</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#faq">FAQ</a>
-            <a href="#about">About us</a>
+            <a href="#how">{t('landing.navHow')}</a>
+            <a href="#students">{t('landing.navStudents')}</a>
+            <a href="#pricing">{t('landing.navPricing')}</a>
+            <a href="#faq">{t('landing.navFaq')}</a>
+            <a href="#about">{t('landing.navAbout')}</a>
           </nav>
           <div className={styles.navActions}>
+            {/* First thing on the page, so someone who reads Indonesian can
+                switch before reading anything else. */}
+            <LanguageToggle />
             <button
               type="button"
               className={styles.navSignIn}
               onClick={() => setSignInOpen(true)}
             >
-              Sign in
+              {t('auth.signIn')}
             </button>
             <Link to={APP_ENTRY} className={styles.btnLime}>
-              Start teaching for free
+              {t('landing.startFree')}
             </Link>
           </div>
         </div>
@@ -176,28 +175,23 @@ export default function LandingPage() {
         <div className={styles.heroInner}>
           <div className={styles.heroCopy}>
             <h1 className={styles.heroTitle}>
-              You don't know it
+              {t('landing.heroTitle1')}
               <br />
-              until you can teach it.
+              {t('landing.heroTitle2')}
             </h1>
-            <p className={styles.heroLead}>
-              Cogniva gives you a student instead of a quiz. Explain a topic on a whiteboard, out
-              loud if you like, and she'll interrupt, get confused, and ask the one question you
-              were quietly hoping she wouldn't. Afterwards she writes you a letter about what she
-              actually understood.
-            </p>
+            <p className={styles.heroLead}>{t('landing.heroLead')}</p>
             <div className={styles.heroCtas}>
               <Link to={APP_ENTRY} className={styles.btnLimeLarge}>
-                Open a workspace →
+                {t('landing.heroCta')} →
               </Link>
               <a href="#how" className={styles.btnGhost}>
-                See how a session goes
+                {t('landing.heroSecondary')}
               </a>
             </div>
             <div className={styles.heroNotes}>
-              <span>No account needed</span>
-              <span>Just type your name and start</span>
-              <span>Works in Bahasa Indonesia</span>
+              <span>{t('landing.note1')}</span>
+              <span>{t('landing.note2')}</span>
+              <span>{t('landing.note3')}</span>
             </div>
           </div>
 
@@ -206,15 +200,15 @@ export default function LandingPage() {
             <div className={styles.preview}>
               <div className={styles.previewTitlebar}>
                 <span className={styles.previewBack}>←</span>
-                <span className={styles.previewTopic}>Photosynthesis in C4 plants</span>
+                <span className={styles.previewTopic}>{t('landing.previewTopic')}</span>
                 <span className={styles.previewSavedDot} />
-                <span className={styles.previewSaved}>Saved</span>
+                <span className={styles.previewSaved}>{t('common.saved')}</span>
               </div>
               <div className={styles.previewToolbar}>
                 <span className={styles.previewChip}>biology-ch4.pdf</span>
                 <div className={styles.previewSpacer} />
                 <div className={styles.thinking}>
-                  <span className={styles.thinkingLabel}>Thinking</span>
+                  <span className={styles.thinkingLabel}>{t('landing.previewThinking')}</span>
                   <span className={styles.dots}>
                     <span className={styles.dot} />
                     <span className={styles.dot} />
@@ -226,9 +220,9 @@ export default function LandingPage() {
                 <div className={styles.previewCanvas}>
                   <div className={styles.previewCanvasInner}>
                     <span>
-                      your whiteboard
+                      {t('landing.previewCanvas')}
                       <br />
-                      read-only while she reads
+                      {t('landing.previewCanvas2')}
                     </span>
                   </div>
                 </div>
@@ -242,10 +236,8 @@ export default function LandingPage() {
                       className={styles.avatarBlob}
                     />
                   </div>
-                  <span className={styles.previewSideTitle}>Reading your board…</span>
-                  <span className={styles.previewSideNote}>
-                    She's looking at the arrows on the right side.
-                  </span>
+                  <span className={styles.previewSideTitle}>{t('landing.previewReading')}</span>
+                  <span className={styles.previewSideNote}>{t('landing.previewNote')}</span>
                 </div>
               </div>
             </div>
@@ -258,13 +250,10 @@ export default function LandingPage() {
         <div className={styles.container}>
           <div className={styles.sectionHead}>
             <div className={styles.sectionHeadMain}>
-              <span className={styles.eyebrow}>How a session goes</span>
-              <h2 className={styles.h2}>Four steps, about twenty minutes.</h2>
+              <span className={styles.eyebrow}>{t('landing.howEyebrow')}</span>
+              <h2 className={styles.h2}>{t('landing.howTitle')}</h2>
             </div>
-            <p className={styles.sectionHeadAside}>
-              Nothing to configure and nothing to grade. You talk, she listens badly enough to
-              expose the gaps, and the report tells you where to look again.
-            </p>
+            <p className={styles.sectionHeadAside}>{t('landing.howAside')}</p>
           </div>
 
           <div ref={howReveal.ref} className={`${styles.stepGrid} ${howReveal.className}`}>
@@ -276,38 +265,32 @@ export default function LandingPage() {
                 }
               >
                 <span className={styles.stepNum}>{step.num}</span>
-                <h3 className={styles.stepTitle}>{step.title}</h3>
-                <p className={styles.stepBody}>{step.body}</p>
+                <h3 className={styles.stepTitle}>{t(step.title)}</h3>
+                <p className={styles.stepBody}>{step.body(t)}</p>
               </div>
             ))}
           </div>
 
           <div className={styles.letterRow}>
             <div className={styles.letterCard}>
-              <span className={styles.letterKicker}>What the letter looks like</span>
-              <p className={styles.letterQuote}>
-                “Arif-sensei, I think I finally get why C4 plants bother with the extra step. But
-                when you drew the two cell types I wrote them down without really following. If
-                you asked me now which one has the rubisco, I would guess.”
-              </p>
-              <span className={styles.letterBy}>(Yuzuki, after 24 minutes)</span>
+              <span className={styles.letterKicker}>{t('landing.letterKicker')}</span>
+              <p className={styles.letterQuote}>{t('landing.letterQuote')}</p>
+              <span className={styles.letterBy}>{t('landing.letterBy')}</span>
             </div>
             <div className={styles.statCard}>
               <div className={styles.stat}>
                 <span className={styles.statNum}>3</span>
-                <span className={styles.statLabel}>students, each with their own temperament</span>
+                <span className={styles.statLabel}>{t('landing.stat1')}</span>
               </div>
               <div className={styles.statRule} />
               <div className={styles.stat}>
                 <span className={styles.statNum}>0</span>
-                <span className={styles.statLabel}>accounts, passwords or setup screens</span>
+                <span className={styles.statLabel}>{t('landing.stat2')}</span>
               </div>
               <div className={styles.statRule} />
               <div className={styles.stat}>
                 <span className={styles.statNum}>∞</span>
-                <span className={styles.statLabel}>
-                  rounds per topic, and each one keeps its own report
-                </span>
+                <span className={styles.statLabel}>{t('landing.stat3')}</span>
               </div>
             </div>
           </div>
@@ -319,27 +302,27 @@ export default function LandingPage() {
         <div className={styles.container}>
           <div className={styles.sectionHead}>
             <div className={styles.sectionHeadMain}>
-              <span className={styles.eyebrowOnDark}>Who you'll be teaching</span>
-              <h2 className={styles.h2OnDark}>Three students. You don't get to pick.</h2>
+              <span className={styles.eyebrowOnDark}>{t('landing.studentsEyebrow')}</span>
+              <h2 className={styles.h2OnDark}>{t('landing.studentsTitle')}</h2>
             </div>
-            <p className={styles.sectionHeadAsideOnDark}>
-              Each workspace is assigned a student and keeps her for good, so a topic always has
-              the same voice in it. Teach three topics and you'll have met all three.
-            </p>
+            <p className={styles.sectionHeadAsideOnDark}>{t('landing.studentsAside')}</p>
           </div>
 
           <div ref={studentsReveal.ref} className={`${styles.studentGrid} ${studentsReveal.className}`}>
-            {LEARNERS.map((s) => (
-              <div key={s.id} className={styles.studentCard}>
-                <img src={s.avatarUrl} alt={s.name} className={styles.avatarBlobLarge} />
-                <div className={styles.studentHead}>
-                  <h3 className={styles.studentName}>{s.name}</h3>
-                  <span className={styles.studentTrait}>{s.traits}</span>
+            {LEARNERS.map((s) => {
+              const copy = learnerCopy(s, locale)
+              return (
+                <div key={s.id} className={styles.studentCard}>
+                  <img src={s.avatarUrl} alt={s.name} className={styles.avatarBlobLarge} />
+                  <div className={styles.studentHead}>
+                    <h3 className={styles.studentName}>{s.name}</h3>
+                    <span className={styles.studentTrait}>{copy.traits}</span>
+                  </div>
+                  <p className={styles.studentBody}>{copy.description}</p>
+                  <span className={styles.studentQuote}>{copy.catchphrase}</span>
                 </div>
-                <p className={styles.studentBody}>{s.description}</p>
-                <span className={styles.studentQuote}>{s.catchphrase}</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </section>
@@ -348,15 +331,14 @@ export default function LandingPage() {
       <section id="pricing" className={styles.pricing}>
         <div className={styles.container}>
           <div className={styles.pricingHead}>
-            <span className={styles.eyebrow}>Pricing</span>
-            <h2 className={styles.h2Centered}>
-              Free to learn with. Paid when you want her to remember.
-            </h2>
-            <p className={styles.pricingLead}>
-              Prices in IDR, per month, cancel any time. Every plan includes all three students and
-              the full report.
-            </p>
-            <div className={styles.billingToggle} role="tablist" aria-label="Billing period">
+            <span className={styles.eyebrow}>{t('landing.navPricing')}</span>
+            <h2 className={styles.h2Centered}>{t('landing.pricingTitle')}</h2>
+            <p className={styles.pricingLead}>{t('landing.pricingLead')}</p>
+            <div
+              className={styles.billingToggle}
+              role="tablist"
+              aria-label={t('landing.billingPeriod')}
+            >
               <button
                 type="button"
                 role="tab"
@@ -366,7 +348,7 @@ export default function LandingPage() {
                 }
                 onClick={() => setAnnual(false)}
               >
-                Monthly
+                {t('landing.monthly')}
               </button>
               <button
                 type="button"
@@ -377,7 +359,7 @@ export default function LandingPage() {
                 }
                 onClick={() => setAnnual(true)}
               >
-                Annual · 2 months free
+                {t('landing.annual')}
               </button>
             </div>
           </div>
@@ -387,80 +369,74 @@ export default function LandingPage() {
             <div className={styles.plan}>
               <div className={styles.planHead}>
                 <h3 className={styles.planName}>Belajar</h3>
-                <p className={styles.planTag}>For seeing whether teaching actually works on you.</p>
+                <p className={styles.planTag}>{t('landing.freeTag')}</p>
               </div>
               <div className={styles.priceRow}>
                 <span className={styles.price}>Rp 0</span>
-                <span className={styles.priceUnit}>forever</span>
+                <span className={styles.priceUnit}>{t('landing.forever')}</span>
               </div>
               <Link to={APP_ENTRY} className={styles.planCtaGhost}>
-                Start now
+                {t('landing.startNow')}
               </Link>
               <div className={styles.planRule} />
               <div className={styles.featureList}>
                 <div className={styles.feature}>
                   <Tick />
-                  <span>3 workspaces at a time</span>
+                  <span>{t('landing.freeFeature1')}</span>
                 </div>
                 <div className={styles.feature}>
                   <Tick />
-                  <span>Whiteboard, voice recording, chat</span>
+                  <span>{t('landing.freeFeature2')}</span>
                 </div>
                 <div className={styles.feature}>
                   <Tick />
-                  <span>Letter, notebook and next topics</span>
+                  <span>{t('landing.freeFeature3')}</span>
                 </div>
                 <div className={styles.feature}>
                   <Tick on={false} />
-                  <span className={styles.featureOff}>Reports kept 7 days</span>
+                  <span className={styles.featureOff}>{t('landing.freeFeature4')}</span>
                 </div>
               </div>
             </div>
 
             {/* ── Sensei ── */}
             <div className={styles.planFeatured}>
-              <span className={styles.planBadge}>Most chosen</span>
+              <span className={styles.planBadge}>{t('landing.mostChosen')}</span>
               <div className={styles.planHead}>
                 <h3 className={styles.planNameOnDark}>Sensei</h3>
-                <p className={styles.planTagOnDark}>
-                  For someone with an exam, a thesis, or a habit.
-                </p>
+                <p className={styles.planTagOnDark}>{t('landing.senseiTag')}</p>
               </div>
               <div className={styles.priceBlock}>
                 <div className={styles.priceRow}>
                   <span className={styles.priceLime}>Rp {senseiPrice}</span>
-                  <span className={styles.priceUnitOnDark}>/ month</span>
+                  <span className={styles.priceUnitOnDark}>{t('landing.perMonth')}</span>
                 </div>
                 <span className={styles.priceNote}>{senseiNote}</span>
               </div>
               <Link to={APP_ENTRY} className={styles.planCtaLime}>
-                Take Sensei
+                {t('landing.takeSensei')}
               </Link>
               <div className={styles.planRuleDark} />
               <div className={styles.featureList}>
                 <div className={styles.feature}>
                   <Tick dark />
-                  <span className={styles.featureOnDark}>Unlimited workspaces and rounds</span>
+                  <span className={styles.featureOnDark}>{t('landing.senseiFeature1')}</span>
                 </div>
                 <div className={styles.feature}>
                   <Tick dark />
-                  <span className={styles.featureOnDark}>
-                    Reports kept forever, with round history
-                  </span>
+                  <span className={styles.featureOnDark}>{t('landing.senseiFeature2')}</span>
                 </div>
                 <div className={styles.feature}>
                   <Tick dark />
-                  <span className={styles.featureOnDark}>Reference PDFs up to 100 pages</span>
+                  <span className={styles.featureOnDark}>{t('landing.senseiFeature3')}</span>
                 </div>
                 <div className={styles.feature}>
                   <Tick dark />
-                  <span className={styles.featureOnDark}>
-                    Deeper evaluation that remembers earlier rounds
-                  </span>
+                  <span className={styles.featureOnDark}>{t('landing.senseiFeature4')}</span>
                 </div>
                 <div className={styles.feature}>
                   <Tick dark />
-                  <span className={styles.featureOnDark}>Export letters and notes as PDF</span>
+                  <span className={styles.featureOnDark}>{t('landing.senseiFeature5')}</span>
                 </div>
               </div>
             </div>
@@ -469,35 +445,35 @@ export default function LandingPage() {
             <div className={styles.plan}>
               <div className={styles.planHead}>
                 <h3 className={styles.planName}>Sekolah</h3>
-                <p className={styles.planTag}>For a class, a study group, or a whole school.</p>
+                <p className={styles.planTag}>{t('landing.schoolTag')}</p>
               </div>
               <div className={styles.priceBlock}>
                 <div className={styles.priceRow}>
                   <span className={styles.price}>Rp {schoolPrice}</span>
-                  <span className={styles.priceUnit}>/ student / month</span>
+                  <span className={styles.priceUnit}>{t('landing.perStudent')}</span>
                 </div>
-                <span className={styles.priceNoteLight}>Minimum 20 students</span>
+                <span className={styles.priceNoteLight}>{t('landing.minStudents')}</span>
               </div>
               <a href="#about" className={styles.planCtaOutline}>
-                Talk to us
+                {t('landing.talkToUs')}
               </a>
               <div className={styles.planRule} />
               <div className={styles.featureList}>
                 <div className={styles.feature}>
                   <Tick />
-                  <span>Everything in Sensei</span>
+                  <span>{t('landing.schoolFeature1')}</span>
                 </div>
                 <div className={styles.feature}>
                   <Tick />
-                  <span>Teacher view: who taught what, and how it went</span>
+                  <span>{t('landing.schoolFeature2')}</span>
                 </div>
                 <div className={styles.feature}>
                   <Tick />
-                  <span>Assign a topic to the whole class</span>
+                  <span>{t('landing.schoolFeature3')}</span>
                 </div>
                 <div className={styles.feature}>
                   <Tick />
-                  <span>Invoicing, onboarding session, priority support</span>
+                  <span>{t('landing.schoolFeature4')}</span>
                 </div>
               </div>
             </div>
@@ -510,8 +486,8 @@ export default function LandingPage() {
       <section id="faq" className={styles.faqSection}>
         <div className={styles.container}>
           <div className={styles.pricingHead}>
-            <span className={styles.eyebrow}>FAQ</span>
-            <h2 className={styles.h2Centered}>Questions you might have</h2>
+            <span className={styles.eyebrow}>{t('landing.navFaq')}</span>
+            <h2 className={styles.h2Centered}>{t('landing.faqTitle')}</h2>
           </div>
 
           <div ref={faqReveal.ref} className={`${styles.faqList} ${faqReveal.className}`}>
@@ -526,7 +502,7 @@ export default function LandingPage() {
                     aria-controls={`faq-a-${i}`}
                     onClick={() => setOpenFaq(open ? null : i)}
                   >
-                    <span>{item.q}</span>
+                    <span>{t(item.q)}</span>
                     <span className={styles.faqChevron} aria-hidden="true">
                       ⌄
                     </span>
@@ -534,7 +510,7 @@ export default function LandingPage() {
                   {/* Kept mounted and collapsed by max-height so the open/close
                       is animatable and the text stays findable by Ctrl+F. */}
                   <div id={`faq-a-${i}`} className={styles.faqAWrap} role="region">
-                    <p className={styles.faqA}>{item.a}</p>
+                    <p className={styles.faqA}>{t(item.a)}</p>
                   </div>
                 </div>
               )
@@ -548,42 +524,23 @@ export default function LandingPage() {
         <div className={styles.container}>
           <div className={styles.aboutRow}>
             <div className={styles.aboutCopy}>
-              <span className={styles.eyebrow}>About us</span>
-              <h2 className={styles.h2}>
-                We built the study tool we kept failing to be disciplined enough for.
-              </h2>
-              <p className={styles.aboutPara}>
-                Cogniva started as a small team in Bandung re-reading the same chapter for the
-                fourth time and still not being able to explain it to a friend. Flashcards told us
-                we knew things we didn't. Talking out loud to nobody felt silly. So we made the
-                nobody talk back.
-              </p>
-              <p className={styles.aboutPara}>
-                The students are deliberately not experts. An expert would fill your gaps in
-                politely. A confused beginner leaves them exactly where they are, in writing, where
-                you have to look at them.
-              </p>
+              <span className={styles.eyebrow}>{t('landing.navAbout')}</span>
+              <h2 className={styles.h2}>{t('landing.aboutTitle')}</h2>
+              <p className={styles.aboutPara}>{t('landing.aboutPara1')}</p>
+              <p className={styles.aboutPara}>{t('landing.aboutPara2')}</p>
             </div>
             <div className={styles.beliefCol}>
               <div className={styles.beliefCard}>
-                <span className={styles.beliefKicker}>What we believe</span>
-                <p className={styles.beliefBody}>
-                  Understanding is a performance, not a feeling. If you can't perform it, you don't
-                  have it yet.
-                </p>
+                <span className={styles.beliefKicker}>{t('landing.believeKicker')}</span>
+                <p className={styles.beliefBody}>{t('landing.believeBody')}</p>
               </div>
               <div className={styles.beliefCard}>
-                <span className={styles.beliefKicker}>What we won't do</span>
-                <p className={styles.beliefBody}>
-                  No streaks, no leaderboards, no notifications guilting you back. One good session
-                  beats thirty nagged ones.
-                </p>
+                <span className={styles.beliefKicker}>{t('landing.wontKicker')}</span>
+                <p className={styles.beliefBody}>{t('landing.wontBody')}</p>
               </div>
               <div className={styles.beliefCard}>
-                <span className={styles.beliefKicker}>Where we are</span>
-                <p className={styles.beliefBody}>
-                  Open beta, four people, Bandung. Bahasa Indonesia first, English second.
-                </p>
+                <span className={styles.beliefKicker}>{t('landing.whereKicker')}</span>
+                <p className={styles.beliefBody}>{t('landing.whereBody')}</p>
               </div>
             </div>
           </div>
@@ -598,12 +555,10 @@ export default function LandingPage() {
       <section className={styles.closing}>
         <div className={styles.container}>
           <div className={styles.closingCta}>
-            <h2 className={styles.closingTitle}>Pick a topic you think you know.</h2>
-            <p className={styles.closingLead}>
-              Type your name, open a board, and find out in twenty minutes. No card, no account.
-            </p>
+            <h2 className={styles.closingTitle}>{t('landing.closingTitle')}</h2>
+            <p className={styles.closingLead}>{t('landing.closingLead')}</p>
             <Link to={APP_ENTRY} className={styles.btnLimeLarge}>
-              Start teaching for free
+              {t('landing.startFree')}
             </Link>
           </div>
 
@@ -615,32 +570,30 @@ export default function LandingPage() {
                 <img src="/cogniva_logo.png" alt="" aria-hidden="true" className={styles.brandMarkImg} />
                 <span className={styles.brandNameOnDark}>Cogniva</span>
               </div>
-              <span className={styles.footerTagline}>
-                Learning by teaching. Made in Bandung, Indonesia.
-              </span>
+              <span className={styles.footerTagline}>{t('landing.tagline')}</span>
             </div>
             <div className={styles.footerCols}>
               <div className={styles.footerCol}>
-                <span className={styles.footerColTitle}>Product</span>
-                <a href="#how">How it works</a>
-                <a href="#students">Your students</a>
-                <a href="#pricing">Pricing</a>
+                <span className={styles.footerColTitle}>{t('landing.footerProduct')}</span>
+                <a href="#how">{t('landing.navHow')}</a>
+                <a href="#students">{t('landing.navStudents')}</a>
+                <a href="#pricing">{t('landing.navPricing')}</a>
               </div>
               <div className={styles.footerCol}>
-                <span className={styles.footerColTitle}>Company</span>
-                <a href="#about">About us</a>
-                <a href="#about">Contact</a>
-                <a href="#about">Careers</a>
+                <span className={styles.footerColTitle}>{t('landing.footerCompany')}</span>
+                <a href="#about">{t('landing.navAbout')}</a>
+                <a href="#about">{t('landing.footerContact')}</a>
+                <a href="#about">{t('landing.footerCareers')}</a>
               </div>
               <div className={styles.footerCol}>
-                <span className={styles.footerColTitle}>Legal</span>
-                <a href="#about">Privacy</a>
-                <a href="#about">Terms</a>
+                <span className={styles.footerColTitle}>{t('landing.footerLegal')}</span>
+                <a href="#about">{t('landing.footerPrivacy')}</a>
+                <a href="#about">{t('landing.footerTerms')}</a>
               </div>
             </div>
           </footer>
 
-          <span className={styles.copyright}>© 2026 Cogniva. Open beta.</span>
+          <span className={styles.copyright}>{t('landing.copyright')}</span>
         </div>
       </section>
 

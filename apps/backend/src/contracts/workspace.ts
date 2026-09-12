@@ -55,8 +55,32 @@ export interface Workspace {
    * made before the picker existed; the id-derived default covers those.
    */
   learnerId?: string;
+  /**
+   * The language this session runs in, chosen when the workspace was created
+   * and fixed from then on ("id" | "en").
+   *
+   * On the wire because it is a property of the session rather than of the
+   * browser: the Home grid labels every card with it, and reopening a workspace
+   * on another device has to show it in the language it was taught in.
+   */
+  locale: Locale;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * The two languages the product ships in.
+ *
+ * Indonesian is first because that is the audience; English exists because the
+ * learner's synthesized voice only speaks it (see services/tts/README.md).
+ */
+export const LOCALES = ["id", "en"] as const;
+
+export type Locale = (typeof LOCALES)[number];
+
+/** Narrow an unknown value to a Locale, falling back to Indonesian. */
+export function asLocale(value: unknown): Locale {
+  return LOCALES.includes(value as Locale) ? (value as Locale) : "id";
 }
 
 /** Provenance of web-sourced reference material (§1.4: Evaluator-side only). */
@@ -189,6 +213,11 @@ export const saveDraftSchema = z.object({
   snapshot: z.unknown(),
   /** Optional thumbnail as a data URL (already rasterized by the client). */
   thumbnail: z.string().optional(),
+});
+
+/** Body of POST /workspaces. Empty is valid — the language then defaults. */
+export const createWorkspaceSchema = z.object({
+  locale: z.enum(LOCALES).optional(),
 });
 
 export const submitCheckpointSchema = z.object({

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { LearnerCharacter } from '../../../lib/Learner'
 import styles from '../../../styles/Evaluation.module.css'
+import { useT } from '../../../i18n/LanguageProvider'
 
 interface LetterFromLearnerProps {
   learner: LearnerCharacter
@@ -9,24 +10,27 @@ interface LetterFromLearnerProps {
 
 export function LetterFromLearner({ learner, letter }: LetterFromLearnerProps) {
   const [sealed, setSealed] = useState(true)
+  const t = useT()
 
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>
         <span>📩</span>
-        <span>Letter from Your Learner</span>
+        <span>{t('evaluation.letterTitle')}</span>
       </div>
 
       {sealed ? (
         // Sealed envelope state — user clicks to open
         <div className={styles.letterSealed} onClick={() => setSealed(false)} role="button" tabIndex={0}
           onKeyDown={e => e.key === 'Enter' && setSealed(false)}
-          aria-label="Open the letter from your learner"
+          aria-label={t('evaluation.letterOpen')}
         >
           <img src={learner.avatarUrl} alt={learner.name} className={styles.letterSealAvatar} />
           <div className={styles.letterSealText}>
-            <p className={styles.letterSealFrom}>Letter from {learner.name}</p>
-            <p className={styles.letterSealHint}>Click to open</p>
+            <p className={styles.letterSealFrom}>
+              {t('evaluation.letterFrom', { name: learner.name })}
+            </p>
+            <p className={styles.letterSealHint}>{t('evaluation.clickToOpen')}</p>
           </div>
           <span className={styles.letterSealIcon}>✉</span>
         </div>
@@ -37,7 +41,7 @@ export function LetterFromLearner({ learner, letter }: LetterFromLearnerProps) {
             <img src={learner.avatarUrl} alt={learner.name} className={styles.letterAvatar} />
             <div>
               <p className={styles.letterFrom}>{learner.name}</p>
-              <p className={styles.letterSub}>to their teacher</p>
+              <p className={styles.letterSub}>{t('evaluation.toTheirTeacher')}</p>
             </div>
           </div>
           <div className={styles.letterBody}>

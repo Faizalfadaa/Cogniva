@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChatToast } from '../hooks/useWorkspaceChat'
 import { spokenText, useUtteranceProgress } from '../hooks/useLearnerVoice'
+import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/TeachingSession.module.css'
 
 /** How long a toast stays once its line has been fully said. */
@@ -21,6 +22,7 @@ interface ToastItemProps {
 function ToastItem({ toast, onDismiss, onOpenChat }: ToastItemProps) {
   const [visible, setVisible] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const t = useT()
   const progress = useUtteranceProgress(toast.speech)
   const waiting = progress?.phase === 'waiting'
   const shown = waiting ? '...' : spokenText(toast.content, toast.speech, progress)
@@ -57,7 +59,7 @@ function ToastItem({ toast, onDismiss, onOpenChat }: ToastItemProps) {
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onOpenChat()}
-      aria-label={`Message from ${toast.senderName}: ${shown}. Click to open chat.`}
+      aria-label={t('stage.messageFrom', { name: toast.senderName, text: shown })}
     >
       <img src={toast.avatarUrl} alt={toast.senderName} className={styles.chatToastAvatar} />
       <div className={styles.chatToastBody}>

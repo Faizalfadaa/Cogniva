@@ -1,3 +1,4 @@
+import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/TeachingSession.module.css'
 
 interface ChatLauncherProps {
@@ -60,8 +61,9 @@ export function ChatLauncher({
   learnerAvatarUrl,
   learnerName,
 }: ChatLauncherProps) {
-  const who = learnerName ?? 'the learner'
-  const label = chatOpen ? 'Close chat' : `Open chat with ${who}`
+  const t = useT()
+  const who = learnerName ?? t('stage.theLearner')
+  const label = chatOpen ? t('stage.closeChat') : t('stage.openChat', { name: who })
 
   return (
     <button

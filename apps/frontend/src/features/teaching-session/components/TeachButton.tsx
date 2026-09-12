@@ -1,3 +1,4 @@
+import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/TeachingSession.module.css'
 
 interface TeachButtonProps {
@@ -8,10 +9,12 @@ interface TeachButtonProps {
 }
 
 export function TeachButton({ mode, pending, onTeach, onContinueEditing }: TeachButtonProps) {
+  const t = useT()
+
   if (mode === 'editing') {
     return (
       <button data-tour="teach-button" className={styles.teachBtn} onClick={onTeach}>
-        Teach ↗
+        {t('header.teach')} ↗
       </button>
     )
   }
@@ -19,14 +22,14 @@ export function TeachButton({ mode, pending, onTeach, onContinueEditing }: Teach
   if (pending) {
     return (
       <button data-tour="teach-button" className={styles.teachBtn} disabled>
-        Thinking...
+        {t('header.thinking')}
       </button>
     )
   }
 
   return (
     <button data-tour="teach-button" className={styles.outlineBtn} onClick={onContinueEditing}>
-      Continue editing
+      {t('header.continueEditing')}
     </button>
   )
 }

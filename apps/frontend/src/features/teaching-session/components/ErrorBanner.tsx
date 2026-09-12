@@ -1,4 +1,6 @@
 import styles from '../../../styles/TeachingSession.module.css'
+import { useT } from '../../../i18n/LanguageProvider'
+import type { MessageKey } from '../../../i18n/messages'
 import type { SessionError, SessionErrorKind } from './errorTypes'
 
 interface ErrorBannerProps {
@@ -8,8 +10,8 @@ interface ErrorBannerProps {
 
 interface Copy {
   icon: string
-  title: string
-  text: string
+  title: MessageKey
+  text: MessageKey
   className: string
 }
 
@@ -21,20 +23,20 @@ interface Copy {
 const COPY: Record<SessionErrorKind, Copy> = {
   budget_exceeded: {
     icon: '🌱',
-    title: 'Batas token sesi tercapai',
-    text: 'Sesi ini sudah memakai seluruh jatah tokennya. Akhiri sesi untuk melihat evaluasi, atau buka workspace baru untuk lanjut mengajar.',
+    title: 'error.budgetTitle',
+    text: 'error.budgetText',
     className: styles.errorBannerBudget,
   },
   network: {
     icon: '📡',
-    title: 'Tidak terhubung ke internet',
-    text: 'Koneksi terputus. Coretan di papan tetap tersimpan di perangkat ini — pesan akan terkirim lagi begitu koneksi kembali.',
+    title: 'error.networkTitle',
+    text: 'error.networkText',
     className: styles.errorBannerNetwork,
   },
   ai_unavailable: {
     icon: '⚠️',
-    title: 'Gagal menghubungi Cogniva',
-    text: 'Server tidak merespons, jadi giliran ini belum terkirim. Coba tekan Teach sekali lagi sebentar lagi.',
+    title: 'error.aiTitle',
+    text: 'error.aiText',
     className: styles.errorBannerAi,
   },
 }
@@ -45,6 +47,7 @@ const COPY: Record<SessionErrorKind, Copy> = {
  * (see .errorBanner in the stylesheet for why that spot).
  */
 export function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
+  const t = useT()
   if (!error) return null
 
   const copy = COPY[error.kind]
@@ -60,8 +63,8 @@ export function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
       </span>
 
       <div className={styles.errorBannerBody}>
-        <span className={styles.errorBannerTitle}>{copy.title}</span>
-        <p className={styles.errorBannerText}>{copy.text}</p>
+        <span className={styles.errorBannerTitle}>{t(copy.title)}</span>
+        <p className={styles.errorBannerText}>{t(copy.text)}</p>
         {error.detail && <p className={styles.errorBannerDetail}>{error.detail}</p>}
       </div>
 
@@ -69,7 +72,7 @@ export function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
         type="button"
         className={styles.errorBannerClose}
         onClick={onDismiss}
-        aria-label="Tutup pemberitahuan"
+        aria-label={t('error.dismiss')}
       >
         ✕
       </button>

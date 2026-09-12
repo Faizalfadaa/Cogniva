@@ -8,6 +8,8 @@ import { EvaluationProcessing } from '../../features/evaluation/components/Evalu
 import { LetterFromLearner } from '../../features/evaluation/components/LetterFromLearner'
 import { Notebook } from '../../features/evaluation/components/Notebook'
 import { ContinueLearning } from '../../features/evaluation/components/ContinueLearning'
+import { useLocale, usePinnedLocale, useT } from '../../i18n/LanguageProvider'
+import { LanguageToggle } from '../../i18n/LanguageToggle'
 import styles from '../../styles/Evaluation.module.css'
 
 const POLL_INTERVAL_MS = 3000
@@ -16,12 +18,18 @@ export default function EvaluationPage() {
   const { id } = useParams<{ id: string }>()
   const bridge = useBridge()
   const navigate = useNavigate()
+  const t = useT()
 
   const [workspace, setWorkspace] = useState<WorkspaceDTO | null>(null)
   const [report, setReport] = useState<EvaluationReportDTO | null>(null)
   const [loading, setLoading] = useState(true)
   const [resuming, setResuming] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // The report is written in the language the session ran in, so the page
+  // around it is too — and the header's switch becomes a label.
+  usePinnedLocale(workspace?.locale)
+  const { locale } = useLocale()
 
   // Same resolution as Workspace.tsx: the user's pick when there is one, the
   // hash-derived default otherwise — so the debrief comes from the student they
@@ -74,7 +82,7 @@ export default function EvaluationPage() {
   }, [bridge, id, workspace?.state]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleNewSession() {
-    const ws = await bridge.createWorkspace()
+    const ws = await bridge.createWorkspace(locale)
     navigate(`/workspace/${ws.id}`)
   }
 
@@ -109,12 +117,13 @@ export default function EvaluationPage() {
       {/* Minimal top bar */}
       <header className={styles.reportHeader}>
         <button className={styles.reportBack} onClick={() => navigate('/home')}>
-          ← Home
+          ← {t('header.home')}
         </button>
         <div className={styles.reportHeaderCenter}>
           <img src="/cogniva_logo.png" alt="Cogniva" className={styles.reportLogo} />
         </div>
         <div className={styles.reportHeaderRight}>
+          <LanguageToggle />
           <img src={learner.avatarUrl} alt={learner.name} className={styles.reportLearnerAvatar} />
           <span className={styles.reportLearnerName}>{learner.name}</span>
         </div>
@@ -122,9 +131,9 @@ export default function EvaluationPage() {
 
       {/* Hero */}
       <div className={styles.reportHero}>
-        <p className={styles.reportHeroEyebrow}>Session complete</p>
+        <p className={styles.reportHeroEyebrow}>{t('evaluation.complete')}</p>
         <h1 className={styles.reportHeroTitle}>
-          {workspace.title ?? 'Untitled workspace'}
+          {workspace.title ?? t('home.untitledWorkspace')}
         </h1>
       </div>
 

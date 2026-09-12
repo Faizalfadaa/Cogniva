@@ -35,6 +35,7 @@ import type {
   CheckpointErrorKind,
   LearnerSpeech,
   ReferenceSource,
+  Locale,
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
@@ -68,10 +69,16 @@ export async function isOwner(id: string, ownerId: string = ANON_OWNER): Promise
   return workspaces.isOwner(id, ownerId);
 }
 
-export async function createWorkspace(ownerId: string = ANON_OWNER): Promise<Workspace> {
+export async function createWorkspace(
+  ownerId: string = ANON_OWNER,
+  locale: Locale = "id",
+): Promise<Workspace> {
   const id = newWorkspaceId();
   const now = utcNowIso();
-  const workspace: Workspace = { id, state: "Draft", createdAt: now, updatedAt: now };
+  // The language is settled here and never written again: a session's
+  // transcript, report and (in English) spoken replies all end up in it, so a
+  // workspace that changed language halfway would be half in each.
+  const workspace: Workspace = { id, state: "Draft", locale, createdAt: now, updatedAt: now };
 
   // Back it with a Session so the orchestrator/Evaluator drive it unchanged.
   // The session is written first: the workspace row references it.

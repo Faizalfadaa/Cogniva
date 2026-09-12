@@ -1,5 +1,6 @@
 import type { CognivaBridge } from './CognivaBridge';
 import type { WorkspaceDTO } from '../dto/WorkspaceDTO';
+import type { Locale } from '../i18n/messages';
 import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
 import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
@@ -137,12 +138,13 @@ export class MockCognivaBridge implements CognivaBridge {
     );
   }
 
-  async createWorkspace(): Promise<WorkspaceDTO> {
+  async createWorkspace(locale: Locale): Promise<WorkspaceDTO> {
     await delay(300);
     const id = uuid();
     const workspace: WorkspaceDTO = {
       id,
       state: 'Draft',
+      locale,
       createdAt: now(),
       updatedAt: now(),
     };

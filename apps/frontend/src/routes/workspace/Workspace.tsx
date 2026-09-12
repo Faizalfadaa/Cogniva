@@ -28,11 +28,13 @@ import {
   resolveLearner,
   setStoredLearnerId,
 } from '../../lib/Learner'
+import { useLocale, usePinnedLocale, useT } from '../../i18n/LanguageProvider'
 import styles from '../../styles/TeachingSession.module.css'
 
 export default function WorkspacePage() {
   const { id } = useParams<{ id: string }>()
   const bridge = useBridge()
+  const t = useT()
   const [workspace, setWorkspace] = useState<WorkspaceDTO | null>(null)
   const [loading, setLoading] = useState(true)
   const whiteboardRef = useRef<WhiteboardHandle>(null)
@@ -48,6 +50,12 @@ export default function WorkspacePage() {
     })
     return () => { active = false }
   }, [bridge, id])
+
+  // A session is shown in its own language, and the switch in the header turns
+  // into a label saying which. Undefined until the workspace loads, which pins
+  // nothing and leaves the reader's own preference in place for that moment.
+  usePinnedLocale(workspace?.locale)
+  const { locale } = useLocale()
 
   const handleAutosave = useCallback(
     (payload: { snapshot: unknown; thumbnail?: Blob }) => {
@@ -124,7 +132,7 @@ export default function WorkspacePage() {
   // Resolve first messages with userName substitution — stable across renders
   const seedMessages = useMemo(
     () =>
-      resolveFirstMessages(learner, userName || 'you').map((content, i) => ({
+      resolveFirstMessages(learner, userName || t('intro.you'), locale).map((content, i) => ({
         id: `seed-${id}-${i}`,
         content,
       })),

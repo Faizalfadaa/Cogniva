@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useBridge } from '../../../bridge/BridgeProvider'
 import type { ReferenceOptionDTO, ReferenceSuggestionsDTO } from '../../../dto/ReferenceDTO'
+import { useLocale, useT } from '../../../i18n/LanguageProvider'
+import { LOCALE_TAGS } from '../../../i18n/messages'
 import styles from '../../../styles/ReferenceFinder.module.css'
 
 interface ReferenceFinderProps {
@@ -35,6 +37,8 @@ const KIND_ICON: Record<ReferenceOptionDTO['kind'], string> = {
  */
 export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: ReferenceFinderProps) {
   const bridge = useBridge()
+  const t = useT()
+  const { locale } = useLocale()
   const [hint, setHint] = useState('')
   const [searching, setSearching] = useState(false)
   const [suggestions, setSuggestions] = useState<ReferenceSuggestionsDTO | null>(null)
@@ -65,11 +69,12 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       setSelected(result.options[0]?.id ?? null)
     } catch (err) {
       console.error('[ReferenceFinder] suggestReferences failed', err)
-      if (alive.current) setError('Pencarian gagal. Coba lagi sebentar.')
+      if (alive.current) setError(t('reference.searchFailed'))
     } finally {
       if (alive.current) setSearching(false)
     }
-  }, [bridge, workspaceId, hint])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridge, workspaceId, hint, t])
 
   // Search on open: the user already said what the topic is by naming the
   // workspace, so making them press a button first would be asking twice.
@@ -103,18 +108,21 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       })
       if (!alive.current) return
       if (!result.ok) {
-        setError(result.problem || 'Sumber itu tidak bisa dipakai.')
+        setError(result.problem || t('reference.unusable'))
         return
       }
-      setDone(`Referensi tersimpan (${result.chars.toLocaleString('id-ID')} karakter).`)
+      setDone(
+        t('reference.saved', { count: result.chars.toLocaleString(LOCALE_TAGS[locale]) }),
+      )
       onAdopted()
     } catch (err) {
       console.error('[ReferenceFinder] useReference failed', err)
-      if (alive.current) setError('Gagal menyimpan referensi. Coba lagi.')
+      if (alive.current) setError(t('reference.useFailed'))
     } finally {
       if (alive.current) setAdopting(false)
     }
-  }, [bridge, workspaceId, suggestions, selected, onAdopted])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridge, workspaceId, suggestions, selected, onAdopted, t, locale])
 
   const options = suggestions?.options ?? []
 
@@ -123,7 +131,7 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       className={styles.overlay}
       role="dialog"
       aria-modal="true"
-      aria-label="Cari referensi"
+      aria-label={t('reference.title')}
       onClick={(event) => {
         // Backdrop click closes, but only the backdrop — a click that started
         // inside the panel and drifted out should not throw the list away.
@@ -133,13 +141,15 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       <div className={styles.panel}>
         <header className={styles.head}>
           <div>
-            <h2 className={styles.title}>Cari referensi</h2>
-            <p className={styles.subtitle}>
-              Belum punya bahan sendiri? Pilih satu sumber untuk dipakai menilai penjelasanmu
-              nanti. Materinya tidak pernah dilihat murid — hanya penilai.
-            </p>
+            <h2 className={styles.title}>{t('reference.title')}</h2>
+            <p className={styles.subtitle}>{t('reference.subtitle')}</p>
           </div>
-          <button className={styles.close} onClick={onClose} aria-label="Tutup" disabled={adopting}>
+          <button
+            className={styles.close}
+            onClick={onClose}
+            aria-label={t('common.close')}
+            disabled={adopting}
+          >
             ✕
           </button>
         </header>
@@ -148,30 +158,34 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
           <input
             className={styles.hintInput}
             value={hint}
-            placeholder={`Topik: ${topic || 'belum ada judul'} — tambahkan arahan, misal "tingkat SMA"`}
+            placeholder={t('reference.hintPlaceholder', {
+              topic: topic || t('reference.noTopic'),
+            })}
             onChange={(event) => setHint(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !searching) void search()
             }}
             disabled={searching || adopting}
-            aria-label="Arahan pencarian"
+            aria-label={t('reference.hintLabel')}
           />
           <button
             className={styles.searchBtn}
             onClick={() => void search()}
             disabled={searching || adopting}
           >
-            {searching ? 'Mencari…' : 'Cari lagi'}
+            {searching ? t('reference.searching') : t('reference.search')}
           </button>
         </div>
 
         {suggestions?.notice && <p className={styles.notice}>{suggestions.notice}</p>}
 
         <div className={styles.list}>
-          {searching && <p className={styles.status}>Mencari sumber untuk “{topic}”…</p>}
+          {searching && (
+            <p className={styles.status}>{t('reference.searchingFor', { topic })}</p>
+          )}
 
           {!searching && options.length === 0 && (
-            <p className={styles.status}>Tidak ada sumber yang bisa ditawarkan.</p>
+            <p className={styles.status}>{t('reference.empty')}</p>
           )}
 
           {!searching &&
@@ -199,15 +213,12 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
                   <div className={styles.meta}>
                     <span className={styles.publisher}>{option.source}</span>
                     {option.verified ? (
-                      <span className={styles.badgeOk} title="Muncul di hasil pencarian">
-                        terkonfirmasi
+                      <span className={styles.badgeOk} title={t('reference.verifiedTitle')}>
+                        {t('reference.verified')}
                       </span>
                     ) : (
-                      <span
-                        className={styles.badgeWarn}
-                        title="Belum terkonfirmasi di hasil pencarian"
-                      >
-                        belum dicek
+                      <span className={styles.badgeWarn} title={t('reference.unverifiedTitle')}>
+                        {t('reference.unverified')}
                       </span>
                     )}
                     <a
@@ -217,7 +228,7 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
                       rel="noreferrer"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      buka ↗
+                      {t('reference.open')} ↗
                     </a>
                   </div>
 
@@ -233,14 +244,14 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
 
         <footer className={styles.foot}>
           <button className={styles.ghostBtn} onClick={onClose} disabled={adopting}>
-            {done ? 'Selesai' : 'Batal'}
+            {done ? t('common.done') : t('common.cancel')}
           </button>
           <button
             className={styles.primaryBtn}
             onClick={() => void adopt()}
             disabled={!selected || adopting || searching}
           >
-            {adopting ? 'Menyiapkan…' : 'Pakai referensi ini'}
+            {adopting ? t('reference.preparing') : t('reference.use')}
           </button>
         </footer>
       </div>

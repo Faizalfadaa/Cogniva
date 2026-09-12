@@ -11,6 +11,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import {
+  createWorkspaceSchema,
   saveDraftSchema,
   saveReferenceTextSchema,
   sendMessageSchema,
@@ -44,8 +45,12 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
   app.get("/workspaces", async (req) => service.listWorkspaces(await ownerOf(req)));
 
   app.post("/workspaces", async (req, reply) => {
+    // The body is optional: an older client that posts nothing still gets a
+    // workspace, in the default language.
+    const parsed = createWorkspaceSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return badRequest(reply, "Invalid workspace payload");
     reply.code(201);
-    return service.createWorkspace(await ownerOf(req));
+    return service.createWorkspace(await ownerOf(req), parsed.data.locale);
   });
 
   // --- Workspace meta -----------------------------------------------------

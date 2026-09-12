@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import styles from '../../styles/HomePage.module.css'
+import { useT } from '../../i18n/LanguageProvider'
+import { LanguageToggle } from '../../i18n/LanguageToggle'
 
 /**
  * The real sign-in form: login/register toggle, credentials, guest escape.
@@ -24,6 +26,7 @@ export function LoginScreen({
   onGuest: () => void
   onClose?: () => void
 }) {
+  const t = useT()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -41,7 +44,7 @@ export function LoginScreen({
         await onRegister(username, password)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed')
+      setError(err instanceof Error ? err.message : t('auth.failed'))
     } finally {
       setSubmitting(false)
     }
@@ -62,52 +65,54 @@ export function LoginScreen({
             type="button"
             className={styles.loginClose}
             onClick={onClose}
-            aria-label="Close sign in"
+            aria-label={t('auth.closeSignIn')}
             disabled={submitting}
           >
             ✕
           </button>
         )}
 
+        {/* Someone who cannot read the form cannot sign in, so the switch is on
+            this screen too rather than only behind it. */}
+        <LanguageToggle style={{ alignSelf: 'center', marginBottom: '4px' }} />
+
         <div className={styles.loginLogo}>
           <img src="/cogniva_logo.png" alt="" />
         </div>
         <h2 id="login-title" className={styles.modalTitle}>
-          {mode === 'login' ? 'Sign in to Cogniva' : 'Create your account'}
+          {mode === 'login' ? t('auth.signInTitle') : t('auth.registerTitle')}
         </h2>
-        <p className={styles.modalBody}>
-          Keep your teaching workspaces attached to your username.
-        </p>
+        <p className={styles.modalBody}>{t('auth.body')}</p>
 
         <input
           className={styles.modalInput}
           type="text"
           value={username}
-          placeholder="Username"
+          placeholder={t('auth.username')}
           autoComplete="username"
           onChange={e => setUsername(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSubmit()}
           maxLength={24}
-          aria-label="Username"
+          aria-label={t('auth.username')}
         />
         <input
           className={styles.modalInput}
           type="password"
           value={password}
-          placeholder="Password"
+          placeholder={t('auth.password')}
           autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
           onChange={e => setPassword(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          aria-label="Password"
+          aria-label={t('auth.password')}
         />
         {error && <p className={styles.authError}>{error}</p>}
 
         <button className={styles.modalBtn} onClick={handleSubmit} disabled={!canSubmit || submitting}>
           {submitting
-            ? 'Please wait...'
+            ? t('auth.wait')
             : mode === 'login'
-              ? 'Sign in'
-              : 'Create account'}
+              ? t('auth.signIn')
+              : t('auth.createAccount')}
         </button>
         <button
           className={styles.modalBtnGhost}
@@ -117,10 +122,10 @@ export function LoginScreen({
           }}
           disabled={submitting}
         >
-          {mode === 'login' ? 'Create a new account' : 'I already have an account'}
+          {mode === 'login' ? t('auth.toRegister') : t('auth.toLogin')}
         </button>
         <button className={styles.guestBtn} onClick={onGuest} disabled={submitting}>
-          Continue as guest
+          {t('auth.guest')}
         </button>
 
         {onClose && (
@@ -130,7 +135,7 @@ export function LoginScreen({
             onClick={onClose}
             disabled={submitting}
           >
-            ← Back to the site
+            ← {t('auth.backToSite')}
           </button>
         )}
       </div>

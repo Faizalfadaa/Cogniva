@@ -3,6 +3,7 @@ import styles from '../../../styles/TeachingSession.module.css'
 import type { LearnerCharacter } from '../../../lib/Learner'
 import type { LearnerSpeechDTO } from '../../../dto/LearnerSpeechDTO'
 import { spokenText, useLearnerVoice, useUtteranceProgress } from '../hooks/useLearnerVoice'
+import { useT } from '../../../i18n/LanguageProvider'
 
 interface LearnerResponseBubbleProps {
   learner: LearnerCharacter
@@ -29,6 +30,7 @@ export function LearnerResponseBubble({
   const [dismissed, setDismissed] = useState(false)
   const voice = useLearnerVoice()
   const progress = useUtteranceProgress(speech)
+  const t = useT()
 
   // Hand the reply to the player on every poll. It speaks each reply once, and
   // the chat stage shares the same speech id, so the line is never heard twice.
@@ -58,11 +60,13 @@ export function LearnerResponseBubble({
   if (dismissed || (!pending && !text)) return null
 
   const waiting = pending || progress?.phase === 'waiting'
-  const clips = speech
-    ? speech.segments.flatMap((segment) => (segment.audioUrl ? [segment.audioUrl] : []))
-    : audioUrl
-      ? [audioUrl]
-      : []
+  const clips = !voice.available
+    ? []
+    : speech
+      ? speech.segments.flatMap((segment) => (segment.audioUrl ? [segment.audioUrl] : []))
+      : audioUrl
+        ? [audioUrl]
+        : []
   const speaking = voice.playingUrl !== null && clips.includes(voice.playingUrl)
 
   function replayOrStop() {
@@ -82,8 +86,12 @@ export function LearnerResponseBubble({
               <button
                 className={styles.notifSpeak}
                 onClick={replayOrStop}
-                aria-label={speaking ? 'Stop playback' : `Replay ${learner.name}'s voice`}
-                title={speaking ? 'Stop' : 'Replay voice'}
+                aria-label={
+                  speaking
+                    ? t('stage.stopPlayback')
+                    : t('stage.replayVoice', { name: learner.name })
+                }
+                title={speaking ? t('stage.stop') : t('stage.replay')}
               >
                 {speaking ? '◼' : '▶'}
               </button>
@@ -96,7 +104,7 @@ export function LearnerResponseBubble({
         <button
           className={styles.notifClose}
           onClick={() => setDismissed(true)}
-          aria-label="Close learner response"
+          aria-label={t('stage.closeResponse')}
         >
           ×
         </button>

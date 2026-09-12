@@ -21,6 +21,7 @@ import type {
   Workspace,
   WorkspaceState,
 } from "../../contracts/workspace.js";
+import { asLocale } from "../../contracts/workspace.js";
 import type { Timeline } from "../../contracts/timeline.js";
 import {
   ReferenceIndex,
@@ -47,6 +48,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
         title: workspace.title ?? null,
         description: workspace.description ?? null,
         state: workspace.state,
+        locale: workspace.locale,
         created_at: new Date(workspace.createdAt),
         updated_at: new Date(workspace.updatedAt),
       },
@@ -429,6 +431,7 @@ function toWorkspace(row: WorkspaceRow): Workspace {
     currentWhiteboardSnapshot: row.whiteboard_snapshot ?? undefined,
     thumbnailUrl: row.thumbnail_url ?? undefined,
     learnerId: row.learner_id ?? undefined,
+    locale: asLocale(row.locale),
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };

@@ -9,6 +9,7 @@ import {
   useVoiceLevel,
   type LearnerVoice,
 } from '../hooks/useLearnerVoice'
+import { useT, type Translate } from '../../../i18n/LanguageProvider'
 
 const STAGE_MIN_PX = 300
 const STAGE_MAX_RATIO = 0.5 // at most half the canvas
@@ -29,7 +30,8 @@ function isSpeaking(message: ChatMessageDTO | undefined, playingUrl: string | nu
   return message.learnerAudioUrl === playingUrl
 }
 
-function hasAudio(message: ChatMessageDTO): boolean {
+function hasAudio(message: ChatMessageDTO, voice: LearnerVoice): boolean {
+  if (!voice.available) return false
   return message.speech
     ? message.speech.segments.some((s) => Boolean(s.audioUrl))
     : Boolean(message.learnerAudioUrl)
@@ -46,10 +48,12 @@ function TranscriptBubble({
   message,
   learnerName,
   voice,
+  t,
 }: {
   message: ChatMessageDTO
   learnerName: string
   voice: LearnerVoice
+  t: Translate
 }) {
   const progress = useUtteranceProgress(message.speech)
   const waiting = progress?.phase === 'waiting'
@@ -62,11 +66,11 @@ function TranscriptBubble({
       }`}
     >
       {waiting ? '…' : spokenText(message.content, message.speech, progress)}
-      {!waiting && hasAudio(message) && (
+      {!waiting && hasAudio(message, voice) && (
         <button
           className={styles.chatBubbleSpeak}
           onClick={() => replayOrStop(message, speaking, voice)}
-          aria-label={`Play ${learnerName}'s voice`}
+          aria-label={t('stage.playVoice', { name: learnerName })}
         >
           {speaking ? '◼' : '▶'}
         </button>
@@ -106,6 +110,7 @@ export function LearnerStage({
   const seededRef = useRef(false)
 
   const voice = useLearnerVoice()
+  const t = useT()
   // Amplitude lands on the stage element; every moving part reads it from there.
   useVoiceLevel(stageRef)
 
@@ -221,16 +226,16 @@ export function LearnerStage({
             className={showTranscript ? styles.stageIconBtnOn : styles.stageIconBtn}
             onClick={() => setShowTranscript((open) => !open)}
             aria-pressed={showTranscript}
-            aria-label={showTranscript ? 'Hide transcript' : 'Show transcript'}
-            title={showTranscript ? 'Hide transcript' : 'Show transcript'}
+            aria-label={showTranscript ? t('stage.hideTranscript') : t('stage.showTranscript')}
+            title={showTranscript ? t('stage.hideTranscript') : t('stage.showTranscript')}
           >
             ☰
           </button>
           <button
             className={styles.stageIconBtn}
             onClick={onToggle}
-            aria-label="Close"
-            title="Close"
+            aria-label={t('common.close')}
+            title={t('common.close')}
           >
             ×
           </button>
@@ -264,29 +269,35 @@ export function LearnerStage({
               ? '…'
               : spokenText(latestLearnerLine.content, latestLearnerLine.speech, latestProgress)}
           </p>
-          {!waitingForVoice && hasAudio(latestLearnerLine) && (
+          {!waitingForVoice && hasAudio(latestLearnerLine, voice) && (
             <button
               className={styles.stageReplay}
               onClick={() => replayOrStop(latestLearnerLine, speaking, voice)}
-              aria-label={speaking ? 'Stop playback' : `Replay ${learner.name}'s voice`}
+              aria-label={
+                speaking ? t('stage.stopPlayback') : t('stage.replayVoice', { name: learner.name })
+              }
             >
-              {speaking ? '◼ Stop' : '▶ Replay'}
+              {speaking ? `◼ ${t('stage.stop')}` : `▶ ${t('stage.replay')}`}
             </button>
           )}
         </div>
       ) : (
-        <p className={styles.stageIdle}>
-          {learner.name} is waiting. Teach something, or say hi below.
-        </p>
+        <p className={styles.stageIdle}>{t('stage.idle', { name: learner.name })}</p>
       )}
 
       {showTranscript && (
         <div className={styles.stageTranscript} ref={transcriptRef}>
           {messages.length === 0 ? (
-            <p className={styles.chatSidebarEmpty}>Nothing said yet.</p>
+            <p className={styles.chatSidebarEmpty}>{t('stage.nothingSaid')}</p>
           ) : (
             messages.map((m) => (
-              <TranscriptBubble key={m.id} message={m} learnerName={learner.name} voice={voice} />
+              <TranscriptBubble
+                key={m.id}
+                message={m}
+                learnerName={learner.name}
+                voice={voice}
+                t={t}
+              />
             ))
           )}
         </div>
@@ -298,14 +309,14 @@ export function LearnerStage({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-          placeholder={`Say something to ${learner.name}...`}
-          aria-label="Write a message"
+          placeholder={t('stage.say', { name: learner.name })}
+          aria-label={t('stage.writeMessage')}
         />
         <button
           className={styles.chatSidebarSend}
           onClick={handleSubmit}
           disabled={!draft.trim()}
-          aria-label="Send"
+          aria-label={t('common.send')}
         >
           ↑
         </button>

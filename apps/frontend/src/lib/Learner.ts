@@ -1,4 +1,5 @@
 import type { LearnerDTO } from '../dto/LearnerDTO';
+import type { Locale } from '../i18n/messages';
 
 // 3 learner characters, hardcoded "for fun".
 // firstMessages is an array of bubbles shown one at a time, with the {userName}
@@ -72,6 +73,85 @@ export const LEARNERS: readonly LearnerCharacter[] = [
   },
 ];
 
+/** The part of a character that is written prose, and so has to be translated. */
+export interface LearnerCopy {
+  firstMessages: string[];
+  traits: string;
+  description: string;
+  catchphrase: string;
+}
+
+/**
+ * The three students in Indonesian.
+ *
+ * Not a literal translation: each one is rewritten so the character survives.
+ * Akira is blunt in Indonesian the way he is blunt in English, which means
+ * different words rather than the same words. "-sensei" stays — it is how these
+ * students address the user, in either language.
+ */
+const ID_COPY: Record<string, LearnerCopy> = {
+  yuzuki: {
+    firstMessages: [
+      'E-Etto...',
+      '...{userName}-sensei?',
+      'Akhirnya... aku bisa bertemu denganmu.',
+      'Ayo belajar sesuatu yang baru hari ini, sensei...',
+    ],
+    traits: 'Cemas, teliti',
+    description:
+      'Minta maaf dulu sebelum bertanya, lalu melontarkan pertanyaan paling tajam di sesi itu. Dia mau mengaku kalau dia cuma menyalin diagrammu.',
+    catchphrase: '“E-Etto… sensei, maaf, satu lagi boleh?”',
+  },
+  reina: {
+    firstMessages: [
+      'Eh?',
+      'K-Kamu benar-benar...',
+      '{userName}-sensei?',
+      'KYAA...!',
+      'Akhirnya!! Aku menemukanmu!',
+      '...Jangan menghilang lagi, ya?',
+      '...Janji?',
+    ],
+    traits: 'Ribut, girang',
+    description:
+      'Semangatnya sampai bikin kacau. Melompat tiga langkah ke depan — dan justru dari situ kamu tahu penjelasanmu tidak punya langkah kedua.',
+    catchphrase: '“KYAA...! Tunggu, jadi itu artinya...”',
+  },
+  akira: {
+    firstMessages: [
+      '...Kamu terlambat.',
+      '...Hm?',
+      'Oh.',
+      'Jadi kamu {userName}-sensei.',
+      '...Aku Akira.',
+      'Ingat namaku.',
+      '...Mulai sekarang kamu akan sering mendengarnya.',
+    ],
+    traits: 'Blak-blakan, datar',
+    description:
+      'Mengucapkan bagian yang orang lain cuma pikirkan. Kalau ada bagian penjelasanmu yang sekadar pengisi, suratnya akan menyebut bagian itu. Paling berguna untuk dipilih.',
+    catchphrase: '“…Kamu terlambat. Dan bagian itu tidak masuk akal.”',
+  },
+};
+
+/**
+ * A character's written lines in one language.
+ *
+ * The English text lives on the character itself, so a language with no
+ * translation yet falls back to it rather than to an empty card.
+ */
+export function learnerCopy(learner: LearnerCharacter, locale: Locale): LearnerCopy {
+  const translated = locale === 'en' ? undefined : ID_COPY[learner.id];
+  return (
+    translated ?? {
+      firstMessages: learner.firstMessages,
+      traits: learner.traits,
+      description: learner.description,
+      catchphrase: learner.catchphrase,
+    }
+  );
+}
+
 /**
  * Pick a learner deterministically from the workspaceId so the same learner
  * always shows up again whenever the same workspace is reopened, without the
@@ -141,6 +221,12 @@ export function resolveLearner(
  * Resolve firstMessages into the final string array with userName substituted in.
  * This is what the component uses directly to display the bubbles one by one.
  */
-export function resolveFirstMessages(learner: LearnerCharacter, userName: string): string[] {
-  return learner.firstMessages.map((msg) => msg.replace(/\{userName\}/g, userName));
+export function resolveFirstMessages(
+  learner: LearnerCharacter,
+  userName: string,
+  locale: Locale = 'en',
+): string[] {
+  return learnerCopy(learner, locale).firstMessages.map((msg) =>
+    msg.replace(/\{userName\}/g, userName),
+  );
 }

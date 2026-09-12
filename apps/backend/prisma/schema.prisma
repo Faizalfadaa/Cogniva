@@ -165,6 +165,11 @@ model workspace {
   /// the picker existed, and on any the user never chose for — both fall back
   /// to the id-derived default.
   learner_id          String?
+  /// The language this session runs in ("id" | "en"), fixed when the workspace
+  /// is created. Not a live preference: the transcript, the report and (for
+  /// English) the spoken replies are all in it, so changing it mid-session would
+  /// leave a session written in two languages.
+  locale              String   @default("id")
   /// The uploaded reference PDF, served back by GET /workspaces/:id/pdf.
   pdf_data            Bytes?
   pdf_mime            String?

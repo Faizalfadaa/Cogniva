@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import styles from '../../styles/ProductTour.module.css'
+import { useT } from '../../i18n/LanguageProvider'
+import type { MessageKey } from '../../i18n/messages'
 
 export type TourPlacement = 'top' | 'bottom' | 'left' | 'right'
 
 export interface TourStep {
   /** CSS selector for the element to highlight, e.g. '[data-tour="mic-button"]'. */
   selector: string
-  title: string
-  body: string
+  /** Message keys, not text: a step is data and does not know the language. */
+  title: MessageKey
+  body: MessageKey
   /** Preferred side for the callout. Flipped automatically when it won't fit. */
   placement?: TourPlacement
 }
@@ -23,7 +26,7 @@ interface ProductTourProps {
   onIndexChange: (next: number) => void
   onFinish: () => void
   onSkip: () => void
-  /** Label for the button on the final step. The home leg of a multi-screen
+  /** Label for the button on the final step, already translated. The home leg of a multi-screen
    *  tour is not "done" — it continues on the next screen. */
   finishLabel?: string
 }
@@ -167,8 +170,9 @@ export function ProductTour({
   onIndexChange,
   onFinish,
   onSkip,
-  finishLabel = 'Done',
+  finishLabel,
 }: ProductTourProps) {
+  const t = useT()
   const [target, setTarget] = useState<{ box: Box; radius: string } | null>(null)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const tipRef = useRef<HTMLDivElement>(null)
@@ -301,18 +305,18 @@ export function ProductTour({
           {index + 1} / {steps.length}
         </span>
         <h3 id="tour-title" className={styles.title}>
-          {step.title}
+          {t(step.title)}
         </h3>
         <p id="tour-body" className={styles.body}>
-          {step.body}
+          {t(step.body)}
         </p>
         <div className={styles.actions}>
           <button type="button" className={styles.skip} onClick={onSkip}>
-            Skip tour
+            {t('tour.skip')}
           </button>
           <div className={styles.spacer} />
           <button type="button" className={styles.next} onClick={goNext}>
-            {isLast ? finishLabel : 'Next'}
+            {isLast ? (finishLabel ?? t('common.done')) : t('tour.next')}
           </button>
         </div>
       </div>

@@ -117,6 +117,44 @@ function setMutedFlag(next: boolean): void {
   notifyUtterances()
 }
 
+// --- is there a voice at all -----------------------------------------------
+
+/**
+ * Whether a voice exists for the language this session is running in.
+ *
+ * Only English has one: every cloning model that could speak in a chosen
+ * character's voice covers 23-odd languages and Indonesian is not among them
+ * (see services/tts/README.md). So an Indonesian session is silent rather than
+ * being read out in an English accent.
+ *
+ * This is deliberately NOT the mute flag. Mute is the user's choice and is
+ * remembered for them; this is the app admitting it has nothing to play, and it
+ * follows the interface language instead. They converge on the same behaviour —
+ * no audio, and every reply shown in full the moment it arrives rather than
+ * revealed sentence by sentence.
+ */
+let voiceAvailable = true
+const availableListeners = new Set<(available: boolean) => void>()
+
+/** True when nothing should be played, for either reason. */
+function silenced(): boolean {
+  return mutedFlag || !voiceAvailable
+}
+
+/** Called when the interface language changes. Idempotent. */
+export function setVoiceAvailable(available: boolean): void {
+  if (available === voiceAvailable) return
+  voiceAvailable = available
+  if (!available) {
+    audioElement().pause()
+    setCurrent(null)
+    // Nothing is coming to reveal the held-back words, so show them all now.
+    interruptUtterances(true)
+  }
+  for (const listener of availableListeners) listener(available)
+  notifyUtterances()
+}
+
 // --- utterances: a reply spoken sentence by sentence ------------------------
 
 /**
@@ -187,7 +225,7 @@ export function speakUtterance(speech: LearnerSpeechDTO): void {
       replay: false,
     }
     utterances.set(speech.id, utterance)
-    if (mutedFlag) {
+    if (silenced()) {
       finishUtterance(utterance)
       return
     }
@@ -243,7 +281,9 @@ export function utteranceProgress(speech: LearnerSpeechDTO): UtteranceProgress {
   if (utterance && utterance.phase !== 'done') {
     return { phase: utterance.phase, revealed: utterance.revealed }
   }
-  if (utterance || heardSpeech.has(speech.id) || mutedFlag) return { phase: 'done', revealed: total }
+  if (utterance || heardSpeech.has(speech.id) || silenced()) {
+    return { phase: 'done', revealed: total }
+  }
   // Not started yet. Nothing to wait for if synthesis gave up before any clip.
   if (speech.status !== 'pending' && !speech.segments.some((segment) => segment.audioUrl)) {
     return { phase: 'done', revealed: total }
@@ -556,6 +596,12 @@ function readMuted(): boolean {
 export interface LearnerVoice {
   muted: boolean
   toggleMuted: () => void
+  /**
+   * False when this language has no voice at all. Distinct from `muted`: there
+   * is nothing to unmute, so the UI should say so rather than offer a switch,
+   * and replay controls have nothing to replay.
+   */
+  available: boolean
   /** Currently playing URL, or null. Use it to render a "speaking" state. */
   playingUrl: string | null
   /** Play a single clip now, regardless of how many times it has played before. */
@@ -581,14 +627,17 @@ export interface LearnerVoice {
 
 export function useLearnerVoice(): LearnerVoice {
   const [muted, setMuted] = useState(mutedFlag)
+  const [available, setAvailable] = useState(voiceAvailable)
   const [playingUrl, setPlayingUrl] = useState<string | null>(currentUrl)
 
   useEffect(() => {
     listeners.add(setPlayingUrl)
     mutedListeners.add(setMuted)
+    availableListeners.add(setAvailable)
     return () => {
       listeners.delete(setPlayingUrl)
       mutedListeners.delete(setMuted)
+      availableListeners.delete(setAvailable)
     }
   }, [])
 
@@ -607,7 +656,7 @@ export function useLearnerVoice(): LearnerVoice {
   }, [])
 
   const autoPlay = useCallback((url: string | undefined) => {
-    if (!url || mutedFlag || autoPlayed.has(url)) return
+    if (!url || silenced() || autoPlayed.has(url)) return
     // Claimed before the await, so two polls landing together cannot both
     // start the same clip.
     autoPlayed.add(url)
@@ -630,5 +679,17 @@ export function useLearnerVoice(): LearnerVoice {
   const speak = useCallback((speech: LearnerSpeechDTO) => speakUtterance(speech), [])
   const replay = useCallback((speech: LearnerSpeechDTO) => replayUtterance(speech), [])
 
-  return { muted, toggleMuted, playingUrl, play, autoPlay, prefetch, markHeard, speak, replay, stop }
+  return {
+    muted,
+    available,
+    toggleMuted,
+    playingUrl,
+    play,
+    autoPlay,
+    prefetch,
+    markHeard,
+    speak,
+    replay,
+    stop,
+  }
 }
