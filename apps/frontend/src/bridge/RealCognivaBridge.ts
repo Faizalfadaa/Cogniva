@@ -1,4 +1,5 @@
 import type { CognivaBridge } from './CognivaBridge';
+import { getGuestSessionId } from '../state/guestSession';
 import type { WorkspaceDTO } from '../dto/WorkspaceDTO';
 import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
@@ -21,32 +22,11 @@ import type {
 
 const BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 
-// A stable per-device id so the backend can keep each device's workspaces
-// separate (there are no user accounts). Sent as x-client-id on every request.
-// Persisted in localStorage; regenerated only if storage is wiped.
-const DEVICE_ID_KEY = 'cogniva:deviceId';
-
-function getDeviceId(): string {
-  try {
-    let id = localStorage.getItem(DEVICE_ID_KEY);
-    if (!id) {
-      id =
-        globalThis.crypto?.randomUUID?.() ??
-        `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      localStorage.setItem(DEVICE_ID_KEY, id);
-    }
-    return id;
-  } catch {
-    // localStorage unavailable (private mode) — fall back to a per-tab id.
-    return 'anonymous';
-  }
-}
-
-const CLIENT_ID = getDeviceId();
-
-/** Headers sent on every request so the backend scopes data to this device. */
+/** Accounts use their login cookie; guests use an ID held only in this page. */
 function clientHeaders(): Record<string, string> {
-  return { 'x-client-id': CLIENT_ID };
+  const guestId = getGuestSessionId();
+  if (guestId) return { 'x-guest-session': guestId };
+  return {};
 }
 
 async function json<T>(res: Response): Promise<T> {

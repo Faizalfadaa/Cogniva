@@ -2,10 +2,9 @@
  * The session store singleton, plus the in-memory double the tests use.
  *
  * Storage is Postgres (src/database/stores/prismaSessionStore.ts). The Map-based
- * implementation below is NOT a production path: it exists so `npm test` runs
- * without a database, and is selected only by an explicit COGNIVA_STORE=memory
- * (vitest sets it). Anything else gets Postgres, and a missing DATABASE_URL then
- * fails loudly at boot rather than silently losing data.
+ * implementation below holds temporary guest sessions and runs tests without
+ * a database. Authenticated requests use Postgres unless COGNIVA_STORE=memory
+ * is explicitly enabled. Request context also follows background agent jobs.
  */
 
 import { randomUUID } from "node:crypto";
@@ -18,6 +17,7 @@ import type { SpeechTranscript } from "../../contracts/speech.js";
 import type { TeachingTurn } from "../../contracts/teaching.js";
 import { PrismaSessionStore } from "../../database/stores/prismaSessionStore.js";
 import { usingMemoryStore } from "./mode.js";
+import { contextualStore } from "./context.js";
 import type { SessionStore, TurnWithResponse } from "./types.js";
 
 export type { SessionStore, TurnWithResponse } from "./types.js";
@@ -27,7 +27,7 @@ export function newId(prefix: string): string {
   return `${prefix}_${randomUUID().replace(/-/g, "").slice(0, 8)}`;
 }
 
-/** Test double: the same contract, held in Maps. See the file header. */
+/** Temporary guest storage and test double, held only in Maps. */
 export class MemorySessionStore implements SessionStore {
   private sessions = new Map<string, Session>();
   private evaluationsById = new Map<string, EvaluationResult>();
@@ -165,6 +165,6 @@ export class MemorySessionStore implements SessionStore {
 }
 
 /** The store the whole backend writes through. */
-export const sessions: SessionStore = usingMemoryStore()
+export const sessions: SessionStore = contextualStore("sessions", usingMemoryStore()
   ? new MemorySessionStore()
-  : new PrismaSessionStore();
+  : new PrismaSessionStore());

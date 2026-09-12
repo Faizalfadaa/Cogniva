@@ -82,8 +82,12 @@
 }
 
 .landingLinkLogo {
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
+  padding: 5.25px;
+  border-radius: 7px;
+  background: var(--forest-dark);
+  flex: none;
   object-fit: contain;
   display: block;
 }
@@ -645,7 +649,7 @@
 .errorBannerDetail {
   margin: 6px 0 0;
   font-size: 11px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   color: var(--text-muted);
   word-break: break-word;
 }
