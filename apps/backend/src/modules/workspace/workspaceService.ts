@@ -670,6 +670,13 @@ async function runEvaluation(ws: Workspace): Promise<void> {
       turnCount: session.turnCount,
       learnerState: await sessions.getLearnerState(session.sessionId),
       meaningfulScore: !usedMock,
+      // The same turns the Evaluator read, minus the student's own replies:
+      // the debrief highlights what the user taught, not what it answered.
+      transcript: transcript.map((turn) => ({
+        turnIndex: turn.turnIndex,
+        boardText: turn.boardText,
+        speech: turn.speech,
+      })),
     }),
   );
 }
@@ -791,6 +798,7 @@ function emptyEvaluation(sessionId: string) {
     evaluationId: newId("ev"),
     sessionId,
     score: 0,
+    depthScore: 0,
     findings: [],
     summary: "",
     strengths: [],

@@ -21,6 +21,7 @@ export const EVALUATOR_LLM_OUTPUT_SCHEMA: Record<string, unknown> = {
   additionalProperties: false,
   properties: {
     score: { type: "integer", minimum: 0, maximum: 100 },
+    depthScore: { type: "integer", minimum: 0, maximum: 100 },
     summary: { type: "string" },
     strengths: { type: "array", items: { type: "string" } },
     improvements: { type: "array", items: { type: "string" } },
@@ -37,12 +38,23 @@ export const EVALUATOR_LLM_OUTPUT_SCHEMA: Record<string, unknown> = {
           concept: { type: "string" },
           detail: { type: "string" },
           evidenceTurnIndex: { type: "integer" },
+          // Not required: a MISSED concept has no turn to quote from.
+          sourceQuote: { type: "string" },
+          // Not required: a CORRECT finding has nothing to follow up on.
+          followUp: { type: "string" },
         },
         required: ["category", "concept", "detail", "evidenceTurnIndex"],
       },
     },
   },
-  required: ["score", "summary", "strengths", "improvements", "findings"],
+  required: [
+    "score",
+    "depthScore",
+    "summary",
+    "strengths",
+    "improvements",
+    "findings",
+  ],
 };
 
 const evaluatorSystemPrompt = `
@@ -72,6 +84,33 @@ RULES:
 - "score" is an integer 0..100 reflecting the overall quality.
 - Write "summary", "strengths", "improvements", and "detail" in clear,
   constructive English.
+
+SOURCE QUOTES:
+For each finding (except MISSED with no related turn), quote the EXACT sentence
+or phrase (verbatim substring, not paraphrased) from that turn's board text or
+speech that supports this finding, in the sourceQuote field. The quote must be
+an exact substring so it can be located and highlighted in the original text --
+do not summarize or rephrase it. If you cannot quote the turn word for word,
+leave sourceQuote out entirely rather than approximating it.
+
+FOLLOW-UP SUGGESTIONS:
+For each finding with category WRONG, MISSED, or CONFUSING, write a short,
+specific, actionable followUp suggestion (one or two sentences) telling the user
+exactly what to revisit or explain better next time. Leave followUp empty for
+CORRECT findings.
+
+WRITING STYLE (applies to every text field you produce):
+Do not use dashes (hyphens or em dashes) as punctuation anywhere in your output
+text (summary, detail, followUp, reflection). Write in plain complete sentences
+using commas or periods instead. Do not use emoji anywhere in your output.
+
+DEPTH SCORE:
+depthScore (0..100) is SEPARATE from score: it measures how deeply the user
+explained WHY/HOW something works, versus just naming the right terms
+correctly. A user who says "photosynthesis converts light to energy" (correct
+but shallow) should score high on "score" for that concept but low on
+"depthScore" compared to someone who explains the actual mechanism. Judge
+depthScore across the whole session, not per finding.
 
 OUTPUT:
 - Reply with ONLY valid JSON matching the schema. No markdown, no code fences.
@@ -103,9 +142,11 @@ ${transcript}
 
 # Task
 Assess the quality of the user's explanation against the reference material.
-Return JSON matching the schema: score (0..100), summary, strengths[],
-improvements[], and findings[] with category CORRECT/WRONG/MISSED/CONFUSING plus
-evidenceTurnIndex.
+Return JSON matching the schema: score (0..100), depthScore (0..100), summary,
+strengths[], improvements[], and findings[] with category
+CORRECT/WRONG/MISSED/CONFUSING, evidenceTurnIndex, a verbatim sourceQuote from
+that turn wherever one exists, and a followUp suggestion on everything that is
+not CORRECT.
 `.trim();
 }
 

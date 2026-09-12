@@ -10,11 +10,13 @@
 
 import { randomUUID } from "node:crypto";
 
+import type { Finding } from "../../contracts/evaluation.js";
 import type {
   ChatMessage,
   ChatSender,
   CheckpointErrorKind,
   EvaluationReport,
+  EvaluationTranscriptTurn,
   ReferenceSource,
   TeachingCheckpoint,
   Workspace,
@@ -245,6 +247,13 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
           letter: report.letter,
           reflection: report.notebook.reflection,
           continue_learning: report.continueLearning,
+          score: report.score,
+          depth_score: report.depthScore,
+          // Stored as JSON rather than child tables: unlike the notebook lines,
+          // nothing queries into a finding, and the shape is the contract's to
+          // change (§6.9).
+          findings: report.findings as Prisma.InputJsonValue,
+          transcript: (report.transcript ?? []) as unknown as Prisma.InputJsonValue,
           learned: {
             create: report.notebook.learned.map((content, seq) => ({
               id_learned: `lrn_${idReport}_${seq}`,
@@ -282,6 +291,13 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
         reflection: row.reflection,
       },
       continueLearning: row.continue_learning,
+      // Null on reports written before the breakdown columns existed, and the
+      // debrief still has to render for them (§10), so they read as an empty
+      // evaluation rather than a missing one.
+      score: row.score ?? 0,
+      depthScore: row.depth_score ?? 0,
+      findings: (row.findings as Finding[] | null) ?? [],
+      transcript: (row.transcript as EvaluationTranscriptTurn[] | null) ?? [],
     };
   }
 

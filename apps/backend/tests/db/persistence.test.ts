@@ -21,6 +21,7 @@ import type { Session } from "../../src/contracts/session.js";
 import type { TeachingTurn } from "../../src/contracts/teaching.js";
 import type { Workspace } from "../../src/contracts/workspace.js";
 import { disconnectDatabase, prisma } from "../../src/database/index.js";
+import { Prisma } from "../../src/generated/prisma/client.js";
 import { PrismaSessionStore } from "../../src/database/stores/prismaSessionStore.js";
 import { PrismaWorkspaceStore } from "../../src/database/stores/prismaWorkspaceStore.js";
 import { buildReferenceIndex } from "../../src/modules/retrieval/index.js";
@@ -203,18 +204,96 @@ describe("workspace persistence", () => {
       letter: "Terima kasih!",
       notebook: { learned: ["a", "b"], stillConfused: ["c"], reflection: "lumayan" },
       continueLearning: ["Respirasi"],
+      score: 40,
+      depthScore: 20,
+      findings: [],
+      transcript: [],
     });
 
     const second = {
       letter: "Babak dua",
       notebook: { learned: ["x"], stillConfused: ["y", "z"], reflection: "lebih baik" },
       continueLearning: ["Siklus Calvin", "Klorofil"],
+      score: 82,
+      depthScore: 55,
+      findings: [],
+      transcript: [],
     };
     await workspaces.saveReport(ws.id, second);
 
     expect(await workspaces.getReport(ws.id)).toEqual(second);
     // Exactly one report row survives, so the notebook can't accumulate.
     expect(await prisma.report.count({ where: { id_workspace: ws.id } })).toBe(1);
+  });
+
+  it("round-trips the Evaluator breakdown through Postgres", async () => {
+    const ws = await makeWorkspace();
+    const report = {
+      letter: "Halo!",
+      notebook: { learned: ["klorofil"], stillConfused: ["siklus Calvin"], reflection: "oke" },
+      continueLearning: ["Respirasi"],
+      score: 78,
+      depthScore: 41,
+      findings: [
+        {
+          category: "CORRECT" as const,
+          concept: "penyerapan cahaya",
+          detail: "tepat",
+          evidenceTurnIndex: 0,
+          sourceQuote: "Chlorophyll absorbs red and blue light.",
+        },
+        {
+          category: "MISSED" as const,
+          concept: "siklus Calvin",
+          detail: "tidak disinggung",
+          evidenceTurnIndex: null,
+        },
+      ],
+      transcript: [
+        { turnIndex: 0, boardText: "Chlorophyll absorbs red and blue light.", speech: "itu sebabnya daun hijau" },
+        { turnIndex: 1, boardText: "ATP dibuat di membran tilakoid." },
+      ],
+    };
+
+    await workspaces.saveReport(ws.id, report);
+
+    // Read back through the store, which is the path GET /report actually uses.
+    const read = await workspaces.getReport(ws.id);
+    expect(read).toEqual(report);
+
+    // And assert the columns themselves, so a mapper that happened to echo its
+    // input back would still fail here.
+    const row = await prisma.report.findUnique({ where: { id_workspace: ws.id } });
+    expect(row?.score).toBe(78);
+    expect(row?.depth_score).toBe(41);
+    expect(row?.findings).toEqual(report.findings);
+    expect(row?.transcript).toEqual(report.transcript);
+  });
+
+  it("reads a pre-migration report, whose breakdown columns are null", async () => {
+    const ws = await makeWorkspace();
+    await workspaces.saveReport(ws.id, {
+      letter: "lama",
+      notebook: { learned: ["a"], stillConfused: [], reflection: "r" },
+      continueLearning: [],
+      score: 90,
+      depthScore: 70,
+      findings: [{ category: "CORRECT", concept: "c", detail: "d", evidenceTurnIndex: 0 }],
+      transcript: [{ turnIndex: 0, boardText: "b" }],
+    });
+
+    // Blank the new columns to reproduce a row written before the migration.
+    await prisma.report.updateMany({
+      where: { id_workspace: ws.id },
+      data: { score: null, depth_score: null, findings: Prisma.DbNull, transcript: Prisma.DbNull },
+    });
+
+    const read = await workspaces.getReport(ws.id);
+    expect(read?.letter).toBe("lama");
+    expect(read?.score).toBe(0);
+    expect(read?.depthScore).toBe(0);
+    expect(read?.findings).toEqual([]);
+    expect(read?.transcript).toEqual([]);
   });
 
   it("stores the PDF, its text, and the retrieval index", async () => {
@@ -264,6 +343,10 @@ describe("workspace persistence", () => {
       letter: "l",
       notebook: { learned: ["a"], stillConfused: [], reflection: "r" },
       continueLearning: [],
+      score: 0,
+      depthScore: 0,
+      findings: [],
+      transcript: [],
     });
 
     await workspaces.delete(ws.id);
@@ -314,6 +397,7 @@ describe("session persistence", () => {
       evaluationId: `ev_${RUN}_${n}`,
       sessionId: session.sessionId,
       score: n * 10,
+      depthScore: n * 5,
       findings: [{ category: "CORRECT", concept: `c${n}`, detail: `d${n}`, evidenceTurnIndex: n }],
       summary: `ringkasan ${n}`,
       strengths: [`s${n}`],

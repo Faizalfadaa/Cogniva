@@ -13,8 +13,7 @@ export function LetterFromLearner({ learner, letter }: LetterFromLearnerProps) {
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>
-        <span>📩</span>
-        <span>Letter from Your Learner</span>
+        <span>Surat dari Muridmu</span>
       </div>
 
       {sealed ? (
@@ -28,7 +27,6 @@ export function LetterFromLearner({ learner, letter }: LetterFromLearnerProps) {
             <p className={styles.letterSealFrom}>Letter from {learner.name}</p>
             <p className={styles.letterSealHint}>Click to open</p>
           </div>
-          <span className={styles.letterSealIcon}>✉</span>
         </div>
       ) : (
         // Opened letter

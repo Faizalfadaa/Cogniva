@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 
 import type { LLM, StructuredArgs } from "../../../llm/index.js";
 import { runEvaluator } from "../evaluator.js";
-import type { EvaluatorInput } from "../types.js";
+import { normalizeEvaluation } from "../evaluator.guard.js";
+import type { EvaluatorInput, TranscriptTurn } from "../types.js";
 
 const baseInput: EvaluatorInput = {
   sessionId: "sess-1",
@@ -84,5 +85,161 @@ describe("runEvaluator (real path via injected LLM)", () => {
     // Fallback still yields a valid, renderable result rather than throwing.
     expect(result.evaluationId).toBe("ev_fallback");
     expect(result.findings.length).toBeGreaterThan(0);
+  });
+});
+
+describe("normalizeEvaluation: depthScore", () => {
+  it("clamps depthScore into 0..100 independently of score", () => {
+    const result = normalizeEvaluation(
+      { score: 90, depthScore: 140, findings: [] },
+      "sess-1",
+      "ev_depth",
+    );
+
+    expect(result.score).toBe(90);
+    expect(result.depthScore).toBe(100);
+  });
+
+  it("defaults depthScore to 0 when the model omits it or sends junk", () => {
+    expect(normalizeEvaluation({ score: 70 }, "s", "e").depthScore).toBe(0);
+    expect(
+      normalizeEvaluation({ score: 70, depthScore: "deep" }, "s", "e").depthScore,
+    ).toBe(0);
+  });
+});
+
+describe("normalizeEvaluation: followUp", () => {
+  function raw(followUp: unknown) {
+    return {
+      score: 60,
+      depthScore: 30,
+      findings: [
+        { category: "WRONG", concept: "c", detail: "d", evidenceTurnIndex: 0, followUp },
+      ],
+    };
+  }
+
+  it("keeps a trimmed followUp", () => {
+    const result = normalizeEvaluation(raw("  Revisit the Calvin cycle.  "), "s", "e");
+    expect(result.findings[0].followUp).toBe("Revisit the Calvin cycle.");
+  });
+
+  it("leaves followUp unset when it is blank, missing, or not a string", () => {
+    expect(normalizeEvaluation(raw("   "), "s", "e").findings[0].followUp).toBeUndefined();
+    expect(normalizeEvaluation(raw(undefined), "s", "e").findings[0].followUp).toBeUndefined();
+    expect(normalizeEvaluation(raw(42), "s", "e").findings[0].followUp).toBeUndefined();
+  });
+});
+
+describe("normalizeEvaluation: sourceQuote", () => {
+  const turns: TranscriptTurn[] = [
+    {
+      turnIndex: 0,
+      boardText: "Chlorophyll absorbs red and blue light.\n  Green is reflected.",
+      speech: "The oxygen comes from splitting water.",
+    },
+  ];
+
+  /** Build raw model output carrying a single finding with `sourceQuote`. */
+  function withQuote(sourceQuote: unknown, evidenceTurnIndex: unknown = 0) {
+    return {
+      score: 80,
+      depthScore: 40,
+      findings: [
+        { category: "CORRECT", concept: "chlorophyll", detail: "right", evidenceTurnIndex, sourceQuote },
+      ],
+    };
+  }
+
+  it("keeps a quote that appears verbatim in the turn's board text", () => {
+    const result = normalizeEvaluation(
+      withQuote("Chlorophyll absorbs red and blue light."),
+      "s",
+      "e",
+      turns,
+    );
+
+    expect(result.findings[0].sourceQuote).toBe("Chlorophyll absorbs red and blue light.");
+  });
+
+  it("keeps a quote found in the turn's speech rather than its board", () => {
+    const result = normalizeEvaluation(
+      withQuote("comes from splitting water"),
+      "s",
+      "e",
+      turns,
+    );
+
+    expect(result.findings[0].sourceQuote).toBe("comes from splitting water");
+  });
+
+  it("tolerates reflowed whitespace and returns the board's own text", () => {
+    // The model flattened the newline and two spaces into one space.
+    const result = normalizeEvaluation(
+      withQuote("blue light. Green is reflected."),
+      "s",
+      "e",
+      turns,
+    );
+
+    expect(result.findings[0].sourceQuote).toBe("blue light.\n  Green is reflected.");
+  });
+
+  it("drops a paraphrase but keeps the finding it belongs to", () => {
+    const result = normalizeEvaluation(
+      withQuote("the plant uses chlorophyll to capture light"),
+      "s",
+      "e",
+      turns,
+    );
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].category).toBe("CORRECT");
+    expect(result.findings[0].sourceQuote).toBeUndefined();
+  });
+
+  it("drops a quote whose evidence turn does not exist", () => {
+    const result = normalizeEvaluation(
+      withQuote("Chlorophyll absorbs red and blue light.", 7),
+      "s",
+      "e",
+      turns,
+    );
+
+    expect(result.findings[0].sourceQuote).toBeUndefined();
+  });
+
+  it("drops a quote on a MISSED finding with no evidence turn", () => {
+    const result = normalizeEvaluation(
+      {
+        score: 50,
+        depthScore: 10,
+        findings: [
+          {
+            category: "MISSED",
+            concept: "Calvin cycle",
+            detail: "never mentioned",
+            evidenceTurnIndex: null,
+            sourceQuote: "the Calvin cycle",
+          },
+        ],
+      },
+      "s",
+      "e",
+      turns,
+    );
+
+    expect(result.findings[0].category).toBe("MISSED");
+    expect(result.findings[0].sourceQuote).toBeUndefined();
+  });
+
+  it("drops every quote when the guard is given no turns to check against", () => {
+    const result = normalizeEvaluation(
+      withQuote("Chlorophyll absorbs red and blue light."),
+      "s",
+      "e",
+    );
+
+    expect(result.findings[0].sourceQuote).toBeUndefined();
   });
 });
