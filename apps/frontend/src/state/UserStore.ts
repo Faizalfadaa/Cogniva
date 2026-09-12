@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { endGuestSession, getGuestSessionId, startGuestSession } from './guestSession';
 
 const USER_NAME_KEY = 'cogniva:userName';
 const GUEST_KEY = 'cogniva:guest';
@@ -33,11 +34,7 @@ function loadStoredName(): string | null {
 }
 
 function isGuestStored(): boolean {
-  try {
-    return localStorage.getItem(GUEST_KEY) === 'true';
-  } catch {
-    return false;
-  }
+  return Boolean(getGuestSessionId());
 }
 
 export const useUserStore = create<UserState>((set) => {
@@ -49,9 +46,17 @@ export const useUserStore = create<UserState>((set) => {
     authLoading: true,
     needsNameSetup: false,
     fetchMe: async () => {
+      if (getGuestSessionId()) {
+        set({ authLoading: false });
+        return;
+      }
       set({ authLoading: true });
       try {
         const res = await fetch(`${BASE}/api/auth/me`, { credentials: 'include' });
+        if (getGuestSessionId()) {
+          set({ authLoading: false });
+          return;
+        }
         if (!res.ok) {
           if (isGuestStored()) {
             const guestName = loadStoredName() || 'Guest';
@@ -75,11 +80,16 @@ export const useUserStore = create<UserState>((set) => {
         }
         set({ user, userName: user.username, authLoading: false, needsNameSetup: false });
       } catch {
+        if (getGuestSessionId()) {
+          set({ authLoading: false });
+          return;
+        }
         set({ user: null, authLoading: false, needsNameSetup: false });
       }
     },
     login: async (username: string, password: string) => {
       const { user } = await sendCredentials('/api/auth/login', username, password);
+      endGuestSession();
       try {
         localStorage.removeItem(GUEST_KEY);
         localStorage.setItem(USER_NAME_KEY, user.username);
@@ -90,6 +100,7 @@ export const useUserStore = create<UserState>((set) => {
     },
     register: async (username: string, password: string) => {
       const { user } = await sendCredentials('/api/auth/register', username, password);
+      endGuestSession();
       try {
         localStorage.removeItem(GUEST_KEY);
         localStorage.setItem(USER_NAME_KEY, user.username);
@@ -99,10 +110,10 @@ export const useUserStore = create<UserState>((set) => {
       set({ user, userName: user.username, authLoading: false, needsNameSetup: false });
     },
     continueAsGuest: () => {
-      const guestName = stored || 'Guest';
+      const guestName = 'Guest';
+      startGuestSession();
       try {
-        localStorage.setItem(GUEST_KEY, 'true');
-        localStorage.setItem(USER_NAME_KEY, guestName);
+        localStorage.removeItem(GUEST_KEY);
       } catch {
         // localStorage unavailable - guest mode still works for this tab
       }
@@ -114,6 +125,7 @@ export const useUserStore = create<UserState>((set) => {
       });
     },
     logout: async () => {
+      endGuestSession();
       await fetch(`${BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' });
       try {
         localStorage.removeItem(USER_NAME_KEY);
@@ -126,7 +138,7 @@ export const useUserStore = create<UserState>((set) => {
     setUserName: (name: string) => {
       const trimmed = name.trim();
       try {
-        localStorage.setItem(USER_NAME_KEY, trimmed);
+        if (!getGuestSessionId()) localStorage.setItem(USER_NAME_KEY, trimmed);
       } catch {
         // localStorage unavailable (private mode, etc.) - just carry on
       }

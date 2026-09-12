@@ -1,5 +1,5 @@
 /**
- * The workspace store singleton, plus the in-memory double the tests use.
+ * The workspace store singleton, plus temporary guest storage and test double.
  *
  * Storage is Postgres (src/database/stores/prismaWorkspaceStore.ts); see the
  * header of ../storage/sessionStore.ts for why a Map-based implementation still
@@ -18,6 +18,7 @@ import type {
 import { PrismaWorkspaceStore } from "../../database/stores/prismaWorkspaceStore.js";
 import type { ReferenceIndex } from "../retrieval/index.js";
 import { usingMemoryStore } from "../storage/mode.js";
+import { contextualStore } from "../storage/context.js";
 import type { StoredBlob, WorkspaceStore } from "../storage/types.js";
 
 export type { StoredBlob, WorkspaceStore } from "../storage/types.js";
@@ -27,7 +28,7 @@ export function newWorkspaceId(): string {
   return `ws_${randomUUID().replace(/-/g, "").slice(0, 8)}`;
 }
 
-/** Test double: the same contract, held in Maps. See the file header. */
+/** Temporary guest storage and test double, held only in Maps. */
 export class MemoryWorkspaceStore implements WorkspaceStore {
   private workspaces = new Map<string, Workspace>();
   private sessionIdByWorkspace = new Map<string, string>();
@@ -221,6 +222,6 @@ function audioKey(workspaceId: string, audioId: string): string {
 }
 
 /** The store the whole backend writes through. */
-export const workspaces: WorkspaceStore = usingMemoryStore()
+export const workspaces: WorkspaceStore = contextualStore("workspaces", usingMemoryStore()
   ? new MemoryWorkspaceStore()
-  : new PrismaWorkspaceStore();
+  : new PrismaWorkspaceStore());
