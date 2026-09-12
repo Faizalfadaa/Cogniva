@@ -27,32 +27,7 @@ function ChatBubbleIcon() {
   )
 }
 
-/** Chevron down — the button is a toggle, so an open panel gets a "dismiss" glyph. */
-function ChevronDownIcon() {
-  return (
-    <svg
-      className={styles.chatLauncherIcon}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  )
-}
-
-/**
- * Floating chat button, bottom-right of the canvas.
- *
- * Moved out of the header so the entry point sits where people look for it and
- * the unread badge is visible without scanning the toolbar. It renders inside
- * .canvasArea, so when ChatSidebar opens (a flex sibling that shrinks the
- * canvas) the launcher moves left with it rather than hiding behind the panel.
- */
+/** Floating chat entry point, visible while the sidebar is closed. */
 export function ChatLauncher({
   chatOpen,
   chatUnread,
@@ -60,8 +35,10 @@ export function ChatLauncher({
   learnerAvatarUrl,
   learnerName,
 }: ChatLauncherProps) {
+  if (chatOpen) return null
+
   const who = learnerName ?? 'the learner'
-  const label = chatOpen ? 'Close chat' : `Open chat with ${who}`
+  const label = `Open chat with ${who}`
 
   return (
     <button
@@ -73,10 +50,9 @@ export function ChatLauncher({
       aria-expanded={chatOpen}
       title={label}
     >
-      {chatOpen ? <ChevronDownIcon /> : <ChatBubbleIcon />}
+      <ChatBubbleIcon />
 
-      {/* Secondary identity cue; hidden while open so the close glyph reads cleanly. */}
-      {!chatOpen && learnerAvatarUrl && (
+      {learnerAvatarUrl && (
         <img
           src={learnerAvatarUrl}
           alt=""
@@ -85,7 +61,7 @@ export function ChatLauncher({
         />
       )}
 
-      {!chatOpen && chatUnread > 0 && (
+      {chatUnread > 0 && (
         <span className={styles.sidebarBadge}>{chatUnread > 9 ? '9+' : chatUnread}</span>
       )}
     </button>

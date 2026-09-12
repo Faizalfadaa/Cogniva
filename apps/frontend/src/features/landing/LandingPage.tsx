@@ -43,46 +43,44 @@ function useReveal<T extends HTMLElement>() {
   return { ref, className: shown ? `${styles.reveal} ${styles.revealIn}` : styles.reveal }
 }
 
-/** Where every call-to-action lands. Authentication is a separate workstream,
- *  so "Sign in" points at the same place as "Start teaching" for now. */
+/** Dashboard destination for returning users. */
 const APP_ENTRY = '/home'
 
 interface Step {
   num: string
   title: string
   body: ReactNode
-  dark?: boolean
 }
 
 const STEPS: Step[] = [
   {
     num: '01',
-    title: 'Open a board',
-    body: "Name a topic, or don't. Attach a reference PDF if you have one. Your student never sees it, so she can't cheat off the answer key.",
+    title: 'Prepare your topic',
+    body: 'Create a workspace and choose your AI student. Add a reference PDF, paste your notes, or find a source to give your evaluation more context.',
   },
   {
     num: '02',
-    title: 'Explain it',
+    title: 'Teach in your own words',
     body: (
       <>
-        Draw, write, record your voice. Press <strong>Teach</strong> whenever you want her to look
-        at what's on the board.
+        Write or draw on the whiteboard, and record your voice if you like. Press
+        <strong> Teach</strong> to share your explanation with your AI student.
       </>
     ),
   },
   {
     num: '03',
-    title: 'She pushes back',
-    body: '“E-Etto… is the rubisco in the first box or the second one?” Answer in chat, or go draw it properly. Her questions stay put until you deal with them.',
-    dark: true,
+    title: 'Work through the questions',
+    body: 'Your student responds to your explanation and asks about unclear parts. Answer in chat, add an example, or update the board and teach again.',
   },
   {
     num: '04',
-    title: 'Read her letter',
+    title: 'Reflect and try again',
     body: (
       <>
-        A letter, a notebook split into <em>learned</em> and <em>still confused</em>, and three
-        topics she'd like next. Then teach it again, better.
+        End the session to read a letter and a notebook of what your student
+        <em> learned</em> and is <em>still confused</em> about. Use the suggested next topics
+        to decide what to explain next.
       </>
     ),
   },
@@ -104,16 +102,107 @@ const TEAM = [
 /** Question and answer pairs for the FAQ accordion. */
 const FAQS = [
   {
-    q: 'What happens to my free workspaces?',
-    a: 'They stay. Upgrading only lifts the limits, and nothing is deleted or migrated.',
+    id: 'what-is-cogniva',
+    q: 'What is Cogniva?',
+    a: 'Cogniva is a learning-by-teaching study space. You explain a topic to an AI student using a whiteboard, optional voice recordings, and chat. The student responds, asks questions, and helps you see which parts of your explanation need more work.',
   },
   {
-    q: 'Is my board used for training?',
-    a: 'No. Your boards, voice and PDFs are used to run your session and nothing else.',
+    id: 'who-is-it-for',
+    q: 'Who is Cogniva for?',
+    a: 'Anyone who wants to practise explaining what they are studying. Use it to review a lesson, prepare an explanation for class, or work through a concept in your own words. You do not need teaching experience.',
   },
   {
-    q: 'Do I need an account to pay?',
-    a: "Only from Sensei upwards. That is the point where your reports need somewhere to live.",
+    id: 'getting-started',
+    q: 'How do I start my first session?',
+    a: 'Open the sign-in window and sign in, create an account, or continue as a guest. From the dashboard, create a workspace, choose a student, and prepare your board. Press Teach when you are ready to share your explanation.',
+  },
+  {
+    id: 'guest-and-account',
+    q: 'What is the difference between a guest session and an account?',
+    a: 'Guest sessions let you try Cogniva without an account. Guest work is not saved to your account and ends when you reload, close the page, or sign in. With an account, your workspaces and session results are saved so you can return to them.',
+  },
+  {
+    id: 'choose-student',
+    q: 'Can I choose my AI student?',
+    a: `Yes. Choose from ${LEARNERS.map((student) => student.name).join(', ')} when setting up your workspace. Each character has a different personality, so you can choose the student you would like to teach.`,
+  },
+  {
+    id: 'reference-material',
+    q: 'Do I need to upload a PDF?',
+    a: 'No. You can begin with your own explanation. For more context in the evaluation, upload a reference PDF, paste notes, or use the reference finder to look for a source. Review any suggested source before using it.',
+  },
+  {
+    id: 'voice-and-board',
+    q: 'Do I have to use a microphone or draw?',
+    a: 'Voice recording is optional. You can type text and add shapes on the whiteboard, then use chat for follow-up explanations. If you record your voice, your browser will ask for microphone access.',
+  },
+  {
+    id: 'teach-button',
+    q: 'When does the AI student respond?',
+    a: 'Press Teach to submit your current board and any recorded explanation. The student responds after processing that teaching step. You can also send a chat message to continue the conversation.',
+  },
+  {
+    id: 'session-report',
+    q: 'What do I get at the end of a session?',
+    a: 'Your report includes a letter from your AI student, notes on what they learned and what remains unclear, a reflection, and suggested next topics. Use it to choose which part of your explanation to revisit.',
+  },
+  {
+    id: 'continue-learning',
+    q: 'Can I teach the same topic again?',
+    a: 'Yes. You can resume a completed workspace and start another teaching round. The workspace report updates after a new evaluation, so revisit the latest feedback as you refine your explanation.',
+  },
+  {
+    id: 'ai-feedback',
+    q: 'Is the feedback a final grade?',
+    a: 'No. It is AI-generated feedback on your explanation, intended to help you reflect and practise. It can miss context or make mistakes. Check important points against your course material, reference sources, or a teacher.',
+  },
+  {
+    id: 'plans-and-access',
+    q: 'Can I buy a Sensei or Sekolah subscription now?',
+    a: 'Paid checkout is not available in the current app. Sensei and Sekolah are plan previews, and their listed prices and features are proposals. The buttons open sign-in so you can try the current learning experience; they do not purchase a subscription.',
+  },
+]
+
+const FOOTER_GROUPS = [
+  {
+    title: 'Explore Cogniva',
+    links: [
+      { label: 'How it works', target: 'how' },
+      { label: 'Meet the AI students', target: 'students' },
+      { label: 'Student feedback', target: 'feedback' },
+      { label: 'Access and plans', target: 'pricing' },
+      { label: 'All questions', target: 'faq' },
+    ],
+  },
+  {
+    title: 'Your first session',
+    links: [
+      { label: 'Getting started', target: 'faq-getting-started' },
+      { label: 'Choose a student', target: 'faq-choose-student' },
+      { label: 'Prepare references', target: 'faq-reference-material' },
+      { label: 'Whiteboard and voice', target: 'faq-voice-and-board' },
+      { label: 'Using the Teach button', target: 'faq-teach-button' },
+    ],
+  },
+  {
+    title: 'Keep learning',
+    links: [
+      { label: 'Guest or account?', target: 'faq-guest-and-account' },
+      { label: 'Read your report', target: 'faq-session-report' },
+      { label: 'Teach another round', target: 'faq-continue-learning' },
+      { label: 'Understanding AI feedback', target: 'faq-ai-feedback' },
+      { label: 'Plan availability', target: 'faq-plans-and-access' },
+    ],
+  },
+  {
+    title: 'About Cogniva',
+    links: [
+      { label: 'Our approach', target: 'about' },
+      { label: 'Learning by teaching', target: 'faq-what-is-cogniva' },
+      { label: 'Who it is for', target: 'faq-who-is-it-for' },
+      { label: 'Meet the team', target: 'team' },
+      { label: 'Back to top', target: 'top' },
+    ],
   },
 ]
 
@@ -137,7 +226,7 @@ export default function LandingPage() {
   const teamReveal = useReveal<HTMLDivElement>()
 
   const senseiPrice = annual ? '39.000' : '49.000'
-  const senseiNote = annual ? 'Billed Rp 468.000 yearly' : 'Or Rp 39.000 on annual billing'
+  const senseiNote = annual ? 'Proposed annual total: Rp 468.000' : 'Proposed monthly price'
   const schoolPrice = annual ? '19.000' : '24.000'
 
   return (
@@ -159,14 +248,11 @@ export default function LandingPage() {
           <div className={styles.navActions}>
             <button
               type="button"
-              className={styles.navSignIn}
+              className={styles.btnLime}
               onClick={() => setSignInOpen(true)}
             >
               Sign in
             </button>
-            <Link to={APP_ENTRY} className={styles.btnLime}>
-              Start teaching for free
-            </Link>
           </div>
         </div>
       </header>
@@ -181,10 +267,9 @@ export default function LandingPage() {
               until you can teach it.
             </h1>
             <p className={styles.heroLead}>
-              Cogniva gives you a student instead of a quiz. Explain a topic on a whiteboard, out
-              loud if you like, and she'll interrupt, get confused, and ask the one question you
-              were quietly hoping she wouldn't. Afterwards she writes you a letter about what she
-              actually understood.
+              Turn what you are studying into an explanation. Write, draw, or record your voice,
+              then teach an AI student who responds and asks questions. Finish with feedback
+              on what came across clearly and what you can explain better.
             </p>
             <div className={styles.heroCtas}>
               <Link to={APP_ENTRY} className={styles.btnLimeLarge}>
@@ -195,9 +280,9 @@ export default function LandingPage() {
               </a>
             </div>
             <div className={styles.heroNotes}>
-              <span>No account needed</span>
-              <span>Just type your name and start</span>
-              <span>Works in Bahasa Indonesia</span>
+              <span>Try as a guest</span>
+              <span>Sign in to keep your work</span>
+              <span>Whiteboard, voice, and chat</span>
             </div>
           </div>
 
@@ -228,7 +313,7 @@ export default function LandingPage() {
                     <span>
                       your whiteboard
                       <br />
-                      read-only while she reads
+                      explain one idea at a time
                     </span>
                   </div>
                 </div>
@@ -244,7 +329,7 @@ export default function LandingPage() {
                   </div>
                   <span className={styles.previewSideTitle}>Reading your board…</span>
                   <span className={styles.previewSideNote}>
-                    She's looking at the arrows on the right side.
+                    Your student is working through your explanation.
                   </span>
                 </div>
               </div>
@@ -259,11 +344,11 @@ export default function LandingPage() {
           <div className={styles.sectionHead}>
             <div className={styles.sectionHeadMain}>
               <span className={styles.eyebrow}>How a session goes</span>
-              <h2 className={styles.h2}>Four steps, about twenty minutes.</h2>
+              <h2 className={styles.h2}>From explaining to understanding.</h2>
             </div>
             <p className={styles.sectionHeadAside}>
-              Nothing to configure and nothing to grade. You talk, she listens badly enough to
-              expose the gaps, and the report tells you where to look again.
+              Start with one concept. Explain it at your own pace, respond to your student's
+              questions, and use the feedback to guide your next attempt.
             </p>
           </div>
 
@@ -271,9 +356,7 @@ export default function LandingPage() {
             {STEPS.map((step) => (
               <div
                 key={step.num}
-                className={
-                  step.dark ? `${styles.stepCard} ${styles.stepCardDark}` : styles.stepCard
-                }
+                className={styles.stepCard}
               >
                 <span className={styles.stepNum}>{step.num}</span>
                 <h3 className={styles.stepTitle}>{step.title}</h3>
@@ -282,31 +365,31 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <div className={styles.letterRow}>
+          <div id="feedback" className={styles.letterRow}>
             <div className={styles.letterCard}>
-              <span className={styles.letterKicker}>What the letter looks like</span>
+              <span className={styles.letterKicker}>An example of student feedback</span>
               <p className={styles.letterQuote}>
                 “Arif-sensei, I think I finally get why C4 plants bother with the extra step. But
                 when you drew the two cell types I wrote them down without really following. If
                 you asked me now which one has the rubisco, I would guess.”
               </p>
-              <span className={styles.letterBy}>(Yuzuki, after 24 minutes)</span>
+              <span className={styles.letterBy}>Illustrative example from Yuzuki</span>
             </div>
             <div className={styles.statCard}>
               <div className={styles.stat}>
-                <span className={styles.statNum}>3</span>
+                <span className={styles.statNum}>{LEARNERS.length}</span>
                 <span className={styles.statLabel}>students, each with their own temperament</span>
               </div>
               <div className={styles.statRule} />
               <div className={styles.stat}>
-                <span className={styles.statNum}>0</span>
-                <span className={styles.statLabel}>accounts, passwords or setup screens</span>
+                <span className={styles.statNum}>1</span>
+                <span className={styles.statLabel}>workspace for your board, references, and conversation</span>
               </div>
               <div className={styles.statRule} />
               <div className={styles.stat}>
-                <span className={styles.statNum}>∞</span>
+                <span className={styles.statNum}>4</span>
                 <span className={styles.statLabel}>
-                  rounds per topic, and each one keeps its own report
+                  steps: prepare, explain, respond, and reflect
                 </span>
               </div>
             </div>
@@ -320,11 +403,11 @@ export default function LandingPage() {
           <div className={styles.sectionHead}>
             <div className={styles.sectionHeadMain}>
               <span className={styles.eyebrowOnDark}>Who you'll be teaching</span>
-              <h2 className={styles.h2OnDark}>Three students. You don't get to pick.</h2>
+              <h2 className={styles.h2OnDark}>Meet your next AI student.</h2>
             </div>
             <p className={styles.sectionHeadAsideOnDark}>
-              Each workspace is assigned a student and keeps her for good, so a topic always has
-              the same voice in it. Teach three topics and you'll have met all three.
+              Choose from {LEARNERS.map((student) => student.name.split(' ')[0]).join(', ')} when you set up a workspace. Each brings a different
+              personality to the conversation. You bring the topic and the explanation.
             </p>
           </div>
 
@@ -348,13 +431,13 @@ export default function LandingPage() {
       <section id="pricing" className={styles.pricing}>
         <div className={styles.container}>
           <div className={styles.pricingHead}>
-            <span className={styles.eyebrow}>Pricing</span>
+            <span className={styles.eyebrow}>Access and plan previews</span>
             <h2 className={styles.h2Centered}>
-              Free to learn with. Paid when you want her to remember.
+              Start learning. See what is planned.
             </h2>
             <p className={styles.pricingLead}>
-              Prices in IDR, per month, cancel any time. Every plan includes all three students and
-              the full report.
+              Try the current Cogniva experience for free. Sensei and Sekolah below are proposed
+              paid plans, with indicative prices in IDR. Paid checkout is not available yet.
             </p>
             <div className={styles.billingToggle} role="tablist" aria-label="Billing period">
               <button
@@ -377,7 +460,7 @@ export default function LandingPage() {
                 }
                 onClick={() => setAnnual(true)}
               >
-                Annual · 2 months free
+                Annual
               </button>
             </div>
           </div>
@@ -387,20 +470,24 @@ export default function LandingPage() {
             <div className={styles.plan}>
               <div className={styles.planHead}>
                 <h3 className={styles.planName}>Belajar</h3>
-                <p className={styles.planTag}>For seeing whether teaching actually works on you.</p>
+                <p className={styles.planTag}>Explore a topic by explaining it to an AI student.</p>
               </div>
               <div className={styles.priceRow}>
                 <span className={styles.price}>Rp 0</span>
-                <span className={styles.priceUnit}>forever</span>
+                <span className={styles.priceUnit}>to get started</span>
               </div>
-              <Link to={APP_ENTRY} className={styles.planCtaGhost}>
+              <button
+                type="button"
+                className={styles.planCtaGhost}
+                onClick={() => setSignInOpen(true)}
+              >
                 Start now
-              </Link>
+              </button>
               <div className={styles.planRule} />
               <div className={styles.featureList}>
                 <div className={styles.feature}>
                   <Tick />
-                  <span>3 workspaces at a time</span>
+                  <span>Choose from three AI students</span>
                 </div>
                 <div className={styles.feature}>
                   <Tick />
@@ -411,19 +498,19 @@ export default function LandingPage() {
                   <span>Letter, notebook and next topics</span>
                 </div>
                 <div className={styles.feature}>
-                  <Tick on={false} />
-                  <span className={styles.featureOff}>Reports kept 7 days</span>
+                  <Tick />
+                  <span>Save workspaces when signed in</span>
                 </div>
               </div>
             </div>
 
             {/* ── Sensei ── */}
             <div className={styles.planFeatured}>
-              <span className={styles.planBadge}>Most chosen</span>
+              <span className={styles.planBadge}>Plan preview</span>
               <div className={styles.planHead}>
                 <h3 className={styles.planNameOnDark}>Sensei</h3>
                 <p className={styles.planTagOnDark}>
-                  For someone with an exam, a thesis, or a habit.
+                  A proposed plan for a regular learning-by-teaching routine.
                 </p>
               </div>
               <div className={styles.priceBlock}>
@@ -433,9 +520,13 @@ export default function LandingPage() {
                 </div>
                 <span className={styles.priceNote}>{senseiNote}</span>
               </div>
-              <Link to={APP_ENTRY} className={styles.planCtaLime}>
+              <button
+                type="button"
+                className={styles.planCtaLime}
+                onClick={() => setSignInOpen(true)}
+              >
                 Take Sensei
-              </Link>
+              </button>
               <div className={styles.planRuleDark} />
               <div className={styles.featureList}>
                 <div className={styles.feature}>
@@ -445,7 +536,7 @@ export default function LandingPage() {
                 <div className={styles.feature}>
                   <Tick dark />
                   <span className={styles.featureOnDark}>
-                    Reports kept forever, with round history
+                    Extended report history
                   </span>
                 </div>
                 <div className={styles.feature}>
@@ -469,17 +560,17 @@ export default function LandingPage() {
             <div className={styles.plan}>
               <div className={styles.planHead}>
                 <h3 className={styles.planName}>Sekolah</h3>
-                <p className={styles.planTag}>For a class, a study group, or a whole school.</p>
+                <p className={styles.planTag}>A proposed plan for classrooms and study groups.</p>
               </div>
               <div className={styles.priceBlock}>
                 <div className={styles.priceRow}>
                   <span className={styles.price}>Rp {schoolPrice}</span>
                   <span className={styles.priceUnit}>/ student / month</span>
                 </div>
-                <span className={styles.priceNoteLight}>Minimum 20 students</span>
+                <span className={styles.priceNoteLight}>Plan preview · proposed minimum of 20 students</span>
               </div>
-              <a href="#about" className={styles.planCtaOutline}>
-                Talk to us
+              <a href="#faq-plans-and-access" className={styles.planCtaOutline} onClick={() => setOpenFaq(FAQS.findIndex((faq) => faq.id === 'plans-and-access'))}>
+                About plan availability
               </a>
               <div className={styles.planRule} />
               <div className={styles.featureList}>
@@ -512,15 +603,19 @@ export default function LandingPage() {
           <div className={styles.pricingHead}>
             <span className={styles.eyebrow}>FAQ</span>
             <h2 className={styles.h2Centered}>Questions you might have</h2>
+            <p className={styles.pricingLead}>
+              Getting started, choosing a student, and making the most of your teaching session.
+            </p>
           </div>
 
           <div ref={faqReveal.ref} className={`${styles.faqList} ${faqReveal.className}`}>
             {FAQS.map((item, i) => {
               const open = openFaq === i
               return (
-                <div key={item.q} className={open ? `${styles.faq} ${styles.faqOpen}` : styles.faq}>
+                <div id={`faq-${item.id}`} key={item.id} className={open ? `${styles.faq} ${styles.faqOpen}` : styles.faq}>
                   <button
                     type="button"
+                    id={`faq-q-${item.id}`}
                     className={styles.faqQ}
                     aria-expanded={open}
                     aria-controls={`faq-a-${i}`}
@@ -533,7 +628,7 @@ export default function LandingPage() {
                   </button>
                   {/* Kept mounted and collapsed by max-height so the open/close
                       is animatable and the text stays findable by Ctrl+F. */}
-                  <div id={`faq-a-${i}`} className={styles.faqAWrap} role="region">
+                  <div id={`faq-a-${i}`} className={styles.faqAWrap} role="region" aria-labelledby={`faq-q-${item.id}`} aria-hidden={!open}>
                     <p className={styles.faqA}>{item.a}</p>
                   </div>
                 </div>
@@ -550,45 +645,42 @@ export default function LandingPage() {
             <div className={styles.aboutCopy}>
               <span className={styles.eyebrow}>About us</span>
               <h2 className={styles.h2}>
-                We built the study tool we kept failing to be disciplined enough for.
+                A place to practise what you understand.
               </h2>
               <p className={styles.aboutPara}>
-                Cogniva started as a small team in Bandung re-reading the same chapter for the
-                fourth time and still not being able to explain it to a friend. Flashcards told us
-                we knew things we didn't. Talking out loud to nobody felt silly. So we made the
-                nobody talk back.
+                Cogniva is built around learning by teaching. Choosing your words, connecting
+                ideas, and answering questions gives you a way to examine your own understanding.
+                Our workspace brings that practice together with an AI student you can teach.
               </p>
               <p className={styles.aboutPara}>
-                The students are deliberately not experts. An expert would fill your gaps in
-                politely. A confused beginner leaves them exactly where they are, in writing, where
-                you have to look at them.
+                Your board holds the explanation, chat keeps the conversation going, and the
+                report gives you something concrete to reflect on. Start with what you know,
+                notice what needs another example, and return for another teaching round.
               </p>
             </div>
             <div className={styles.beliefCol}>
               <div className={styles.beliefCard}>
-                <span className={styles.beliefKicker}>What we believe</span>
+                <span className={styles.beliefKicker}>Explain in your own words</span>
                 <p className={styles.beliefBody}>
-                  Understanding is a performance, not a feeling. If you can't perform it, you don't
-                  have it yet.
+                  Build an explanation with your own examples, diagrams, and reasoning.
                 </p>
               </div>
               <div className={styles.beliefCard}>
-                <span className={styles.beliefKicker}>What we won't do</span>
+                <span className={styles.beliefKicker}>Learn through conversation</span>
                 <p className={styles.beliefBody}>
-                  No streaks, no leaderboards, no notifications guilting you back. One good session
-                  beats thirty nagged ones.
+                  Use your student's questions to spot missing steps and try a clearer explanation.
                 </p>
               </div>
               <div className={styles.beliefCard}>
-                <span className={styles.beliefKicker}>Where we are</span>
+                <span className={styles.beliefKicker}>Reflect, then revisit</span>
                 <p className={styles.beliefBody}>
-                  Open beta, four people, Bandung. Bahasa Indonesia first, English second.
+                  Turn feedback into your next study step, whether that is a better example or a new topic.
                 </p>
               </div>
             </div>
           </div>
 
-          <div ref={teamReveal.ref} className={teamReveal.className}>
+          <div id="team" ref={teamReveal.ref} className={teamReveal.className}>
             <TeamSlider people={TEAM} />
           </div>
         </div>
@@ -598,49 +690,62 @@ export default function LandingPage() {
       <section className={styles.closing}>
         <div className={styles.container}>
           <div className={styles.closingCta}>
-            <h2 className={styles.closingTitle}>Pick a topic you think you know.</h2>
+            <h2 className={styles.closingTitle}>What will you teach today?</h2>
             <p className={styles.closingLead}>
-              Type your name, open a board, and find out in twenty minutes. No card, no account.
+              Bring one concept, choose an AI student, and explain it your way.
+              Your next question is a chance to understand it better.
             </p>
-            <Link to={APP_ENTRY} className={styles.btnLimeLarge}>
+            <button
+              type="button"
+              className={styles.btnLimeLarge}
+              onClick={() => setSignInOpen(true)}
+            >
               Start teaching for free
-            </Link>
+            </button>
           </div>
 
           <div className={styles.footerRule} />
 
-          <footer className={styles.footer}>
+          <footer className={styles.footer} aria-label="Cogniva footer">
             <div className={styles.footerBrand}>
-              <div className={styles.brand}>
+              <a href="#top" className={styles.brand} aria-label="Cogniva home">
                 <img src="/cogniva_logo.png" alt="" aria-hidden="true" className={styles.brandMarkImg} />
                 <span className={styles.brandNameOnDark}>Cogniva</span>
-              </div>
+              </a>
               <span className={styles.footerTagline}>
-                Learning by teaching. Made in Bandung, Indonesia.
+                A study space for explaining ideas, asking better questions, and learning
+                through the act of teaching an AI student.
               </span>
+              <button type="button" className={styles.btnLime} onClick={() => setSignInOpen(true)}>
+                Start a teaching session
+              </button>
+              <Link to={APP_ENTRY} className={styles.footerDashboard}>Go to your dashboard →</Link>
             </div>
-            <div className={styles.footerCols}>
-              <div className={styles.footerCol}>
-                <span className={styles.footerColTitle}>Product</span>
-                <a href="#how">How it works</a>
-                <a href="#students">Your students</a>
-                <a href="#pricing">Pricing</a>
-              </div>
-              <div className={styles.footerCol}>
-                <span className={styles.footerColTitle}>Company</span>
-                <a href="#about">About us</a>
-                <a href="#about">Contact</a>
-                <a href="#about">Careers</a>
-              </div>
-              <div className={styles.footerCol}>
-                <span className={styles.footerColTitle}>Legal</span>
-                <a href="#about">Privacy</a>
-                <a href="#about">Terms</a>
-              </div>
-            </div>
+            <nav className={styles.footerCols} aria-label="Explore and get help">
+              {FOOTER_GROUPS.map((group) => (
+                <div key={group.title} className={styles.footerCol}>
+                  <h3 className={styles.footerColTitle}>{group.title}</h3>
+                  {group.links.map((link) => (
+                    <a
+                      key={link.target}
+                      href={`#${link.target}`}
+                      onClick={() => {
+                        const index = FAQS.findIndex((faq) => `faq-${faq.id}` === link.target)
+                        if (index >= 0) setOpenFaq(index)
+                      }}
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+              ))}
+            </nav>
           </footer>
 
-          <span className={styles.copyright}>© 2026 Cogniva. Open beta.</span>
+          <div className={styles.footerBottom}>
+            <span className={styles.copyright}>© {new Date().getFullYear()} Cogniva.</span>
+            <span className={styles.copyright}>Explain. Question. Reflect. Teach again.</span>
+          </div>
         </div>
       </section>
 

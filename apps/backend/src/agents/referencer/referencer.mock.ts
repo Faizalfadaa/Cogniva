@@ -9,12 +9,16 @@
  * well-known open libraries, pre-filtered to the topic, and says so plainly.
  * Every URL is a stable entry point that resolves whatever the topic is.
  *
- * Wikipedia is queried through Special:Search with go=Go, which jumps straight
- * to the article when the title matches exactly and shows results otherwise —
- * so the most common case lands on real reference text, not a search page.
+ * Every library here also has to pass the source policy in referencer.trust.ts —
+ * this list is the fallback for the same feature, so it cannot offer what the
+ * online path would refuse. That is why there is no Wikipedia entry: it used to
+ * lead this list, and an open-edit page is exactly what must not become a
+ * marking key. Britannica takes its place for the same job (one broad,
+ * encyclopedic entry point) with a named editorial process behind it.
  */
 
 import * as config from "../../config/index.js";
+import type { SourceTrust } from "./referencer.trust.js";
 import type { ReferenceOption, ReferenceSuggestions, SuggestReferencesArgs } from "./referencer.types.js";
 
 interface Library {
@@ -23,68 +27,85 @@ interface Library {
   url: (query: string) => string;
   source: string;
   kind: ReferenceOption["kind"];
+  trust: SourceTrust;
   summary: string;
   whyRelevant: string;
 }
 
 const LIBRARIES: Library[] = [
   {
-    id: "wikipedia",
-    title: (topic) => `Wikipedia: ${topic}`,
-    url: (q) => `https://en.wikipedia.org/wiki/Special:Search?search=${q}&go=Go`,
-    source: "Wikipedia",
+    id: "britannica",
+    title: (topic) => `Encyclopaedia Britannica: ${topic}`,
+    url: (q) => `https://www.britannica.com/search?query=${q}`,
+    source: "Encyclopaedia Britannica",
     kind: "article",
+    trust: "medium",
     summary:
-      "Ringkasan ensiklopedis dengan definisi, istilah kunci, dan daftar rujukan di bagian bawah.",
+      "An encyclopedia whose articles carry a named author and go through editorial review.",
     whyRelevant:
-      "Cakupan luas dan struktur berjudul — cocok dipakai sebagai kerangka awal saat menjelaskan.",
+      "Broad coverage under clear headings — a good opening framework, and you can see who wrote it.",
   },
   {
     id: "khan-academy",
-    title: (topic) => `Khan Academy — materi tentang ${topic}`,
+    title: (topic) => `Khan Academy — material on ${topic}`,
     url: (q) => `https://www.khanacademy.org/search?page_search_query=${q}`,
     source: "Khan Academy",
     kind: "course",
-    summary: "Pelajaran singkat dan latihan bertingkat, ditulis untuk pelajar sekolah.",
-    whyRelevant: "Bahasanya paling dekat dengan cara seseorang menjelaskan ke pemula.",
+    trust: "medium",
+    summary: "Short lessons and graded exercises, written for school-age learners.",
+    whyRelevant: "The wording is closest to how a person actually explains something to a beginner.",
   },
   {
     id: "openstax",
-    title: (topic) => `OpenStax — buku teks terbuka tentang ${topic}`,
+    title: (topic) => `OpenStax — open textbook on ${topic}`,
     url: (q) => `https://openstax.org/search?q=${q}`,
     source: "OpenStax",
     kind: "pdf",
-    summary: "Buku teks kuliah gratis, tersedia dalam bentuk PDF utuh per bab.",
-    whyRelevant: "Kalau butuh referensi yang bisa diunduh sebagai PDF, ini sumber paling rapi.",
+    trust: "high",
+    summary: "Free peer-reviewed university textbooks, available as a full PDF per chapter.",
+    whyRelevant: "If you need reference material you can download as a PDF, this is the tidiest source.",
+  },
+  {
+    id: "libretexts",
+    title: (topic) => `LibreTexts — textbook chapter on ${topic}`,
+    url: (q) => `https://libretexts.org/search.html?q=${q}`,
+    source: "LibreTexts",
+    kind: "book",
+    trust: "high",
+    summary:
+      "An open-textbook library run by a consortium of universities, split by chapter and section.",
+    whyRelevant: "University-level depth broken into small pieces, so one topic is easy to lift out.",
   },
   {
     id: "mit-ocw",
-    title: (topic) => `MIT OpenCourseWare — kuliah tentang ${topic}`,
+    title: (topic) => `MIT OpenCourseWare — course material on ${topic}`,
     url: (q) => `https://ocw.mit.edu/search/?q=${q}`,
     source: "MIT OpenCourseWare",
     kind: "course",
-    summary: "Catatan kuliah, slide, dan soal dari mata kuliah MIT yang dibuka untuk umum.",
-    whyRelevant: "Kedalamannya paling tinggi di daftar ini; berguna untuk topik tingkat lanjut.",
+    trust: "high",
+    summary: "Lecture notes, slides and problem sets from MIT courses, opened to the public.",
+    whyRelevant: "The deepest material on this list; useful for advanced topics.",
   },
   {
     id: "semantic-scholar",
-    title: (topic) => `Semantic Scholar — artikel ilmiah tentang ${topic}`,
+    title: (topic) => `Semantic Scholar — research papers on ${topic}`,
     url: (q) => `https://www.semanticscholar.org/search?q=${q}`,
     source: "Semantic Scholar",
     kind: "article",
-    summary: "Mesin pencari makalah ilmiah, banyak di antaranya berbentuk PDF terbuka.",
-    whyRelevant: "Dipakai kalau topiknya menuntut sumber primer, bukan ringkasan.",
+    trust: "high",
+    summary: "A search engine for scientific papers, many of them open-access PDFs.",
+    whyRelevant: "Use it when the topic calls for a primary source rather than a summary.",
   },
 ];
 
 const NOTICE =
-  "Pencarian daring sedang tidak aktif, jadi ini adalah pintu masuk ke perpustakaan terbuka " +
-  "yang sudah disaring untuk topikmu — bukan judul dokumen tertentu. Buka salah satu, lalu " +
-  "unggah PDF-nya kalau kamu menemukan yang cocok.";
+  "Online search is unavailable right now, so these are entry points into open libraries, " +
+  "pre-filtered for your topic — not specific document titles. Open one, then upload the PDF " +
+  "if you find something that fits.";
 
 /** Build the offline option list. Pure and deterministic. */
 export function suggestOffline(args: SuggestReferencesArgs): ReferenceSuggestions {
-  const topic = args.topic.trim() || "topik ini";
+  const topic = args.topic.trim() || "this topic";
   const query = encodeURIComponent([topic, args.hint].filter(Boolean).join(" ").trim());
   const count = Math.max(1, args.count ?? config.REFERENCER_OPTIONS);
 
@@ -99,6 +120,9 @@ export function suggestOffline(args: SuggestReferencesArgs): ReferenceSuggestion
     // Nothing was searched, so nothing is corroborated. Saying "verified" here
     // would be the exact lie this fallback exists to avoid.
     verified: false,
+    // Trust is a property of the publisher, not of the search, so it is known
+    // offline and stated: these are the hosts, and they do not change.
+    trust: library.trust,
   }));
 
   return { topic, options, source: "offline", notice: NOTICE };

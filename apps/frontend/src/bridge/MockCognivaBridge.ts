@@ -214,44 +214,50 @@ export class MockCognivaBridge implements CognivaBridge {
   async suggestReferences(workspaceId: string, hint?: string): Promise<ReferenceSuggestionsDTO> {
     await delay(900);
     const ws = store.workspaces.get(workspaceId);
-    const topic = ws?.title?.trim() || 'topik ini';
+    const topic = ws?.title?.trim() || 'this topic';
     const query = encodeURIComponent([topic, hint].filter(Boolean).join(' ').trim());
 
     return {
       topic,
       source: 'offline',
       notice:
-        'Mode mock: ini pintu masuk ke perpustakaan terbuka, bukan judul dokumen tertentu.',
+        'Mock mode: these are entry points into open libraries, not specific document titles.',
       options: [
+        // Mirrors the backend's offline list, source policy included: no
+        // open-edit wiki appears here either, or the mock would show a card the
+        // real agent is no longer able to produce.
         {
-          id: 'wikipedia-1',
-          title: `Wikipedia: ${topic}`,
-          url: `https://en.wikipedia.org/wiki/Special:Search?search=${query}&go=Go`,
-          source: 'Wikipedia',
-          kind: 'article',
-          summary: 'Ringkasan ensiklopedis dengan definisi dan daftar rujukan.',
-          whyRelevant: 'Cakupan luas, cocok sebagai kerangka awal.',
-          verified: false,
-        },
-        {
-          id: 'khan-academy-2',
-          title: `Khan Academy — materi tentang ${topic}`,
-          url: `https://www.khanacademy.org/search?page_search_query=${query}`,
-          source: 'Khan Academy',
-          kind: 'course',
-          summary: 'Pelajaran singkat dan latihan bertingkat untuk pelajar.',
-          whyRelevant: 'Bahasanya dekat dengan cara menjelaskan ke pemula.',
-          verified: false,
-        },
-        {
-          id: 'openstax-3',
-          title: `OpenStax — buku teks terbuka tentang ${topic}`,
+          id: 'openstax-1',
+          title: `OpenStax — open textbook on ${topic}`,
           url: `https://openstax.org/search?q=${query}`,
           source: 'OpenStax',
           kind: 'pdf',
-          summary: 'Buku teks kuliah gratis, tersedia sebagai PDF per bab.',
-          whyRelevant: 'Pilihan terbaik kalau butuh PDF yang bisa diunduh.',
+          summary: 'Free university textbooks, available as a PDF per chapter.',
+          whyRelevant: 'The best option when you need a downloadable PDF.',
           verified: false,
+          trust: 'high',
+        },
+        {
+          id: 'libretexts-2',
+          title: `LibreTexts — textbook chapter on ${topic}`,
+          url: `https://libretexts.org/search.html?q=${query}`,
+          source: 'LibreTexts',
+          kind: 'book',
+          summary: 'Open textbooks run by a consortium of universities.',
+          whyRelevant: 'University-level depth, broken down by section.',
+          verified: false,
+          trust: 'high',
+        },
+        {
+          id: 'britannica-3',
+          title: `Encyclopaedia Britannica: ${topic}`,
+          url: `https://www.britannica.com/search?query=${query}`,
+          source: 'Encyclopaedia Britannica',
+          kind: 'article',
+          summary: 'Encyclopedia articles that are editorially reviewed and carry a named author.',
+          whyRelevant: 'Broad coverage, a good opening framework.',
+          verified: false,
+          trust: 'medium',
         },
       ],
     };
@@ -265,7 +271,7 @@ export class MockCognivaBridge implements CognivaBridge {
     const ws = store.workspaces.get(workspaceId);
     if (!ws) throw new Error(`[Mock] Workspace not found: ${workspaceId}`);
 
-    const text = `Catatan referensi tiruan dari ${choice.url}`;
+    const text = `Mock reference notes from ${choice.url}`;
     store.workspaces.set(workspaceId, {
       ...ws,
       referenceSource: {

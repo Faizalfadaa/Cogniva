@@ -21,12 +21,60 @@ import {
   useReferenceSchema,
 } from "../../contracts/workspace.js";
 import { getCurrentUser } from "../../modules/auth/authService.js";
+import { storageContext } from "../../modules/storage/context.js";
+import { endGuest, guestForWorkspace, guestStorage, rememberGuestWorkspace } from "../../modules/storage/guestStorage.js";
 import * as service from "../../modules/workspace/workspaceService.js";
 import { workspaces } from "../../modules/workspace/workspaceStore.js";
 
 export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
-  // Per-device isolation: every /workspaces/:id route must belong to the calling
-  // device (x-client-id). The collection routes (no :id) are exempt, as are the
+  const owners = new WeakMap<FastifyRequest, string>();
+  app.addHook("onRequest", (req, reply, done) => {
+    const header = req.headers["x-guest-session"];
+    const guestId = typeof header === "string" ? header : undefined;
+    const path = req.url.split("?")[0];
+    const id = (req.params as { id?: string })?.id;
+    const binary = req.method === "GET" && (path.endsWith("/pdf") || path.includes("/audio/"));
+    const binaryGuest = binary && id ? guestForWorkspace(id) : undefined;
+    if (binaryGuest) {
+      reply.header("Cache-Control", "no-store");
+      owners.set(req, binaryGuest.ownerId);
+      storageContext.run(binaryGuest, done);
+      return;
+    }
+    if (guestId) {
+      if (!/^[a-zA-Z0-9_-]{16,128}$/.test(guestId)) {
+        reply.code(400).send({ detail: "Invalid guest session" });
+        return;
+      }
+      // Explicit guest mode must never inherit an existing login cookie.
+      owners.set(req, guestId);
+      reply.header("Cache-Control", "no-store");
+      storageContext.run(guestStorage(guestId), done);
+      return;
+    }
+    getCurrentUser(req).then((user) => {
+      if (user) {
+        owners.set(req, user.id);
+        done();
+      } else if (binary) {
+        done();
+      } else {
+        reply.code(401).send({ detail: "Sign in or start a guest session" });
+      }
+    }, done);
+  });
+
+  async function ownerOf(req: FastifyRequest): Promise<string> {
+    return owners.get(req) ?? service.ANON_OWNER;
+  }
+
+  app.post("/guest-session/end", async (_req, reply) => {
+    const guest = storageContext.getStore();
+    if (guest) endGuest(guest.ownerId);
+    return reply.code(204).send();
+  });
+  // Every /workspaces/:id route must belong to the current account or guest
+  // session. The collection routes (no :id) are exempt, as are the
   // two binary GETs the browser fetches through an element — <iframe> for the
   // PDF and <audio> for learner speech — which cannot carry a custom header.
   // Both are addressed by unguessable random ids, matching the posture the PDF
@@ -45,7 +93,10 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/workspaces", async (req, reply) => {
     reply.code(201);
-    return service.createWorkspace(await ownerOf(req));
+    const workspace = await service.createWorkspace(await ownerOf(req));
+    const guest = storageContext.getStore();
+    if (guest) rememberGuestWorkspace(workspace.id, guest.ownerId);
+    return workspace;
   });
 
   // --- Workspace meta -----------------------------------------------------
@@ -137,7 +188,7 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     // can keep it for the life of the session and replay it without refetching.
     return reply
       .type(blob.mime)
-      .header("Cache-Control", "private, max-age=86400, immutable")
+      .header("Cache-Control", storageContext.getStore() ? "no-store" : "private, max-age=86400, immutable")
       .send(blob.data);
   });
 
@@ -199,18 +250,6 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
 
 function idOf(params: unknown): string {
   return (params as { id: string }).id;
-}
-
-/** The calling device's id (x-client-id header); "anonymous" when absent. */
-async function ownerOf(req: FastifyRequest): Promise<string> {
-  const user = await getCurrentUser(req);
-  return user?.id ?? clientOf(req);
-}
-
-function clientOf(req: FastifyRequest): string {
-  const h = req.headers["x-client-id"];
-  const value = Array.isArray(h) ? h[0] : h;
-  return value?.trim() || service.ANON_OWNER;
 }
 
 function notFound(reply: FastifyReply): FastifyReply {

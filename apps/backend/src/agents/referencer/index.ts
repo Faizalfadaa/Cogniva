@@ -23,6 +23,14 @@ export {
   normalizeOptions,
   optionsFromSources,
 } from "./referencer.guard.js";
+export type { GuardedOptions } from "./referencer.guard.js";
+export {
+  byTrust,
+  isBlockedHost,
+  meetsMinTrust,
+  trustOfHost,
+  SOURCE_TRUST,
+} from "./referencer.trust.js";
 export { REFERENCE_KINDS } from "./referencer.types.js";
 export type {
   FetchedReference,
@@ -31,6 +39,7 @@ export type {
   ReferenceSuggestions,
   ReferenceSuggestionSource,
   ReferencerLLMOutput,
+  SourceTrust,
   SuggestReferencesArgs,
 } from "./referencer.types.js";
 

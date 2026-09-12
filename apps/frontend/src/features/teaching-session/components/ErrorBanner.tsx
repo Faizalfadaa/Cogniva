@@ -21,20 +21,20 @@ interface Copy {
 const COPY: Record<SessionErrorKind, Copy> = {
   budget_exceeded: {
     icon: '🌱',
-    title: 'Batas token sesi tercapai',
-    text: 'Sesi ini sudah memakai seluruh jatah tokennya. Akhiri sesi untuk melihat evaluasi, atau buka workspace baru untuk lanjut mengajar.',
+    title: 'Session token limit reached',
+    text: 'This session has used its entire token allowance. End the session to see the evaluation, or open a new workspace to keep teaching.',
     className: styles.errorBannerBudget,
   },
   network: {
     icon: '📡',
-    title: 'Tidak terhubung ke internet',
-    text: 'Koneksi terputus. Coretan di papan tetap tersimpan di perangkat ini — pesan akan terkirim lagi begitu koneksi kembali.',
+    title: 'No internet connection',
+    text: 'The connection dropped. Your whiteboard strokes are still saved on this device — messages will be sent again as soon as the connection is back.',
     className: styles.errorBannerNetwork,
   },
   ai_unavailable: {
     icon: '⚠️',
-    title: 'Gagal menghubungi Cogniva',
-    text: 'Server tidak merespons, jadi giliran ini belum terkirim. Coba tekan Teach sekali lagi sebentar lagi.',
+    title: 'Could not reach Cogniva',
+    text: 'The server did not respond, so this turn was not sent. Try pressing Teach again in a moment.',
     className: styles.errorBannerAi,
   },
 }
@@ -69,7 +69,7 @@ export function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
         type="button"
         className={styles.errorBannerClose}
         onClick={onDismiss}
-        aria-label="Tutup pemberitahuan"
+        aria-label="Dismiss notification"
       >
         ✕
       </button>

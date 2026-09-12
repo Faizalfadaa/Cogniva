@@ -452,9 +452,14 @@ describe("a workspace survives a restart", () => {
 describe("the HTTP API over Postgres", () => {
   it("creates, edits, and re-reads a workspace through the real routes", async () => {
     const app = await buildApp();
-    const client = `test-http-${RUN}`;
-    created.owners.push(client);
-    const headers = { "x-client-id": client };
+    const registration = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: { username: `test_http_${RUN}`, password: "test-password-123" },
+    });
+    expect(registration.statusCode).toBe(201);
+    created.owners.push(registration.json().user.id);
+    const headers = { cookie: String(registration.headers["set-cookie"]).split(";")[0] };
 
     try {
       const createdRes = await app.inject({
@@ -492,7 +497,7 @@ describe("the HTTP API over Postgres", () => {
       const intruder = await app.inject({
         method: "GET",
         url: `/api/workspaces/${id}`,
-        headers: { "x-client-id": `test-intruder-${RUN}` },
+        headers: { "x-guest-session": `test-intruder-${RUN}` },
       });
       expect(intruder.statusCode).toBe(404);
 

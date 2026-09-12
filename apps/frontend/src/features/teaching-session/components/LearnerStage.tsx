@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import styles from '../../../styles/TeachingSession.module.css'
 import type { LearnerCharacter } from '../../../lib/Learner'
 import type { ChatMessageDTO } from '../../../dto/ChatMessageDTO'
@@ -13,6 +13,7 @@ import {
 const STAGE_MIN_PX = 300
 const STAGE_MAX_RATIO = 0.5 // at most half the canvas
 const STAGE_DEFAULT_PX = 360
+const SCROLL_BOTTOM_THRESHOLD_PX = 48
 
 interface LearnerStageProps {
   learner: LearnerCharacter
@@ -75,21 +76,7 @@ function TranscriptBubble({
   )
 }
 
-/**
- * The learner as a presence rather than a chat log.
- *
- * The character stands on stage and moves with their own voice: `useVoiceLevel`
- * writes the live amplitude into `--voice-level`, and the CSS drives every
- * motion from that one number. Nothing here is a canned animation on a timer —
- * when the audio is quiet the avatar is still, and it settles the moment the
- * clip ends.
- *
- * A reply is spoken one sentence at a time, and its words appear as they are
- * said: the line holds a thinking mark until the first clip starts, then grows a
- * sentence per clip. Only the current line is shown. The full transcript is
- * still one click away, because losing the ability to re-read what was said
- * would be a regression, not a simplification.
- */
+/** Character portrait above a permanently visible conversation. */
 export function LearnerStage({
   learner,
   messages,
@@ -99,10 +86,12 @@ export function LearnerStage({
 }: LearnerStageProps) {
   const [width, setWidth] = useState(STAGE_DEFAULT_PX)
   const [draft, setDraft] = useState('')
-  const [showTranscript, setShowTranscript] = useState(false)
+  const [characterMinimized, setCharacterMinimized] = useState(false)
+  const characterId = useId()
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
+  const followMessagesRef = useRef(true)
   const seededRef = useRef(false)
 
   const voice = useLearnerVoice()
@@ -113,9 +102,7 @@ export function LearnerStage({
     () => [...messages].reverse().find((m) => m.sender === 'learner'),
     [messages],
   )
-  const latestProgress = useUtteranceProgress(latestLearnerLine?.speech)
   const speaking = isSpeaking(latestLearnerLine, voice.playingUrl)
-  const waitingForVoice = latestProgress?.phase === 'waiting'
 
   // Legacy single-clip messages: whatever is already on screen when this opens
   // counts as heard, so reopening a conversation does not replay it.
@@ -151,13 +138,47 @@ export function LearnerStage({
     }
   }, [messages, voice.speak]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (!showTranscript) return
-    transcriptRef.current?.scrollTo({
-      top: transcriptRef.current.scrollHeight,
-      behavior: 'smooth',
-    })
-  }, [showTranscript, messages])
+  // Polling creates a new array even when nothing visible has changed.
+  const transcriptVersion = useMemo(
+    () => JSON.stringify(messages.map(({ id, content, learnerAudioUrl }) => [id, content, learnerAudioUrl])),
+    [messages],
+  )
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      followMessagesRef.current = true
+      return
+    }
+    const transcript = transcriptRef.current
+    if (transcript && followMessagesRef.current) {
+      // Apply before paint, without a smooth animation that can fight manual scrolling.
+      transcript.scrollTop = transcript.scrollHeight
+    }
+  }, [isOpen, transcriptVersion, characterMinimized])
+
+  // Follow both layout transitions and text revealed by per-sentence playback.
+  useLayoutEffect(() => {
+    const transcript = transcriptRef.current
+    if (!isOpen || !transcript) return
+    const followLatest = () => {
+      if (followMessagesRef.current) transcript.scrollTop = transcript.scrollHeight
+    }
+    const observer = new ResizeObserver(followLatest)
+    const contentObserver = new MutationObserver(followLatest)
+    observer.observe(transcript)
+    contentObserver.observe(transcript, { childList: true, characterData: true, subtree: true })
+    return () => {
+      observer.disconnect()
+      contentObserver.disconnect()
+    }
+  }, [isOpen])
+
+  function handleTranscriptScroll() {
+    const transcript = transcriptRef.current
+    if (!transcript) return
+    followMessagesRef.current =
+      transcript.scrollHeight - transcript.clientHeight - transcript.scrollTop <= SCROLL_BOTTOM_THRESHOLD_PX
+  }
 
   // --- drag to resize -------------------------------------------------------
   const dragging = useRef(false)
@@ -215,24 +236,22 @@ export function LearnerStage({
       <div className={styles.stageHandle} onMouseDown={onDragStart} aria-hidden="true" />
 
       <div className={styles.stageHeader}>
-        <span className={styles.stageName}>{learner.name}</span>
+        <div className={styles.stageIdentity}>
+          <img src={learner.avatarUrl} alt="" className={styles.stageHeaderAvatar} />
+          <span className={styles.stageName}>{learner.name}</span>
+        </div>
         <div className={styles.stageHeaderActions}>
+
           <button
-            className={showTranscript ? styles.stageIconBtnOn : styles.stageIconBtn}
-            onClick={() => setShowTranscript((open) => !open)}
-            aria-pressed={showTranscript}
-            aria-label={showTranscript ? 'Hide transcript' : 'Show transcript'}
-            title={showTranscript ? 'Hide transcript' : 'Show transcript'}
-          >
-            ☰
-          </button>
-          <button
+            type="button"
             className={styles.stageIconBtn}
             onClick={onToggle}
-            aria-label="Close"
-            title="Close"
+            aria-label="Close chat"
+            title="Close chat"
           >
-            ×
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
           </button>
         </div>
       </div>
@@ -240,7 +259,9 @@ export function LearnerStage({
       {/* Everything below reads --voice-level, set on this node each frame. */}
       <div
         ref={stageRef}
-        className={`${styles.stageBody} ${speaking ? styles.stageBodySpeaking : ''}`}
+        id={characterId}
+        aria-hidden={characterMinimized}
+        className={`${styles.stageBody} ${speaking ? styles.stageBodySpeaking : ''} ${characterMinimized ? styles.stageBodyMinimized : ''}`}
       >
         <div className={styles.stageGlow} aria-hidden="true" />
         <img
@@ -257,31 +278,23 @@ export function LearnerStage({
         </div>
       </div>
 
-      {latestLearnerLine ? (
-        <div className={styles.stageLine}>
-          <p className={styles.stageLineText} aria-live="polite">
-            {waitingForVoice
-              ? '…'
-              : spokenText(latestLearnerLine.content, latestLearnerLine.speech, latestProgress)}
-          </p>
-          {!waitingForVoice && hasAudio(latestLearnerLine) && (
-            <button
-              className={styles.stageReplay}
-              onClick={() => replayOrStop(latestLearnerLine, speaking, voice)}
-              aria-label={speaking ? 'Stop playback' : `Replay ${learner.name}'s voice`}
-            >
-              {speaking ? '◼ Stop' : '▶ Replay'}
-            </button>
-          )}
-        </div>
-      ) : (
-        <p className={styles.stageIdle}>
-          {learner.name} is waiting. Teach something, or say hi below.
-        </p>
-      )}
+      <div className={styles.stageChatToolbar}>
+          <button
+            type="button"
+            className={styles.stageIconBtn}
+            onClick={() => setCharacterMinimized((minimized) => !minimized)}
+            aria-expanded={!characterMinimized}
+            aria-controls={characterId}
+            aria-label={characterMinimized ? 'Show character' : 'Minimize character'}
+            title={characterMinimized ? 'Show character' : 'Minimize character'}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d={characterMinimized ? 'M12 5v14m-6-6 6 6 6-6' : 'M12 19V5m-6 6 6-6 6 6'} />
+            </svg>
+          </button>
+      </div>
 
-      {showTranscript && (
-        <div className={styles.stageTranscript} ref={transcriptRef}>
+        <div className={styles.stageTranscript} ref={transcriptRef} onScroll={handleTranscriptScroll} role="log" aria-label={`Conversation with ${learner.name}`}>
           {messages.length === 0 ? (
             <p className={styles.chatSidebarEmpty}>Nothing said yet.</p>
           ) : (
@@ -290,7 +303,6 @@ export function LearnerStage({
             ))
           )}
         </div>
-      )}
 
       <div className={styles.chatSidebarInputRow}>
         <input

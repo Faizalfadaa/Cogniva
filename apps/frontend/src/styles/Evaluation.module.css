@@ -123,8 +123,12 @@
 }
 
 .reportLogo {
-  height: 28px;
-  width: auto;
+  height: 40px;
+  width: 40px;
+  padding: 7.5px;
+  border-radius: 10px;
+  background: var(--forest-dark);
+  display: block;
   object-fit: contain;
 }
 

@@ -120,7 +120,7 @@ async function runTurn(
   if (result.kind === "budget_exceeded") {
     send({
       type: "budget_exceeded",
-      message: "Sesi ini sudah mencapai batas token untuk babak ini.",
+      message: "This session has reached its token limit for this round.",
     });
     return;
   }

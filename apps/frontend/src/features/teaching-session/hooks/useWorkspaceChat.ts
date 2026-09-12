@@ -4,6 +4,7 @@ import type { ChatMessageDTO } from '../../../dto/ChatMessageDTO'
 import type { LearnerSpeechDTO } from '../../../dto/LearnerSpeechDTO'
 import type { SessionError } from '../components/errorTypes'
 import { markHeardUrls, markSpeechHeard } from './useLearnerVoice'
+import { getGuestSessionId } from '../../../state/guestSession'
 
 const POLL_INTERVAL_MS = 2000
 
@@ -52,12 +53,14 @@ function loadReadCount(workspaceId: string): number {
 // read-count or a cached transcript is a cosmetic regression, not something to
 // interrupt the user over. Only the network paths raise a SessionError.
 function saveReadCount(workspaceId: string, count: number) {
+  if (getGuestSessionId()) return
   try {
     localStorage.setItem(readCountKey(workspaceId), String(count))
   } catch {}
 }
 
 function loadSessionMsgs(workspaceId: string): ChatMessageDTO[] {
+  if (getGuestSessionId()) return []
   try {
     const raw = sessionStorage.getItem(sessionMsgsKey(workspaceId))
     return raw ? (JSON.parse(raw) as ChatMessageDTO[]) : []
@@ -67,6 +70,7 @@ function loadSessionMsgs(workspaceId: string): ChatMessageDTO[] {
 }
 
 function saveSessionMsgs(workspaceId: string, msgs: ChatMessageDTO[]) {
+  if (getGuestSessionId()) return
   try {
     sessionStorage.setItem(sessionMsgsKey(workspaceId), JSON.stringify(msgs))
   } catch {}
