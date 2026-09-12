@@ -11,8 +11,7 @@ export function ContinueLearning({ topics, onNewSession, onResumeSession, resumi
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>
-        <span>🌱</span>
-        <span>Continue Learning</span>
+        <span>Lanjut Belajar</span>
       </div>
 
       <div className={styles.continueCard}>
@@ -24,7 +23,6 @@ export function ContinueLearning({ topics, onNewSession, onResumeSession, resumi
               <li key={i} className={styles.continueTopic}>
                 <span className={styles.continueTopicIndex}>{String(i + 1).padStart(2, '0')}</span>
                 <span className={styles.continueTopicName}>{topic}</span>
-                <span className={styles.continueTopicArrow}>→</span>
               </li>
             ))}
           </ul>
@@ -40,10 +38,10 @@ export function ContinueLearning({ topics, onNewSession, onResumeSession, resumi
               onClick={onResumeSession}
               disabled={resuming}
             >
-              {resuming ? 'Opening...' : 'Continue Session ↩'}
+              {resuming ? 'Membuka...' : 'Lanjutkan Sesi Ini'}
             </button>
             <button className={styles.continueBtn} onClick={onNewSession} disabled={resuming}>
-              Start a new session ↗
+              Mulai Sesi Baru
             </button>
           </div>
         </div>

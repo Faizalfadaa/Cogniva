@@ -9,6 +9,8 @@ interface EvaluationProcessingProps {
 
 const MESSAGES = [
   'Your student is thinking back over the session...',
+  'Checking each concept against the reference...',
+  'Marking the sentences that stood out...',
   'Writing up the notes...',
   'Preparing a letter for you...',
   'Almost done...',
@@ -45,7 +47,7 @@ export function EvaluationProcessing({ workspaceId, workspaceTitle }: Evaluation
     <div className={styles.processingPage}>
       {/* Back to home — user can leave and come back */}
       <button className={styles.processingBack} onClick={() => navigate('/home')}>
-        ← Back to Home
+        Kembali ke Home
       </button>
 
       <div className={styles.processingContent}>
@@ -72,7 +74,7 @@ export function EvaluationProcessing({ workspaceId, workspaceTitle }: Evaluation
         </div>
 
         <p className={styles.processingHint}>
-          You can head back to Home and return later — the evaluation keeps running in the background.
+          You can head back to Home and return later. The evaluation keeps running in the background.
         </p>
       </div>
     </div>
