@@ -159,14 +159,11 @@ export default function LandingPage() {
           <div className={styles.navActions}>
             <button
               type="button"
-              className={styles.navSignIn}
+              className={styles.btnLime}
               onClick={() => setSignInOpen(true)}
             >
               Sign in
             </button>
-            <Link to={APP_ENTRY} className={styles.btnLime}>
-              Start teaching for free
-            </Link>
           </div>
         </div>
       </header>
@@ -393,9 +390,13 @@ export default function LandingPage() {
                 <span className={styles.price}>Rp 0</span>
                 <span className={styles.priceUnit}>forever</span>
               </div>
-              <Link to={APP_ENTRY} className={styles.planCtaGhost}>
+              <button
+                type="button"
+                className={styles.planCtaGhost}
+                onClick={() => setSignInOpen(true)}
+              >
                 Start now
-              </Link>
+              </button>
               <div className={styles.planRule} />
               <div className={styles.featureList}>
                 <div className={styles.feature}>
@@ -433,9 +434,13 @@ export default function LandingPage() {
                 </div>
                 <span className={styles.priceNote}>{senseiNote}</span>
               </div>
-              <Link to={APP_ENTRY} className={styles.planCtaLime}>
+              <button
+                type="button"
+                className={styles.planCtaLime}
+                onClick={() => setSignInOpen(true)}
+              >
                 Take Sensei
-              </Link>
+              </button>
               <div className={styles.planRuleDark} />
               <div className={styles.featureList}>
                 <div className={styles.feature}>
@@ -602,9 +607,13 @@ export default function LandingPage() {
             <p className={styles.closingLead}>
               Type your name, open a board, and find out in twenty minutes. No card, no account.
             </p>
-            <Link to={APP_ENTRY} className={styles.btnLimeLarge}>
+            <button
+              type="button"
+              className={styles.btnLimeLarge}
+              onClick={() => setSignInOpen(true)}
+            >
               Start teaching for free
-            </Link>
+            </button>
           </div>
 
           <div className={styles.footerRule} />
