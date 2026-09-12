@@ -1,3 +1,4 @@
+import type { LearnerSpeechDTO } from './LearnerSpeechDTO';
 import type { TimelineDTO } from './TimelineDTO';
 
 export interface TeachingCheckpointDTO {
@@ -10,8 +11,12 @@ export interface TeachingCheckpointDTO {
   audioUrl?: string;
   /** Respon learner setelah Vision + agent memproses snapshot. Kosong selagi diproses. */
   learnerResponse?: string;
-  /** Endpoint URL of the spoken learner response (TTS). Absent when voice is off. */
+  /** Legacy: the whole spoken learner response as one clip, for checkpoints
+   *  recorded before per-sentence speech. */
   learnerAudioUrl?: string;
+  /** The response as per-sentence speech, written together with the text when the
+   *  voice is on. Absent when it is off. */
+  speech?: LearnerSpeechDTO;
   /** Set when the turn ended in a handled condition (e.g. the session ran out of
    *  token budget) rather than a real reply. `learnerResponse` still carries
    *  readable text, so ignoring this field degrades gracefully. */

@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styles from '../../../styles/TeachingSession.module.css'
 import type { LearnerCharacter } from '../../../lib/Learner'
 import type { ChatMessageDTO } from '../../../dto/ChatMessageDTO'
-import { useLearnerVoice, useVoiceLevel } from '../hooks/useLearnerVoice'
+import {
+  spokenText,
+  useLearnerVoice,
+  useUtteranceProgress,
+  useVoiceLevel,
+  type LearnerVoice,
+} from '../hooks/useLearnerVoice'
 
 const STAGE_MIN_PX = 300
 const STAGE_MAX_RATIO = 0.5 // at most half the canvas
@@ -16,6 +22,59 @@ interface LearnerStageProps {
   onSend: (content: string) => void
 }
 
+/** Whether one of this message's clips is the one playing right now. */
+function isSpeaking(message: ChatMessageDTO | undefined, playingUrl: string | null): boolean {
+  if (!message || !playingUrl) return false
+  if (message.speech) return message.speech.segments.some((s) => s.audioUrl === playingUrl)
+  return message.learnerAudioUrl === playingUrl
+}
+
+function hasAudio(message: ChatMessageDTO): boolean {
+  return message.speech
+    ? message.speech.segments.some((s) => Boolean(s.audioUrl))
+    : Boolean(message.learnerAudioUrl)
+}
+
+function replayOrStop(message: ChatMessageDTO, speaking: boolean, voice: LearnerVoice): void {
+  if (speaking) voice.stop()
+  else if (message.speech) voice.replay(message.speech)
+  else if (message.learnerAudioUrl) voice.play(message.learnerAudioUrl)
+}
+
+/** One transcript bubble, revealing a reply only as far as it has been spoken. */
+function TranscriptBubble({
+  message,
+  learnerName,
+  voice,
+}: {
+  message: ChatMessageDTO
+  learnerName: string
+  voice: LearnerVoice
+}) {
+  const progress = useUtteranceProgress(message.speech)
+  const waiting = progress?.phase === 'waiting'
+  const speaking = isSpeaking(message, voice.playingUrl)
+
+  return (
+    <div
+      className={`${styles.chatBubble} ${
+        message.sender === 'user' ? styles.chatBubbleUser : styles.chatBubbleLearner
+      }`}
+    >
+      {waiting ? '…' : spokenText(message.content, message.speech, progress)}
+      {!waiting && hasAudio(message) && (
+        <button
+          className={styles.chatBubbleSpeak}
+          onClick={() => replayOrStop(message, speaking, voice)}
+          aria-label={`Play ${learnerName}'s voice`}
+        >
+          {speaking ? '◼' : '▶'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 /**
  * The learner as a presence rather than a chat log.
  *
@@ -25,9 +84,11 @@ interface LearnerStageProps {
  * when the audio is quiet the avatar is still, and it settles the moment the
  * clip ends.
  *
- * Only the current line is shown. The full transcript is still one click away,
- * because losing the ability to re-read what was said would be a regression, not
- * a simplification.
+ * A reply is spoken one sentence at a time, and its words appear as they are
+ * said: the line holds a thinking mark until the first clip starts, then grows a
+ * sentence per clip. Only the current line is shown. The full transcript is
+ * still one click away, because losing the ability to re-read what was said
+ * would be a regression, not a simplification.
  */
 export function LearnerStage({
   learner,
@@ -52,27 +113,26 @@ export function LearnerStage({
     () => [...messages].reverse().find((m) => m.sender === 'learner'),
     [messages],
   )
-  const speaking = Boolean(
-    latestLearnerLine?.learnerAudioUrl && voice.playingUrl === latestLearnerLine.learnerAudioUrl,
-  )
+  const latestProgress = useUtteranceProgress(latestLearnerLine?.speech)
+  const speaking = isSpeaking(latestLearnerLine, voice.playingUrl)
+  const waitingForVoice = latestProgress?.phase === 'waiting'
 
-  // Whatever is already on screen when this opens counts as heard, so reopening
-  // a conversation does not replay it.
+  // Legacy single-clip messages: whatever is already on screen when this opens
+  // counts as heard, so reopening a conversation does not replay it.
   //
   // This deliberately seeds on the first non-empty message list, NOT on the
-  // first message that happens to carry audio. Speech now lands minutes after
-  // the text it belongs to, so keying on "has audio" meant the very first clip
-  // to arrive was mistaken for backlog and silently skipped — which is what
-  // made pressing replay feel mandatory.
+  // first message that happens to carry audio. Speech lands after the text it
+  // belongs to, so keying on "has audio" meant the very first clip to arrive
+  // was mistaken for backlog and silently skipped.
   useEffect(() => {
     if (seededRef.current || messages.length === 0) return
     seededRef.current = true
     voice.markHeard(messages.map((m) => m.learnerAudioUrl))
   }, [messages, voice.markHeard]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Speak each reply the moment its audio is attached. Nothing to press.
+  // Legacy single clip: speak the newest one the moment it is attached.
   useEffect(() => {
-    const url = latestLearnerLine?.learnerAudioUrl
+    const url = latestLearnerLine?.speech ? undefined : latestLearnerLine?.learnerAudioUrl
     if (!url || !seededRef.current) return
     // Fetch first so playback starts instantly and the clip is same-origin by
     // the time the analyser reads it.
@@ -81,6 +141,15 @@ export function LearnerStage({
     // The callbacks are useCallback-stable; depending on `voice` itself would
     // re-run this on every render.
   }, [latestLearnerLine, voice.autoPlay, voice.prefetch]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Per-sentence replies: hand every one to the player on each poll. It speaks
+  // each reply once, in order, and ignores the ones already heard — the chat
+  // hook marks the backlog heard before any of it reaches this component.
+  useEffect(() => {
+    for (const message of messages) {
+      if (message.sender === 'learner' && message.speech) voice.speak(message.speech)
+    }
+  }, [messages, voice.speak]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!showTranscript) return
@@ -190,13 +259,15 @@ export function LearnerStage({
 
       {latestLearnerLine ? (
         <div className={styles.stageLine}>
-          <p className={styles.stageLineText}>{latestLearnerLine.content}</p>
-          {latestLearnerLine.learnerAudioUrl && (
+          <p className={styles.stageLineText} aria-live="polite">
+            {waitingForVoice
+              ? '…'
+              : spokenText(latestLearnerLine.content, latestLearnerLine.speech, latestProgress)}
+          </p>
+          {!waitingForVoice && hasAudio(latestLearnerLine) && (
             <button
               className={styles.stageReplay}
-              onClick={() =>
-                speaking ? voice.stop() : voice.play(latestLearnerLine.learnerAudioUrl!)
-              }
+              onClick={() => replayOrStop(latestLearnerLine, speaking, voice)}
               aria-label={speaking ? 'Stop playback' : `Replay ${learner.name}'s voice`}
             >
               {speaking ? '◼ Stop' : '▶ Replay'}
@@ -215,27 +286,7 @@ export function LearnerStage({
             <p className={styles.chatSidebarEmpty}>Nothing said yet.</p>
           ) : (
             messages.map((m) => (
-              <div
-                key={m.id}
-                className={`${styles.chatBubble} ${
-                  m.sender === 'user' ? styles.chatBubbleUser : styles.chatBubbleLearner
-                }`}
-              >
-                {m.content}
-                {m.learnerAudioUrl && (
-                  <button
-                    className={styles.chatBubbleSpeak}
-                    onClick={() =>
-                      voice.playingUrl === m.learnerAudioUrl
-                        ? voice.stop()
-                        : voice.play(m.learnerAudioUrl!)
-                    }
-                    aria-label={`Play ${learner.name}'s voice`}
-                  >
-                    {voice.playingUrl === m.learnerAudioUrl ? '◼' : '▶'}
-                  </button>
-                )}
-              </div>
+              <TranscriptBubble key={m.id} message={m} learnerName={learner.name} voice={voice} />
             ))
           )}
         </div>

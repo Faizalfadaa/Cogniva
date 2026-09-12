@@ -6,14 +6,18 @@ per-voice settings — is engine-agnostic. Only the classes here know what a mod
 actually is, which is what makes changing model a contained decision rather than
 a rewrite.
 
-Two engines ship:
+Three engines ship:
 
-    chatterbox  Resemble AI's Chatterbox (MIT). Default. Better prosody on
-                expressive character voices, and commercially usable.
-    xtts        Coqui XTTS v2 (CPML, non-commercial). Kept so a disappointing
-                switch can be undone with one environment variable.
+    chatterbox        Resemble AI's Chatterbox (MIT). Default. Better prosody on
+                      expressive character voices, and commercially usable.
+    chatterbox-turbo  Chatterbox Turbo (MIT). The same voice cloning at about
+                      twice the speed on this project's laptop GPU, but it
+                      ignores exaggeration and cfg_weight, so the per-voice
+                      delivery tuning in voices.json does not carry over.
+    xtts              Coqui XTTS v2 (CPML, non-commercial). Kept so a
+                      disappointing switch can be undone with one variable.
 
-Both take the same input — text, a reference clip, a settings dict — and return
+All take the same input — text, a reference clip, a settings dict — and return
 WAV bytes.
 """
 
@@ -77,6 +81,21 @@ class ChatterboxEngine:
         {"exaggeration", "cfg_weight", "temperature", "repetition_penalty", "min_p", "top_p"}
     )
 
+    # Where fetch_model.py puts the weights, and exactly what from_local() opens.
+    WEIGHTS_DIR = "chatterbox"
+    REQUIRED_FILES = (
+        "ve.safetensors",
+        "t3_cfg.safetensors",
+        "s3gen.safetensors",
+        "tokenizer.json",
+        "conds.pt",
+    )
+
+    def _model_class(self):
+        from chatterbox.tts import ChatterboxTTS
+
+        return ChatterboxTTS
+
     def __init__(self) -> None:
         self._model = None
         self._device = "cpu"
@@ -91,8 +110,8 @@ class ChatterboxEngine:
 
     def load(self) -> None:
         import torch
-        from chatterbox.tts import ChatterboxTTS
 
+        model_class = self._model_class()
         device = config.DEVICE
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -100,29 +119,90 @@ class ChatterboxEngine:
         # Prefer weights fetched by fetch_model.py. from_pretrained() goes
         # through huggingface_hub, which stalls indefinitely here; from_local()
         # just reads the directory.
-        local = config.MODELS_DIR / "chatterbox"
-        required = ["ve.safetensors", "t3_cfg.safetensors", "s3gen.safetensors",
-                    "tokenizer.json", "conds.pt"]
-        if all((local / f).is_file() for f in required):
-            log.info("loading chatterbox from %s on %s", local, device)
-            self._model = ChatterboxTTS.from_local(local, device)
+        local = config.MODELS_DIR / self.WEIGHTS_DIR
+        if all((local / f).is_file() for f in self.REQUIRED_FILES):
+            log.info("loading %s from %s on %s", self.name, local, device)
+            self._model = model_class.from_local(local, device)
         else:
-            missing = [f for f in required if not (local / f).is_file()]
+            missing = [f for f in self.REQUIRED_FILES if not (local / f).is_file()]
             log.info("weights incomplete in %s (missing %s); trying the hub", local, missing)
-            self._model = ChatterboxTTS.from_pretrained(device=device)
+            self._model = model_class.from_pretrained(device=device)
         self._device = device
-        log.info("chatterbox ready on %s", device)
+        # The voice the model shipped with, set aside. Conditioning for a cloned
+        # voice is swapped onto the model per request, so a request with no
+        # reference clip has to get this one back rather than whoever spoke last.
+        self._builtin_conds = self._model.conds
+        self._conds_cache: dict[tuple[str, int], object] = {}
+        log.info("%s ready on %s", self.name, device)
+
+    def _conditionals_for(self, reference: Path | None, exaggeration: float):
+        """
+        Conditioning for a voice, prepared once per reference clip.
+
+        generate(audio_prompt_path=...) re-runs prepare_conditionals on every
+        call: it reloads and resamples the WAV, then runs the voice encoder and
+        the speech tokenizer over it, for a file that does not change between
+        requests. The key carries the clip's mtime, so re-recording a voice
+        invalidates it exactly as it invalidates the render cache.
+        """
+        if reference is None:
+            return self._builtin_conds
+        key = (str(reference), reference.stat().st_mtime_ns)
+        conds = self._conds_cache.get(key)
+        if conds is None:
+            self._model.prepare_conditionals(str(reference), exaggeration=exaggeration)
+            conds = self._model.conds
+            # A replaced recording leaves its previous entry behind under the old mtime.
+            for stale in [k for k in self._conds_cache if k[0] == key[0]]:
+                del self._conds_cache[stale]
+            self._conds_cache[key] = conds
+        return conds
 
     def render(
         self, text: str, language: str, reference: Path | None, settings: dict
     ) -> bytes:
         kwargs = {k: v for k, v in settings.items() if k in self.ACCEPTS}
-        if reference is not None:
-            kwargs["audio_prompt_path"] = str(reference)
-        # No reference clip means Chatterbox uses its own built-in voice; unlike
-        # XTTS there is no named speaker to pick, so nothing else to pass.
+        # No reference clip means the built-in voice. generate() itself rebuilds
+        # the cheap emotion part when exaggeration differs from what the cached
+        # conditioning was prepared with, so retuning voices.json still applies
+        # without re-encoding the clip.
+        self._model.conds = self._conditionals_for(reference, kwargs.get("exaggeration", 0.5))
         wav = self._model.generate(text, **kwargs)
         return _tensor_to_wav_bytes(wav, self._model.sr)
+
+
+class ChatterboxTurboEngine(ChatterboxEngine):
+    """
+    Chatterbox Turbo: the same cloning, decoded without classifier-free guidance
+    and with a two-step meanflow decoder in place of ten flow steps.
+
+    Measured on this project's RTX 4050 laptop GPU with the same line in all three
+    voices: RTF 0.43-0.49 against ~1.0 for standard Chatterbox, and the first
+    sentence of a two-sentence reply ready after 1.7 s instead of 5.1 s.
+
+    Its generate() ignores exaggeration, cfg_weight and min_p, and logs a warning
+    whenever they are set, so none of them is forwarded. The per-voice delivery
+    tuning in voices.json therefore has no effect on this engine.
+    """
+
+    name = "chatterbox-turbo"
+    ACCEPTS = frozenset({"temperature", "top_p", "top_k", "repetition_penalty"})
+
+    WEIGHTS_DIR = "chatterbox-turbo"
+    REQUIRED_FILES = (
+        "ve.safetensors",
+        "t3_turbo_v1.safetensors",
+        "s3gen_meanflow.safetensors",
+        "conds.pt",
+        "tokenizer_config.json",
+        "vocab.json",
+        "merges.txt",
+    )
+
+    def _model_class(self):
+        from chatterbox.tts_turbo import ChatterboxTurboTTS
+
+        return ChatterboxTurboTTS
 
 
 def _tensor_to_wav_bytes(wav, sample_rate: int) -> bytes:
@@ -253,7 +333,11 @@ class XttsEngine:
 
 # --- factory ----------------------------------------------------------------
 
-ENGINES = {"chatterbox": ChatterboxEngine, "xtts": XttsEngine}
+ENGINES = {
+    "chatterbox": ChatterboxEngine,
+    "chatterbox-turbo": ChatterboxTurboEngine,
+    "xtts": XttsEngine,
+}
 
 
 def build_engine(name: str | None = None) -> Engine:

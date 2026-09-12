@@ -15,6 +15,7 @@ import type {
   ChatSender,
   CheckpointErrorKind,
   EvaluationReport,
+  LearnerSpeech,
   ReferenceSource,
   TeachingCheckpoint,
   Workspace,
@@ -120,6 +121,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
         audio_url: checkpoint.audioUrl ?? null,
         learner_response: checkpoint.learnerResponse ?? null,
         learner_audio_url: checkpoint.learnerAudioUrl ?? null,
+        speech: toJson(checkpoint.speech),
         error_kind: checkpoint.errorKind ?? null,
         timeline: toJson(checkpoint.timeline),
         created_at: new Date(checkpoint.createdAt),
@@ -140,6 +142,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
       audioUrl: row.audio_url ?? undefined,
       learnerResponse: row.learner_response ?? undefined,
       learnerAudioUrl: row.learner_audio_url ?? undefined,
+      speech: readSpeech(row.speech),
       errorKind: (row.error_kind as CheckpointErrorKind | null) ?? undefined,
       timeline: (row.timeline as Timeline | null) ?? undefined,
       createdAt: row.created_at.toISOString(),
@@ -157,6 +160,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
     if ("audioUrl" in patch) data.audio_url = patch.audioUrl ?? null;
     if ("learnerResponse" in patch) data.learner_response = patch.learnerResponse ?? null;
     if ("learnerAudioUrl" in patch) data.learner_audio_url = patch.learnerAudioUrl ?? null;
+    if ("speech" in patch) data.speech = toJson(patch.speech);
     if ("errorKind" in patch) data.error_kind = patch.errorKind ?? null;
     if ("timeline" in patch) data.timeline = toJson(patch.timeline);
     if (patch.createdAt !== undefined) data.created_at = new Date(patch.createdAt);
@@ -180,6 +184,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
         sender: message.sender,
         content: message.content,
         learner_audio_url: message.learnerAudioUrl ?? null,
+        speech: toJson(message.speech),
         created_at: new Date(message.createdAt),
       },
     });
@@ -194,6 +199,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
     const data: Prisma.chat_messageUncheckedUpdateManyInput = {};
     if (patch.content !== undefined) data.content = patch.content;
     if ("learnerAudioUrl" in patch) data.learner_audio_url = patch.learnerAudioUrl ?? null;
+    if ("speech" in patch) data.speech = toJson(patch.speech);
     if (Object.keys(data).length === 0) return undefined;
 
     // Scoped by workspace as well as id, mirroring the in-memory store.
@@ -210,6 +216,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
           sender: row.sender as ChatSender,
           content: row.content,
           learnerAudioUrl: row.learner_audio_url ?? undefined,
+          speech: readSpeech(row.speech),
           createdAt: row.created_at.toISOString(),
         }
       : undefined;
@@ -225,6 +232,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
       sender: row.sender as ChatSender,
       content: row.content,
       learnerAudioUrl: row.learner_audio_url ?? undefined,
+      speech: readSpeech(row.speech),
       createdAt: row.created_at.toISOString(),
     }));
   }
@@ -451,5 +459,30 @@ function readReferenceSource(value: unknown): ReferenceSource | undefined {
     url,
     title: typeof record.title === "string" ? record.title : "",
     source: typeof record.source === "string" ? record.source : "",
+  };
+}
+
+/**
+ * Read a speech Json column back into a typed value.
+ *
+ * The column is opaque to Postgres, so anything malformed is treated as absent
+ * rather than handed to the UI half-filled — a reply without speech still shows
+ * its text, which is the safe way to be wrong here.
+ */
+function readSpeech(value: unknown): LearnerSpeech | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const { id, status, segments } = record;
+  if (typeof id !== "string" || !Array.isArray(segments)) return undefined;
+  if (status !== "pending" && status !== "ready" && status !== "unavailable") return undefined;
+  return {
+    id,
+    status,
+    segments: segments.flatMap((segment) => {
+      if (!segment || typeof segment !== "object") return [];
+      const { text: spoken, audioUrl } = segment as Record<string, unknown>;
+      if (typeof spoken !== "string") return [];
+      return [typeof audioUrl === "string" ? { text: spoken, audioUrl } : { text: spoken }];
+    }),
   };
 }

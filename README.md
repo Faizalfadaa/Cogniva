@@ -268,9 +268,9 @@ curl http://localhost:8020/health
 there, just slowly enough that you will notice.
 
 Until then it returns `503`, which the backend reads as "no audio this time" and
-carries on. Replies are text-first by design: the learner's line appears
-immediately and the audio attaches a few seconds later on a following poll, then
-plays on its own — there is no button to press.
+carries on. With the voice on, a reply is spoken one sentence at a time and its
+text appears in step: each sentence shows up as its clip starts playing, with
+nothing to press. If a clip takes longer than 8 seconds, the text is shown anyway.
 
 ### Everything at once, with Docker
 

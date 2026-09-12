@@ -251,6 +251,7 @@ export default function WorkspacePage() {
             pending={session.pending}
             checkpointId={session.latestCheckpoint?.id}
             audioUrl={session.latestCheckpoint?.learnerAudioUrl}
+            speech={session.latestCheckpoint?.speech}
           />
 
           {/* Pick first, then meet them: the intro is held back until a student

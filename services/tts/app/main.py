@@ -16,6 +16,7 @@ Run it with:
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from contextlib import asynccontextmanager
 
@@ -23,8 +24,14 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from . import config
+from . import config, process_tuning
 from .synthesizer import SynthesizerNotReady, synthesizer
+
+# Chatterbox draws a tqdm progress bar for every decode, which floods a server log
+# with carriage-return updates. Set before the model (and tqdm) is first imported;
+# TTS_PROGRESS_BARS=1 brings them back while debugging.
+if os.environ.get("TTS_PROGRESS_BARS", "").lower() not in {"1", "true", "yes"}:
+    os.environ.setdefault("TQDM_DISABLE", "1")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("tts")
@@ -32,6 +39,8 @@ log = logging.getLogger("tts")
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Before the model loads, so loading, warm-up and every render run with it.
+    process_tuning.apply(config.PROCESS_PRIORITY, config.DISABLE_ECOQOS)
     if config.WARM_ON_STARTUP:
         # Loaded off the event loop so uvicorn can already answer /health with
         # ready=false instead of appearing dead for the minute this takes.

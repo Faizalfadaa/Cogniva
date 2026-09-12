@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import type { LearnerSpeechDTO } from '../../../dto/LearnerSpeechDTO'
 
 /**
- * Playback for the learner's synthesized voice (XTTS, see services/tts).
+ * Playback for the learner's synthesized voice (Chatterbox, see services/tts).
  *
- * Three things this handles that a bare <audio> tag would not:
+ * What this handles that a bare <audio> tag would not:
  *
  *  1. One clip at a time. A single shared element means a new reply cuts off the
  *     previous one instead of two learners talking over each other.
- *  2. Auto-play exactly once per clip. The reply to a "Teach" press appears in
- *     BOTH the floating bubble and the chat sidebar, sharing one audio URL — so
+ *  2. Each reply spoken exactly once. The reply to a "Teach" press appears in
+ *     BOTH the floating bubble and the chat stage, sharing one speech id — so
  *     without de-duplication the same line would play twice, together.
- *  3. A mute preference that survives a reload.
- *  4. A live amplitude signal, so the avatar can move in time with the voice
+ *  3. Replies spoken sentence by sentence, with their text revealed in step:
+ *     each sentence appears on screen as its clip starts, the way a person's
+ *     words arrive, instead of the whole paragraph landing seconds before the
+ *     voice catches up.
+ *  4. A mute preference that survives a reload and applies everywhere at once.
+ *  5. A live amplitude signal, so the avatar can move in time with the voice
  *     instead of playing a canned animation.
  */
 
@@ -59,10 +64,329 @@ function setCurrent(url: string | null): void {
 function audioElement(): HTMLAudioElement {
   if (!element) {
     element = new Audio()
-    element.addEventListener('ended', () => setCurrent(null))
-    element.addEventListener('error', () => setCurrent(null))
+    element.addEventListener('ended', () => {
+      setCurrent(null)
+      onClipEnded()
+    })
+    element.addEventListener('error', () => {
+      setCurrent(null)
+      onClipEnded()
+    })
   }
   return element
+}
+
+/**
+ * Start one clip on the shared element.
+ *
+ * Everything here is synchronous on purpose. Awaiting anything before play()
+ * forfeits the user gesture that permits playback, and the call is then
+ * rejected — silently, because a rejected play() throws nowhere the user can see.
+ */
+function playClip(url: string): void {
+  const audio = audioElement()
+  audio.src = blobUrls.get(url) ?? resolveAudioUrl(url)
+  setCurrent(url)
+  audio.play().catch(() => setCurrent(null))
+  // Not cached yet: fetch it now so the next play of this clip is same-origin
+  // and the analyser can read it.
+  if (!blobUrls.has(url)) void prefetchClip(url)
+}
+
+// --- mute -----------------------------------------------------------------
+
+/** One switch for the whole app, so muting in the header silences the stage too. */
+let mutedFlag = readMuted()
+const mutedListeners = new Set<(muted: boolean) => void>()
+
+function setMutedFlag(next: boolean): void {
+  mutedFlag = next
+  try {
+    localStorage.setItem(MUTED_KEY, String(next))
+  } catch {
+    // localStorage unavailable (private mode) — the toggle still works for
+    // this session, it just will not be remembered.
+  }
+  if (next) {
+    audioElement().pause()
+    setCurrent(null)
+    // Muting shows every held-back reply in full: nothing is coming to reveal it.
+    interruptUtterances(true)
+  }
+  for (const listener of mutedListeners) listener(next)
+  notifyUtterances()
+}
+
+// --- utterances: a reply spoken sentence by sentence ------------------------
+
+/**
+ * How long a reply's text is held back waiting for a clip — first for its
+ * opening sentence, then for each next one — before the rest is shown anyway.
+ * Words must never stay hidden behind a voice that is not coming.
+ */
+const CLIP_WAIT_MS = 8000
+
+export type UtterancePhase = 'waiting' | 'speaking' | 'done'
+
+export interface UtteranceProgress {
+  phase: UtterancePhase
+  /** How many leading sentences should be on screen. */
+  revealed: number
+}
+
+interface Utterance {
+  id: string
+  speech: LearnerSpeechDTO
+  phase: UtterancePhase
+  revealed: number
+  /** Index of the sentence whose clip holds the element, or -1. */
+  playing: number
+  timer: ReturnType<typeof setTimeout> | null
+  /** A replay run: plays every clip again and never marks anything heard. */
+  replay: boolean
+}
+
+const utterances = new Map<string, Utterance>()
+/** Replies waiting for the element, in arrival order. */
+const utteranceQueue: string[] = []
+/** The reply that owns the element right now, if any. */
+let activeUtterance: Utterance | null = null
+/** Replies that already played, were skipped, or predate this page. */
+const heardSpeech = new Set<string>()
+const utteranceListeners = new Set<() => void>()
+
+function notifyUtterances(): void {
+  for (const listener of utteranceListeners) listener()
+}
+
+/**
+ * Speak a reply as its clips become available.
+ *
+ * Called with the latest snapshot on every poll, and safe to be: a reply already
+ * heard is ignored, a known one only has its snapshot refreshed, and replies are
+ * spoken one after another in the order they first arrived.
+ */
+export function speakUtterance(speech: LearnerSpeechDTO): void {
+  if (heardSpeech.has(speech.id)) return
+
+  // Download clips as soon as they exist, so each sentence starts the instant
+  // the previous one ends, and plays same-origin for the analyser.
+  for (const segment of speech.segments) {
+    if (segment.audioUrl) void prefetchClip(segment.audioUrl)
+  }
+
+  let utterance = utterances.get(speech.id)
+  if (!utterance) {
+    utterance = {
+      id: speech.id,
+      speech,
+      phase: 'waiting',
+      revealed: 0,
+      playing: -1,
+      timer: null,
+      replay: false,
+    }
+    utterances.set(speech.id, utterance)
+    if (mutedFlag) {
+      finishUtterance(utterance)
+      return
+    }
+    utteranceQueue.push(speech.id)
+  } else {
+    utterance.speech = speech
+  }
+  pump()
+  notifyUtterances()
+}
+
+/** Play a reply again from its first sentence. Its text is already on screen. */
+export function replayUtterance(speech: LearnerSpeechDTO): void {
+  if (!speech.segments.some((segment) => segment.audioUrl)) return
+  interruptUtterances()
+  const run: Utterance = {
+    id: `${speech.id}#replay`,
+    speech,
+    phase: 'waiting',
+    revealed: 0,
+    playing: -1,
+    timer: null,
+    replay: true,
+  }
+  utterances.set(run.id, run)
+  activeUtterance = run
+  // Synchronous down to audio.play(), so a replay press keeps its user gesture.
+  advance(run)
+}
+
+/** Mark replies as already heard, e.g. a conversation restored on reload. */
+export function markSpeechHeard(ids: Array<string | undefined>): void {
+  for (const id of ids) {
+    if (!id) continue
+    heardSpeech.add(id)
+    const utterance = utterances.get(id)
+    if (utterance && utterance.phase !== 'done') finishUtterance(utterance)
+  }
+  notifyUtterances()
+}
+
+/** Mark single legacy clips as already heard so they never auto-play. */
+export function markHeardUrls(urls: Array<string | undefined>): void {
+  for (const url of urls) {
+    if (url) autoPlayed.add(url)
+  }
+}
+
+/** Where a reply stands: still waiting for its voice, being spoken, or done. */
+export function utteranceProgress(speech: LearnerSpeechDTO): UtteranceProgress {
+  const total = speech.segments.length
+  const utterance = utterances.get(speech.id)
+  if (utterance && utterance.phase !== 'done') {
+    return { phase: utterance.phase, revealed: utterance.revealed }
+  }
+  if (utterance || heardSpeech.has(speech.id) || mutedFlag) return { phase: 'done', revealed: total }
+  // Not started yet. Nothing to wait for if synthesis gave up before any clip.
+  if (speech.status !== 'pending' && !speech.segments.some((segment) => segment.audioUrl)) {
+    return { phase: 'done', revealed: total }
+  }
+  return { phase: 'waiting', revealed: 0 }
+}
+
+/** Re-render whenever any reply's progress changes. */
+export function useUtteranceProgress(speech: LearnerSpeechDTO | undefined): UtteranceProgress | null {
+  const [, rerender] = useState(0)
+  useEffect(() => {
+    const listener = () => rerender((n) => n + 1)
+    utteranceListeners.add(listener)
+    return () => {
+      utteranceListeners.delete(listener)
+    }
+  }, [])
+  return speech ? utteranceProgress(speech) : null
+}
+
+/**
+ * The part of a reply that belongs on screen right now: everything once it is
+ * done, the sentences said so far while it speaks, and nothing while it waits.
+ */
+export function spokenText(
+  content: string,
+  speech: LearnerSpeechDTO | undefined,
+  progress: UtteranceProgress | null,
+): string {
+  if (!speech || !progress || progress.phase === 'done') return content
+  return speech.segments
+    .slice(0, progress.revealed)
+    .map((segment) => segment.text)
+    .join(' ')
+}
+
+/** Give the element to the next queued reply when nothing of ours holds it. */
+function pump(): void {
+  if (!activeUtterance) {
+    // A manually played clip still owns the element; wait for it to end.
+    if (currentUrl !== null) return
+    while (utteranceQueue.length > 0 && !activeUtterance) {
+      const next = utterances.get(utteranceQueue.shift()!)
+      if (next && next.phase !== 'done') {
+        activeUtterance = next
+        armWait(next)
+      }
+    }
+    if (!activeUtterance) return
+  }
+  advance(activeUtterance)
+}
+
+function advance(utterance: Utterance): void {
+  if (utterance.phase === 'done' || utterance.playing !== -1) return
+  const index = utterance.revealed
+  const { segments, status } = utterance.speech
+  if (index >= segments.length) {
+    finishUtterance(utterance)
+    return
+  }
+  const url = segments[index].audioUrl
+  if (url) {
+    playSegment(utterance, index, url)
+    return
+  }
+  // No clip for this sentence yet: keep waiting only while one can still arrive.
+  if (status !== 'pending') finishUtterance(utterance)
+}
+
+function playSegment(utterance: Utterance, index: number, url: string): void {
+  clearWait(utterance)
+  utterance.playing = index
+  utterance.revealed = index + 1
+  utterance.phase = 'speaking'
+  const audio = audioElement()
+  audio.src = blobUrls.get(url) ?? resolveAudioUrl(url)
+  setCurrent(url)
+  audio.play().catch(() => {
+    // Refused (no user gesture in this tab yet) or a broken clip: show the
+    // words rather than hold them behind audio that will not play.
+    if (activeUtterance !== utterance) return
+    utterance.playing = -1
+    setCurrent(null)
+    finishUtterance(utterance)
+  })
+  notifyUtterances()
+}
+
+function onClipEnded(): void {
+  const utterance = activeUtterance
+  if (!utterance || utterance.playing === -1) {
+    // A manual clip ended; a queued reply may be waiting for the element.
+    pump()
+    return
+  }
+  utterance.playing = -1
+  if (utterance.revealed >= utterance.speech.segments.length) {
+    finishUtterance(utterance)
+    return
+  }
+  armWait(utterance)
+  advance(utterance)
+  notifyUtterances()
+}
+
+function armWait(utterance: Utterance): void {
+  clearWait(utterance)
+  utterance.timer = setTimeout(() => {
+    utterance.timer = null
+    if (utterance.phase !== 'done' && utterance.playing === -1) finishUtterance(utterance)
+  }, CLIP_WAIT_MS)
+}
+
+function clearWait(utterance: Utterance): void {
+  if (utterance.timer) {
+    clearTimeout(utterance.timer)
+    utterance.timer = null
+  }
+}
+
+function finishUtterance(utterance: Utterance, promote = true): void {
+  clearWait(utterance)
+  utterance.phase = 'done'
+  utterance.revealed = utterance.speech.segments.length
+  utterance.playing = -1
+  if (utterance.replay) utterances.delete(utterance.id)
+  else heardSpeech.add(utterance.id)
+  if (activeUtterance === utterance) {
+    activeUtterance = null
+    if (promote) pump()
+  }
+  notifyUtterances()
+}
+
+/** Stop the speaking reply (and optionally every queued one), showing its text. */
+function interruptUtterances(includeQueued = false): void {
+  if (activeUtterance) finishUtterance(activeUtterance, false)
+  if (!includeQueued) return
+  for (const id of utteranceQueue.splice(0)) {
+    const queued = utterances.get(id)
+    if (queued && queued.phase !== 'done') finishUtterance(queued, false)
+  }
 }
 
 // --- amplitude ------------------------------------------------------------
@@ -234,9 +558,9 @@ export interface LearnerVoice {
   toggleMuted: () => void
   /** Currently playing URL, or null. Use it to render a "speaking" state. */
   playingUrl: string | null
-  /** Play now, regardless of how many times this clip has played before. */
+  /** Play a single clip now, regardless of how many times it has played before. */
   play: (url: string) => void
-  /** Play only if unmuted and this clip has never auto-played. */
+  /** Play a single clip only if unmuted and it has never auto-played. */
   autoPlay: (url: string | undefined) => void
   /** Download a clip ahead of time so play() can start it without awaiting. */
   prefetch: (url: string | undefined) => void
@@ -245,82 +569,66 @@ export interface LearnerVoice {
    * backlog when a view opens on an existing conversation.
    */
   markHeard: (urls: Array<string | undefined>) => void
+  /**
+   * Speak a per-sentence reply as its clips arrive. Safe to call on every poll
+   * with the latest snapshot: each reply is spoken once, in arrival order.
+   */
+  speak: (speech: LearnerSpeechDTO) => void
+  /** Play a per-sentence reply again from its first sentence. */
+  replay: (speech: LearnerSpeechDTO) => void
   stop: () => void
 }
 
 export function useLearnerVoice(): LearnerVoice {
-  const [muted, setMuted] = useState(readMuted)
+  const [muted, setMuted] = useState(mutedFlag)
   const [playingUrl, setPlayingUrl] = useState<string | null>(currentUrl)
 
   useEffect(() => {
     listeners.add(setPlayingUrl)
+    mutedListeners.add(setMuted)
     return () => {
       listeners.delete(setPlayingUrl)
+      mutedListeners.delete(setMuted)
     }
   }, [])
 
   const stop = useCallback(() => {
-    const audio = audioElement()
-    audio.pause()
+    audioElement().pause()
     setCurrent(null)
+    // A reply cut short is shown in full; its words must not stay hidden behind
+    // audio the user chose to stop.
+    interruptUtterances()
   }, [])
 
   const play = useCallback((url: string) => {
-    const audio = audioElement()
-    // Everything here is synchronous on purpose. Awaiting anything before
-    // play() forfeits the user gesture that permits playback, and the call is
-    // then rejected — silently, because a rejected play() throws nowhere the
-    // user can see.
-    audio.src = blobUrls.get(url) ?? resolveAudioUrl(url)
-    setCurrent(url)
-    audio.play().catch(() => setCurrent(null))
-    // Not cached yet: fetch it now so the next play of this clip is
-    // same-origin and the analyser can read it.
-    if (!blobUrls.has(url)) void prefetchClip(url)
+    // A manual play takes the element from whichever reply was speaking.
+    interruptUtterances()
+    playClip(url)
   }, [])
 
-  const autoPlay = useCallback(
-    (url: string | undefined) => {
-      if (!url || muted || autoPlayed.has(url)) return
-      // Claimed before the await, so two polls landing together cannot both
-      // start the same clip.
-      autoPlayed.add(url)
+  const autoPlay = useCallback((url: string | undefined) => {
+    if (!url || mutedFlag || autoPlayed.has(url)) return
+    // Claimed before the await, so two polls landing together cannot both
+    // start the same clip.
+    autoPlayed.add(url)
 
-      // Unlike a replay press, this fires from polling — there is no user
-      // gesture to forfeit by awaiting. So fetch first: the very first play is
-      // then same-origin, which is what lets the analyser read the waveform and
-      // move the avatar. A manual press still plays synchronously.
-      void prefetchClip(url).then(() => play(url))
-    },
-    [muted, play],
-  )
-
-  const markHeard = useCallback((urls: Array<string | undefined>) => {
-    for (const url of urls) {
-      if (url) autoPlayed.add(url)
-    }
+    // Unlike a replay press, this fires from polling — there is no user
+    // gesture to forfeit by awaiting. So fetch first: the very first play is
+    // then same-origin, which is what lets the analyser read the waveform and
+    // move the avatar. A manual press still plays synchronously.
+    void prefetchClip(url).then(() => playClip(url))
   }, [])
 
-  const toggleMuted = useCallback(() => {
-    setMuted((wasMuted) => {
-      const next = !wasMuted
-      try {
-        localStorage.setItem(MUTED_KEY, String(next))
-      } catch {
-        // localStorage unavailable (private mode) — the toggle still works for
-        // this session, it just will not be remembered.
-      }
-      if (next) {
-        audioElement().pause()
-        setCurrent(null)
-      }
-      return next
-    })
-  }, [])
+  const markHeard = useCallback((urls: Array<string | undefined>) => markHeardUrls(urls), [])
+
+  const toggleMuted = useCallback(() => setMutedFlag(!mutedFlag), [])
 
   const prefetch = useCallback((url: string | undefined) => {
     void prefetchClip(url)
   }, [])
 
-  return { muted, toggleMuted, playingUrl, play, autoPlay, prefetch, markHeard, stop }
+  const speak = useCallback((speech: LearnerSpeechDTO) => speakUtterance(speech), [])
+  const replay = useCallback((speech: LearnerSpeechDTO) => replayUtterance(speech), [])
+
+  return { muted, toggleMuted, playingUrl, play, autoPlay, prefetch, markHeard, speak, replay, stop }
 }

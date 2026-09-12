@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react'
 import styles from '../../../styles/TeachingSession.module.css'
 import type { LearnerCharacter } from '../../../lib/Learner'
-import { useLearnerVoice } from '../hooks/useLearnerVoice'
+import type { LearnerSpeechDTO } from '../../../dto/LearnerSpeechDTO'
+import { spokenText, useLearnerVoice, useUtteranceProgress } from '../hooks/useLearnerVoice'
 
 interface LearnerResponseBubbleProps {
   learner: LearnerCharacter
   text?: string
   pending: boolean
   checkpointId?: string
-  /** Spoken version of `text`, when the voice service produced one. */
+  /** Legacy single clip, for checkpoints recorded before per-sentence speech. */
   audioUrl?: string
+  /** The reply as per-sentence speech; its text is revealed as each sentence plays. */
+  speech?: LearnerSpeechDTO
 }
 
+/** How long the card stays once the whole line has been said. */
 const AUTO_DISMISS_MS = 5000
 
 export function LearnerResponseBubble({
@@ -20,24 +24,52 @@ export function LearnerResponseBubble({
   pending,
   checkpointId,
   audioUrl,
+  speech,
 }: LearnerResponseBubbleProps) {
   const [dismissed, setDismissed] = useState(false)
   const voice = useLearnerVoice()
+  const progress = useUtteranceProgress(speech)
+
+  // Hand the reply to the player on every poll. It speaks each reply once, and
+  // the chat stage shares the same speech id, so the line is never heard twice.
+  useEffect(() => {
+    if (speech) voice.speak(speech)
+  }, [speech, voice.speak]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Legacy single clip. Dismissing the bubble does not stop playback — the line
+  // is worth hearing out even after the card disappears.
+  useEffect(() => {
+    if (!speech) voice.autoPlay(audioUrl)
+  }, [audioUrl, speech, voice.autoPlay]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setDismissed(false)
-    if (!checkpointId) return
-    const timer = setTimeout(() => setDismissed(true), AUTO_DISMISS_MS)
-    return () => clearTimeout(timer)
   }, [checkpointId])
 
-  // Speak the reply the moment it lands. Dismissing the bubble does not stop
-  // playback — the line is worth hearing out even after the card disappears.
+  // Count down only after the whole line has been said: a card that vanished
+  // mid-sentence would take the rest of the words with it.
+  const lineDone = !pending && Boolean(text) && (!speech || progress?.phase === 'done')
   useEffect(() => {
-    voice.autoPlay(audioUrl)
-  }, [audioUrl, voice.autoPlay]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!checkpointId || !lineDone) return
+    const timer = setTimeout(() => setDismissed(true), AUTO_DISMISS_MS)
+    return () => clearTimeout(timer)
+  }, [checkpointId, lineDone])
 
   if (dismissed || (!pending && !text)) return null
+
+  const waiting = pending || progress?.phase === 'waiting'
+  const clips = speech
+    ? speech.segments.flatMap((segment) => (segment.audioUrl ? [segment.audioUrl] : []))
+    : audioUrl
+      ? [audioUrl]
+      : []
+  const speaking = voice.playingUrl !== null && clips.includes(voice.playingUrl)
+
+  function replayOrStop() {
+    if (speaking) voice.stop()
+    else if (speech) voice.replay(speech)
+    else if (clips[0]) voice.play(clips[0])
+  }
 
   return (
     <div className={styles.notifStack} style={{ pointerEvents: 'none' }}>
@@ -46,22 +78,20 @@ export function LearnerResponseBubble({
         <div className={styles.notifBody}>
           <span className={styles.notifName}>
             {learner.name}
-            {audioUrl && (
+            {!waiting && clips.length > 0 && (
               <button
                 className={styles.notifSpeak}
-                onClick={() =>
-                  voice.playingUrl === audioUrl ? voice.stop() : voice.play(audioUrl)
-                }
-                aria-label={
-                  voice.playingUrl === audioUrl ? 'Stop playback' : `Replay ${learner.name}'s voice`
-                }
-                title={voice.playingUrl === audioUrl ? 'Stop' : 'Replay voice'}
+                onClick={replayOrStop}
+                aria-label={speaking ? 'Stop playback' : `Replay ${learner.name}'s voice`}
+                title={speaking ? 'Stop' : 'Replay voice'}
               >
-                {voice.playingUrl === audioUrl ? '◼' : '▶'}
+                {speaking ? '◼' : '▶'}
               </button>
             )}
           </span>
-          <p className={styles.notifText}>{pending ? '...' : text}</p>
+          <p className={styles.notifText} aria-live="polite">
+            {waiting ? '...' : spokenText(text ?? '', speech, progress)}
+          </p>
         </div>
         <button
           className={styles.notifClose}

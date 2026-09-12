@@ -37,12 +37,15 @@ class Synthesizer:
         self._lock = threading.Lock()
         self._load_lock = threading.Lock()
         self._load_error: str | None = None
+        # Loaded is not ready: the first renders after a load pay one-off CUDA
+        # setup, so the service warms up before it reports itself ready.
+        self._ready = False
 
     # --- lifecycle ---------------------------------------------------------
 
     @property
     def ready(self) -> bool:
-        return self._engine.loaded
+        return self._ready
 
     @property
     def device(self) -> str:
@@ -57,11 +60,11 @@ class Synthesizer:
         return self._load_error
 
     def load(self) -> None:
-        """Load the model. Safe to call repeatedly; only the first call works."""
-        if self._engine.loaded:
+        """Load and warm the model. Safe to call repeatedly; only the first call works."""
+        if self._ready:
             return
         with self._load_lock:
-            if self._engine.loaded:
+            if self._ready:
                 return
             try:
                 self._engine.load()
@@ -69,6 +72,32 @@ class Synthesizer:
             except Exception as err:  # noqa: BLE001 - surfaced through /health
                 self._load_error = f"{type(err).__name__}: {err}"
                 log.exception("engine %s failed to load", self._engine.name)
+                return
+            if config.WARM_RENDER:
+                self._warm_up()
+            self._ready = True
+
+    def _warm_up(self) -> None:
+        """
+        Render one short line per voice before accepting requests.
+
+        The first render after a load is measurably slower than the ones after
+        it, and without this that cost lands on whichever real reply comes first.
+        It also prepares every voice's conditioning up front. A failure is logged
+        and skipped: a slower first reply beats a service that never comes up.
+        """
+        for voice in self.available_voices() or [""]:
+            try:
+                with self._lock:
+                    self._engine.render(
+                        "Okay, give me a second to think about that.",
+                        config.resolve_language(None),
+                        self.reference_clip(voice),
+                        self.settings_for(voice),
+                    )
+                log.info("warmed voice %r", voice or "builtin")
+            except Exception:  # noqa: BLE001
+                log.warning("warm-up render failed for voice %r", voice, exc_info=True)
 
     # --- voices ------------------------------------------------------------
 
@@ -151,7 +180,7 @@ class Synthesizer:
 
         Raises SynthesizerNotReady while the model is still loading.
         """
-        if not self._engine.loaded:
+        if not self._ready:
             raise SynthesizerNotReady(self._load_error or "model is still loading")
 
         clean = clean_text(text)

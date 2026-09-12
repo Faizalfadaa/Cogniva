@@ -79,13 +79,21 @@ export interface TeachingCheckpoint {
   /** The Learner's reaction; absent while the turn is still processing. */
   learnerResponse?: string;
   /**
-   * Spoken version of `learnerResponse`, as an endpoint URL (§TTS).
+   * Spoken version of `learnerResponse` as a single clip, as an endpoint URL
+   * (§TTS).
    *
-   * A URL rather than an inline data URL because the UI polls this list every
-   * second — embedding hundreds of kilobytes of audio per checkpoint in every
-   * poll would swamp the response. Absent when speech is off or unavailable.
+   * Legacy: replies are now spoken per sentence through `speech`. This stays so
+   * checkpoints recorded before that change still play. A URL rather than an
+   * inline data URL because the UI polls this list every second — embedding
+   * hundreds of kilobytes of audio per checkpoint in every poll would swamp it.
    */
   learnerAudioUrl?: string;
+  /**
+   * The reply as speech, one clip per sentence (§TTS). Written together with
+   * `learnerResponse` whenever the voice is on, so the UI knows to hold the text
+   * and reveal each sentence as it starts playing. Absent when speech is off.
+   */
+  speech?: LearnerSpeech;
   /**
    * Set when the turn ended in a handled condition rather than a real reply,
    * so the UI can show it as a state instead of as something the student said.
@@ -106,6 +114,38 @@ export interface TeachingCheckpoint {
 /** Handled, non-exceptional outcomes of a teaching turn (§7.3). */
 export type CheckpointErrorKind = "budget_exceeded";
 
+/**
+ * A learner reply as speech, split into sentence-sized segments (§TTS).
+ *
+ * Rendering a whole reply before any of it could play left the voice trailing
+ * the text by the full render time. Per sentence, the first one can start
+ * playing while the rest are still rendering, and the UI can reveal each
+ * sentence's text at the moment it is spoken.
+ */
+export interface LearnerSpeech {
+  /**
+   * Shared by a checkpoint and the chat message that mirrors it, so a client
+   * rendering both still speaks the line only once.
+   */
+  id: string;
+  /**
+   * pending      at least one segment is still rendering
+   * ready        every segment has audio
+   * unavailable  synthesis stopped; segments that have audio can still play,
+   *              and the rest should be shown as text rather than waited for
+   */
+  status: LearnerSpeechStatus;
+  segments: SpeechSegment[];
+}
+
+export type LearnerSpeechStatus = "pending" | "ready" | "unavailable";
+
+export interface SpeechSegment {
+  text: string;
+  /** Endpoint URL of this sentence's clip; absent until it has been rendered. */
+  audioUrl?: string;
+}
+
 export type ChatSender = "user" | "learner";
 
 /** One chat bubble between the user and the Learner persona. */
@@ -113,8 +153,10 @@ export interface ChatMessage {
   id: string;
   sender: ChatSender;
   content: string;
-  /** Spoken version of a learner bubble, as an endpoint URL. See above. */
+  /** Legacy single-clip voice for a learner bubble. See TeachingCheckpoint. */
   learnerAudioUrl?: string;
+  /** The bubble as per-sentence speech; learner messages only. See LearnerSpeech. */
+  speech?: LearnerSpeech;
   createdAt: string;
 }
 
