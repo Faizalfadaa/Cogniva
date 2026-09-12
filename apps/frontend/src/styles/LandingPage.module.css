@@ -105,13 +105,13 @@
   text-decoration: none;
 }
 
-/* Real mark, same footprint the lettered placeholder had so the nav and footer
-   keep their rhythm. `contain` rather than `cover`: the logo has its own
-   padding and must not be cropped. */
+/* Match the sign-in mark: a lime icon inside a rounded forest square. */
 .brandMarkImg {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
+  padding: 6.75px;
   border-radius: 9px;
+  background: var(--forest-dark);
   object-fit: contain;
   display: block;
   flex: none;

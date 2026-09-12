@@ -31,8 +31,14 @@
 }
 
 .logoMark {
-  color: var(--lime);
-  font-size: 18px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--forest-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
 }
 
 .logoText {
@@ -821,7 +827,7 @@
 
 .logoImg {
   height: 25px;
-  width: auto;
+  width: 25px;
   object-fit: contain;
 }
 

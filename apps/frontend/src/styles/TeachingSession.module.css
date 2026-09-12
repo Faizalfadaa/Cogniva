@@ -82,8 +82,12 @@
 }
 
 .landingLinkLogo {
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
+  padding: 5.25px;
+  border-radius: 7px;
+  background: var(--forest-dark);
+  flex: none;
   object-fit: contain;
   display: block;
 }
