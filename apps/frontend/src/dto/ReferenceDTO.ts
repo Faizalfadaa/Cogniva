@@ -11,6 +11,16 @@
 
 export type ReferenceKind = 'article' | 'pdf' | 'course' | 'video' | 'book'
 
+/**
+ * How much institutional accountability stands behind the publisher.
+ *
+ * 'high' = university, government body, journal, or open-textbook publisher;
+ * 'medium' = a publisher with a named editorial process; 'low' = a host the
+ * backend does not recognise. Sources with no accountability at all — open-edit
+ * wikis, Q&A sites, note dumps — are dropped by the backend and never arrive.
+ */
+export type SourceTrust = 'high' | 'medium' | 'low'
+
 /** One option the user can choose. */
 export interface ReferenceOptionDTO {
   id: string
@@ -26,6 +36,8 @@ export interface ReferenceOptionDTO {
    * named it. Shown to the user rather than used to hide anything.
    */
   verified: boolean
+  /** Who answers for this source being correct. Drives the badge on the card. */
+  trust: SourceTrust
 }
 
 export interface ReferenceSuggestionsDTO {
@@ -47,7 +59,7 @@ export interface ReferenceSourceDTO {
 /** Result of adopting one option as the session's reference material. */
 export interface UseReferenceResultDTO {
   ok: boolean
-  /** Why it could not be used, in Indonesian. Empty when ok. */
+  /** Why it could not be used, in English. Empty when ok. */
   problem: string
   /** Characters of reference text extracted. */
   chars: number

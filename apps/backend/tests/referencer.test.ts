@@ -7,8 +7,11 @@
  *  1. The offline list never invents a document, and every URL it emits parses.
  *  2. The guard drops unusable links, deduplicates, and — the important one —
  *     marks an option verified only when the search actually returned its host.
- *  3. Suggesting works with no credential at all, like every other agent.
- *  4. The direct-fetch fallback keeps the substance of a page, drops its chrome,
+ *  3. The source policy: what becomes an answer key has to be something someone
+ *     is answerable for, so open-edit wikis and note dumps are dropped outright
+ *     and the survivors are ordered by how much institution stands behind them.
+ *  4. Suggesting works with no credential at all, like every other agent.
+ *  5. The direct-fetch fallback keeps the substance of a page, drops its chrome,
  *     and refuses to fetch anything on the machine's own network.
  */
 
@@ -18,11 +21,13 @@ import {
   fetchSourceText,
   groundedHosts,
   htmlToText,
+  isBlockedHost,
   normalizeFetchedText,
   normalizeOptions,
   optionsFromSources,
   suggestOffline,
   suggestReferences,
+  trustOfHost,
 } from "../src/agents/referencer/index.js";
 import type { GroundedSource } from "../src/llm/index.js";
 
@@ -43,10 +48,21 @@ describe("offline suggestions", () => {
     }
   });
 
+  it("offers no source the online path would have refused", () => {
+    // The fallback for a feature cannot be laxer than the feature. Wikipedia led
+    // this list once; an open-edit page must never become a marking key.
+    for (const option of suggestOffline({ topic: "Fotosintesis", count: 6 }).options) {
+      expect(isBlockedHost(new URL(option.url).hostname)).toBe(false);
+      expect(option.url).not.toContain("wikipedia");
+    }
+  });
+
   it("puts the topic into the query string rather than the path", () => {
-    const [wikipedia] = suggestOffline({ topic: "Hukum Newton II", count: 1 }).options;
-    const url = new URL(wikipedia.url);
-    expect(url.searchParams.get("search")).toBe("Hukum Newton II");
+    const [first] = suggestOffline({ topic: "Hukum Newton II", count: 1 }).options;
+    const url = new URL(first.url);
+    // Which parameter carries it is the library's business; that it is a
+    // parameter and not a guessed article path is the point.
+    expect([...url.searchParams.values()]).toContain("Hukum Newton II");
   });
 
   it("survives an empty topic", () => {
@@ -71,7 +87,7 @@ describe("guard", () => {
   });
 
   it("verifies only options whose host the search actually returned", () => {
-    const options = normalizeOptions(
+    const { options } = normalizeOptions(
       {
         options: [
           {
@@ -103,7 +119,7 @@ describe("guard", () => {
   });
 
   it("drops entries with no usable URL or no title", () => {
-    const options = normalizeOptions(
+    const { options } = normalizeOptions(
       {
         options: [
           { title: "No link", url: "", source: "x", kind: "article", summary: "", whyRelevant: "" },
@@ -128,14 +144,14 @@ describe("guard", () => {
       summary: "",
       whyRelevant: "",
     };
-    const options = normalizeOptions(
+    const { options } = normalizeOptions(
       { options: [entry, { ...entry, url: `${entry.url}/` }, { ...entry, url: `${entry.url}?x=1` }] },
       sources,
       4,
     );
     expect(options).toHaveLength(1);
 
-    const capped = normalizeOptions(
+    const { options: capped } = normalizeOptions(
       {
         options: [
           entry,
@@ -150,7 +166,7 @@ describe("guard", () => {
   });
 
   it("infers kind from the link when the model omits or invents one", () => {
-    const [pdf, other] = normalizeOptions(
+    const { options: [pdf, other] } = normalizeOptions(
       {
         options: [
           { title: "Notes", url: "https://ocw.mit.edu/notes.pdf", source: "MIT", summary: "", whyRelevant: "" },
@@ -165,7 +181,7 @@ describe("guard", () => {
   });
 
   it("falls back to the grounded sources themselves", () => {
-    const options = optionsFromSources(
+    const { options } = optionsFromSources(
       [{ title: "khanacademy.org", uri: "https://www.khanacademy.org/x" }],
       4,
     );
@@ -177,6 +193,149 @@ describe("guard", () => {
   it("tidies fetched text and bounds it", () => {
     const text = normalizeFetchedText("Judul  \r\n\n\n\nIsi   \n", 8);
     expect(text).toBe("Judul\n\nI");
+  });
+});
+
+describe("source policy", () => {
+  const option = (url: string, title = "Judul") => ({
+    title,
+    url,
+    source: "x",
+    kind: "article",
+    summary: "s",
+    whyRelevant: "w",
+  });
+
+  it("blocks every Wikipedia edition, mobile host and mirror", () => {
+    for (const host of [
+      "en.wikipedia.org",
+      "id.wikipedia.org",
+      "id.m.wikipedia.org",
+      "wikipedia.org",
+      "simple.wikipedia.beta.example.com", // a mirror on somebody else's domain
+      "www.wikiwand.com",
+      "id.wikibooks.org",
+      "commons.wikimedia.org",
+    ]) {
+      expect(isBlockedHost(host)).toBe(true);
+    }
+  });
+
+  it("blocks the publishing models where nobody answers for the text", () => {
+    for (const host of [
+      "www.quora.com",
+      "brainly.co.id",
+      "www.coursehero.com",
+      "id.scribd.com",
+      "www.studocu.com",
+      "www.academia.edu", // .edu in the name, self-upload in fact
+      "www.researchgate.net",
+      "someone.medium.com",
+      "myclass.blogspot.com",
+      "www.reddit.com",
+    ]) {
+      expect(isBlockedHost(host)).toBe(true);
+    }
+  });
+
+  it("does not block the institutions it is protecting", () => {
+    for (const host of [
+      "ocw.mit.edu",
+      "www.cam.ac.uk",
+      "fisika.ui.ac.id",
+      "kemdikbud.go.id",
+      "science.nasa.gov",
+      "openstax.org",
+      "arxiv.org",
+      "www.britannica.com",
+    ]) {
+      expect(isBlockedHost(host)).toBe(false);
+    }
+  });
+
+  it("reads accountability off the domain, including outside the US", () => {
+    expect(trustOfHost("ocw.mit.edu")).toBe("high");
+    expect(trustOfHost("www.ox.ac.uk")).toBe("high");
+    expect(trustOfHost("fisika.ui.ac.id")).toBe("high");
+    expect(trustOfHost("bmkg.go.id")).toBe("high");
+    expect(trustOfHost("www.who.int")).toBe("high");
+    expect(trustOfHost("arxiv.org")).toBe("high");
+    expect(trustOfHost("chem.libretexts.org")).toBe("high");
+    expect(trustOfHost("www.britannica.com")).toBe("medium");
+    expect(trustOfHost("www.khanacademy.org")).toBe("medium");
+    // Not recognised is not the same as not allowed: kept, ranked last, labelled.
+    expect(trustOfHost("some-teachers-site.example")).toBe("low");
+  });
+
+  it("removes unaccountable sources from model output and says which", () => {
+    const { options, rejected } = normalizeOptions(
+      {
+        options: [
+          option("https://id.wikipedia.org/wiki/Fotosintesis", "Fotosintesis"),
+          option("https://www.quora.com/What-is-photosynthesis", "Quora"),
+          option("https://openstax.org/books/biology-2e/pages/8-1", "Biology 2e"),
+        ],
+      },
+      [],
+      4,
+    );
+
+    expect(options).toHaveLength(1);
+    expect(options[0].url).toContain("openstax.org");
+    expect(rejected).toContain("id.wikipedia.org");
+    expect(rejected).toContain("quora.com");
+  });
+
+  it("judges a grounded source by its publisher, not by the redirect host", () => {
+    // Grounded results are all vertexaisearch redirects on Google's own domain.
+    // Checking the URI alone would wave a Wikipedia result straight through.
+    const { options, rejected } = optionsFromSources(
+      [
+        { title: "en.wikipedia.org", uri: "https://vertexaisearch.cloud.google.com/grounding-api-redirect/a" },
+        { title: "openstax.org", uri: "https://vertexaisearch.cloud.google.com/grounding-api-redirect/b" },
+      ],
+      4,
+    );
+
+    expect(options).toHaveLength(1);
+    expect(options[0].source).toBe("openstax.org");
+    expect(rejected).toContain("en.wikipedia.org");
+  });
+
+  it("ranks by accountability before relevance, and ranks before it cuts", () => {
+    const { options } = normalizeOptions(
+      {
+        options: [
+          option("https://some-blog.example/a", "Blog"),
+          option("https://another-blog.example/b", "Blog lain"),
+          option("https://www.khanacademy.org/c", "Khan"),
+          option("https://ocw.mit.edu/d", "MIT"),
+        ],
+      },
+      [],
+      2,
+    );
+
+    // The university page arrived last and still leads: cutting at the limit
+    // first would have thrown it away in favour of two unknown blogs.
+    expect(options.map((entry) => entry.trust)).toEqual(["high", "medium"]);
+    expect(options[0].url).toContain("ocw.mit.edu");
+    // Ids carry the final position, so they are handed out after the sort.
+    expect(options[0].id).toBe("ocw-mit-edu-1");
+  });
+
+  it("keeps relevance order within one tier", () => {
+    const { options } = normalizeOptions(
+      {
+        options: [
+          option("https://ocw.mit.edu/first", "Pertama"),
+          option("https://www.ox.ac.uk/second", "Kedua"),
+        ],
+      },
+      [],
+      4,
+    );
+    expect(options.map((entry) => entry.title)).toEqual(["Pertama", "Kedua"]);
   });
 });
 
@@ -235,14 +394,14 @@ describe("direct fetch fallback", () => {
     ]) {
       const result = await fetchSourceText(url);
       expect(result.text).toBe("");
-      expect(result.problem).toBe("Alamat itu tidak boleh diambil.");
+      expect(result.problem).toBe("That address is not allowed to be fetched.");
     }
   });
 
   it("refuses non-web schemes and malformed links", async () => {
     expect((await fetchSourceText("file:///C:/Windows/win.ini")).problem).toBe(
-      "Tautan itu bukan alamat web.",
+      "That link is not a web address.",
     );
-    expect((await fetchSourceText("not a url")).problem).toBe("Tautan itu tidak valid.");
+    expect((await fetchSourceText("not a url")).problem).toBe("That link is not valid.");
   });
 });

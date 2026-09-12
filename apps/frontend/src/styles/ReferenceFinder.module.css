@@ -208,12 +208,33 @@
 }
 
 .badgeOk,
-.badgeWarn {
+.badgeWarn,
+.badgeHigh,
+.badgeMid,
+.badgeLow {
   padding: 1px 7px;
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.02em;
   border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+/* Who answers for the source. Separate from .badgeOk/.badgeWarn, which say
+   something narrower: that the link itself came back from a real search. */
+.badgeHigh {
+  color: var(--badge-teaching-text);
+  background: var(--badge-teaching-bg);
+}
+
+.badgeMid {
+  color: var(--badge-draft-text);
+  background: var(--badge-draft-bg);
+}
+
+.badgeLow {
+  color: var(--badge-evaluating-text);
+  background: var(--badge-evaluating-bg);
 }
 
 .badgeOk {
