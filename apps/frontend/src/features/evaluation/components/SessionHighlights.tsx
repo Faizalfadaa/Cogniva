@@ -1,5 +1,6 @@
 import type { LearnerCharacter } from '../../../lib/Learner'
 import type { SessionHighlights as Highlights } from '../lib/sessionHighlights'
+import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/Evaluation.module.css'
 
 interface SessionHighlightsProps {
@@ -15,6 +16,7 @@ interface SessionHighlightsProps {
  * reads as coming from someone rather than from a scoring function.
  */
 export function SessionHighlights({ highlights, learner }: SessionHighlightsProps) {
+  const t = useT()
   const { strength, priority } = highlights
   if (!strength && !priority) return null
 
@@ -22,7 +24,7 @@ export function SessionHighlights({ highlights, learner }: SessionHighlightsProp
     <div className={styles.highlightRow}>
       {strength && (
         <div className={`${styles.highlightCard} ${styles.highlightStrength}`}>
-          <p className={styles.highlightLabel}>Kekuatan utama</p>
+          <p className={styles.highlightLabel}>{t('evaluation.strengthLabel')}</p>
           <p className={styles.highlightHeadline}>{strength.headline}</p>
           <p className={styles.highlightSupport}>{strength.support}</p>
         </div>
@@ -37,7 +39,7 @@ export function SessionHighlights({ highlights, learner }: SessionHighlightsProp
               aria-hidden="true"
               className={styles.highlightAvatar}
             />
-            <p className={styles.highlightLabel}>Prioritas perbaikan</p>
+            <p className={styles.highlightLabel}>{t('evaluation.priorityLabel')}</p>
           </div>
           <p className={styles.highlightHeadline}>{priority.headline}</p>
           <p className={styles.highlightSupport}>{priority.support}</p>

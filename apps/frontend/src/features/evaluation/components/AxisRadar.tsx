@@ -1,4 +1,5 @@
 import type { ScoreAxis } from '../lib/scoreAxes'
+import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/Evaluation.module.css'
 
 /**
@@ -36,6 +37,7 @@ interface AxisRadarProps {
 }
 
 export function AxisRadar({ axes }: AxisRadarProps) {
+  const t = useT()
   const total = axes.length
   if (total < 3) return null
 
@@ -49,7 +51,7 @@ export function AxisRadar({ axes }: AxisRadarProps) {
     .join(' ')
 
   const label = axes
-    .map((a) => `${a.label} ${a.value === null ? 'belum terukur' : a.value}`)
+    .map((a) => `${a.label} ${a.value === null ? t('evaluation.notMeasured') : a.value}`)
     .join(', ')
 
   return (

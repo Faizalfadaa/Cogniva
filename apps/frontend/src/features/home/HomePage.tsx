@@ -9,6 +9,10 @@ import styles from '../../styles/HomePage.module.css'
 import { ProductTour } from '../tour/ProductTour'
 import { HOME_TOUR_STEPS } from '../tour/tourSteps'
 import { useAppTour } from '../tour/useAppTour'
+import { useLocale, useT, type Translate } from '../../i18n/LanguageProvider'
+import { LanguageToggle } from '../../i18n/LanguageToggle'
+import { LocaleBadge } from '../../i18n/LocaleBadge'
+import { LOCALE_LABELS, type MessageKey } from '../../i18n/messages'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -19,15 +23,23 @@ function getViewFilter(state: WorkspaceState): Exclude<ViewFilter, 'All'> {
   return state === 'Draft' || state === 'Teaching' ? 'Active' : 'Completed'
 }
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, t: Translate): string {
   const diff = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins} min ago`
+  if (mins < 1) return t('time.justNow')
+  if (mins < 60) return t('time.minsAgo', { count: mins })
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} hr ago`
+  if (hours < 24) return t('time.hoursAgo', { count: hours })
   const days = Math.floor(hours / 24)
-  return `${days} day${days === 1 ? '' : 's'} ago`
+  return days === 1 ? t('time.dayAgo') : t('time.daysAgo', { count: days })
+}
+
+/** The four workspace states, as their message keys. */
+const STATE_KEYS: Record<WorkspaceState, MessageKey> = {
+  Draft: 'state.draft',
+  Teaching: 'state.teaching',
+  Evaluating: 'state.evaluating',
+  Completed: 'state.completed',
 }
 
 /** A drawn plus. A text "+" centres its line box rather than the glyph, which
@@ -46,9 +58,10 @@ function IconPlus({ size = 16 }: { size?: number }) {
 // but don't need to filter by it.
 
 function StateBadge({ state }: { state: WorkspaceState }) {
+  const t = useT()
   return (
     <span className={`${styles.badge} ${styles[`badge_${state.toLowerCase()}`]}`}>
-      {state}
+      {t(STATE_KEYS[state])}
     </span>
   )
 }
@@ -64,13 +77,14 @@ function WorkspaceCard({
   onClick: () => void
   onDeleteClick: () => void
 }) {
+  const t = useT()
   const hasTitle = Boolean(ws.title)
   return (
     <div className={styles.wsCardWrap}>
       <button
         className={styles.wsCard}
         onClick={onClick}
-        aria-label={`Open workspace ${ws.title ?? 'untitled'}`}
+        aria-label={t('home.openWorkspace', { title: ws.title ?? t('home.untitled') })}
       >
         <div className={styles.wsCardThumb}>
           {ws.thumbnailUrl ? (
@@ -79,15 +93,20 @@ function WorkspaceCard({
             <div className={styles.wsCardThumbPlaceholder} aria-hidden="true" />
           )}
           <span className={styles.wsCardThumbBadge}>
+            <LocaleBadge
+              locale={ws.locale}
+              title={t('home.workspaceLanguage', { language: LOCALE_LABELS[ws.locale] })}
+              style={{ marginRight: '6px' }}
+            />
             <StateBadge state={ws.state} />
           </span>
         </div>
         <div className={styles.wsCardBody}>
           <p className={`${styles.wsCardTitle} ${!hasTitle ? styles.wsCardTitleEmpty : ''}`}>
-            {ws.title ?? 'Untitled workspace'}
+            {ws.title ?? t('home.untitledWorkspace')}
           </p>
           <p className={styles.wsCardMeta}>
-            {timeAgo(ws.updatedAt)}
+            {timeAgo(ws.updatedAt, t)}
             {ws.description && (
               <span className={styles.wsCardDesc}> · {ws.description}</span>
             )}
@@ -100,8 +119,8 @@ function WorkspaceCard({
           e.stopPropagation()
           onDeleteClick()
         }}
-        aria-label={`Delete workspace ${ws.title ?? 'untitled'}`}
-        title="Delete workspace"
+        aria-label={t('home.deleteWorkspace', { title: ws.title ?? t('home.untitled') })}
+        title={t('home.deleteWorkspaceTitle')}
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
           <path
@@ -118,12 +137,13 @@ function WorkspaceCard({
 }
 
 function NewWorkspaceCard({ onClick, loading }: { onClick: () => void; loading: boolean }) {
+  const t = useT()
   return (
     <button
       className={styles.newCard}
       onClick={onClick}
       disabled={loading}
-      aria-label="Create a new workspace"
+      aria-label={t('home.createWorkspace')}
     >
       <div className={styles.newCardInner}>
         <div className={styles.newCardPlus}>
@@ -135,13 +155,16 @@ function NewWorkspaceCard({ onClick, loading }: { onClick: () => void; loading: 
             <IconPlus size={16} />
           )}
         </div>
-        <p className={styles.newCardLabel}>{loading ? 'Creating workspace...' : 'New workspace'}</p>
+        <p className={styles.newCardLabel}>
+          {loading ? t('home.creatingWorkspace') : t('home.newWorkspace')}
+        </p>
       </div>
     </button>
   )
 }
 
 function EmptyState({ filter, onNew, loading }: { filter: ViewFilter; onNew: () => void; loading: boolean }) {
+  const t = useT()
   const isCompleted = filter === 'Completed'
   return (
     <div className={styles.emptyState}>
@@ -155,19 +178,15 @@ function EmptyState({ filter, onNew, loading }: { filter: ViewFilter; onNew: () 
       </div>
       {isCompleted ? (
         <>
-          <h3 className={styles.emptyTitle}>No finished sessions yet</h3>
-          <p className={styles.emptyBody}>
-            Finish a teaching session and its evaluation will show up here.
-          </p>
+          <h3 className={styles.emptyTitle}>{t('home.noFinished')}</h3>
+          <p className={styles.emptyBody}>{t('home.noFinishedHint')}</p>
         </>
       ) : (
         <>
-          <h3 className={styles.emptyTitle}>No workspaces yet</h3>
-          <p className={styles.emptyBody}>
-            Start your first session. Pick a topic, open the whiteboard, and teach your AI student.
-          </p>
+          <h3 className={styles.emptyTitle}>{t('home.noWorkspaces')}</h3>
+          <p className={styles.emptyBody}>{t('home.noWorkspacesHint')}</p>
           <button className={styles.emptyBtn} onClick={onNew} disabled={loading}>
-            {loading ? 'Creating...' : 'Create your first workspace'}
+            {loading ? t('home.creating') : t('home.createFirst')}
           </button>
         </>
       )}
@@ -193,6 +212,7 @@ function LogoutConfirmModal({
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const t = useT()
   return (
     <div className={styles.modalOverlay} onClick={() => !busy && onCancel()}>
       <div
@@ -204,18 +224,20 @@ function LogoutConfirmModal({
       >
         <div className={styles.modalMark}>?</div>
         <h2 id="logout-modal-title" className={styles.modalTitle}>
-          {isGuest ? 'Exit guest session?' : 'Sign out?'}
+          {isGuest ? t('home.exitGuestTitle') : t('home.signOutTitle')}
         </h2>
         <p className={styles.modalBody}>
-          {isGuest
-            ? 'You will go back to the Cogniva home page. Your workspaces stay on this device, so continuing as a guest again brings them back.'
-            : 'You will go back to the Cogniva home page. Sign in again any time to pick up where you left off.'}
+          {isGuest ? t('home.exitGuestBody') : t('home.signOutBody')}
         </p>
         <button className={styles.modalBtn} onClick={onConfirm} disabled={busy}>
-          {busy ? 'Signing out...' : isGuest ? 'Yes, exit guest' : 'Yes, sign out'}
+          {busy
+            ? t('home.signingOut')
+            : isGuest
+              ? t('home.confirmExitGuest')
+              : t('home.confirmSignOut')}
         </button>
         <button className={styles.modalBtnGhost} onClick={onCancel} disabled={busy}>
-          Stay signed in
+          {t('home.staySignedIn')}
         </button>
       </div>
     </div>
@@ -233,6 +255,7 @@ function DeleteConfirmModal({
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const t = useT()
   return (
     <div className={styles.modalOverlay} onClick={() => !deleting && onCancel()}>
       <div
@@ -243,16 +266,19 @@ function DeleteConfirmModal({
         onClick={e => e.stopPropagation()}
       >
         <div className={styles.modalMarkDanger}>!</div>
-        <h2 id="delete-modal-title" className={styles.modalTitle}>Delete this workspace?</h2>
+        <h2 id="delete-modal-title" className={styles.modalTitle}>
+          {t('home.deleteConfirm')}
+        </h2>
         <p className={styles.modalBody}>
-          {ws.title ? <>"{ws.title}"</> : 'Untitled workspace'} will be permanently deleted,
-          including all its teaching history and evaluation. This action cannot be undone.
+          {t('home.deleteBody', {
+            title: ws.title ? `"${ws.title}"` : t('home.untitledWorkspace'),
+          })}
         </p>
         <button className={styles.modalBtnDanger} onClick={onConfirm} disabled={deleting}>
-          {deleting ? 'Deleting...' : 'Yes, delete workspace'}
+          {deleting ? t('home.deleting') : t('home.confirmDelete')}
         </button>
         <button className={styles.modalBtnGhost} onClick={onCancel} disabled={deleting}>
-          Cancel
+          {t('common.cancel')}
         </button>
       </div>
     </div>
@@ -274,6 +300,7 @@ function ProfileModal({
 }) {
   const [name, setName] = useState(userName)
   const inputRef = useRef<HTMLInputElement>(null)
+  const t = useT()
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -309,29 +336,27 @@ function ProfileModal({
         <div className={styles.profileAvatarLg} aria-hidden="true">
           {userName.charAt(0).toUpperCase() || '?'}
         </div>
-        <h2 id="profile-modal-title" className={styles.modalTitle}>Your profile</h2>
-        <p className={styles.modalBody}>
-          Your AI student calls you by this name during a session.
-        </p>
+        <h2 id="profile-modal-title" className={styles.modalTitle}>{t('home.profile')}</h2>
+        <p className={styles.modalBody}>{t('home.profileBody')}</p>
 
-        <span className={styles.profileFieldLabel}>Display name</span>
+        <span className={styles.profileFieldLabel}>{t('home.displayName')}</span>
         <input
           ref={inputRef}
           className={styles.modalInput}
           type="text"
           value={name}
-          placeholder="Your name..."
+          placeholder={t('home.yourName')}
           onChange={e => setName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSave()}
           maxLength={40}
-          aria-label="Your name"
+          aria-label={t('home.yourNameLabel')}
         />
 
         <button className={styles.modalBtn} onClick={handleSave} disabled={!canSave}>
-          Save changes
+          {t('home.saveChanges')}
         </button>
         <button className={styles.modalBtnGhost} onClick={onClose}>
-          Cancel
+          {t('common.cancel')}
         </button>
       </div>
     </div>
@@ -340,17 +365,26 @@ function ProfileModal({
 
 // ─── Filter tabs ─────────────────────────────────────────────────────────────
 
-const FILTER_OPTIONS: Array<{ label: string; value: ViewFilter }> = [
-  { label: 'All',       value: 'All' },
-  { label: 'Active',    value: 'Active' },
-  { label: 'Completed', value: 'Completed' },
+const FILTER_OPTIONS: Array<{ label: MessageKey; value: ViewFilter }> = [
+  { label: 'home.all',       value: 'All' },
+  { label: 'home.active',    value: 'Active' },
+  { label: 'home.completed', value: 'Completed' },
 ]
+
+/** The heading over the grid, which names the filter rather than repeating it. */
+const FILTER_TITLES: Record<ViewFilter, MessageKey> = {
+  All: 'home.allWorkspaces',
+  Active: 'home.active',
+  Completed: 'home.completed',
+}
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function HomePage() {
   const bridge = useBridge()
   const navigate = useNavigate()
+  const t = useT()
+  const { locale } = useLocale()
 
   const {
     user,
@@ -412,11 +446,10 @@ export default function HomePage() {
       })
       .catch(() => {
         setLoading(false)
-        setError(
-          'Could not connect to the server. Make sure the backend is running at http://localhost:8000.'
-        )
+        setError(t('home.connectError'))
       })
-  }, [bridge])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridge, t])
 
   useEffect(() => {
     if (authLoading || !user || needsNameSetup) return
@@ -428,13 +461,11 @@ export default function HomePage() {
     setCreating(true)
     setError(null)
     try {
-      const ws = await bridge.createWorkspace()
+      const ws = await bridge.createWorkspace(locale)
       navigate(`/workspace/${ws.id}`)
     } catch {
       setCreating(false)
-      setError(
-        'Failed to create workspace. Make sure the backend is running at http://localhost:8000.'
-      )
+      setError(t('home.createError'))
     }
   }
 
@@ -451,7 +482,7 @@ export default function HomePage() {
       setWorkspaces(prev => prev.filter(w => w.id !== deleteTarget.id))
       setDeleteTarget(null)
     } catch {
-      setError('Failed to delete workspace. Please try again.')
+      setError(t('home.deleteError'))
     } finally {
       setDeleting(false)
     }
@@ -507,7 +538,7 @@ export default function HomePage() {
       <aside className={styles.sidebar}>
         <div className={styles.sidebarTop}>
           {/* The mark doubles as the way back to the public site. */}
-          <Link to="/" className={styles.logo} title="Back to the Cogniva home page">
+          <Link to="/" className={styles.logo} title={t('header.homeTitle')}>
             <span className={styles.logoMark}><img src="/cogniva_logo.png" alt="Cogniva Logo" className={styles.logoImg} /></span>
             <span className={styles.logoText}>Cogniva</span>
           </Link>
@@ -517,19 +548,19 @@ export default function HomePage() {
             className={styles.newBtn}
             onClick={handleCreateWorkspace}
             disabled={creating}
-            aria-label="Create a new workspace"
+            aria-label={t('home.createWorkspace')}
           >
             <span className={styles.newBtnPlus}>
               {creating ? '…' : <IconPlus size={14} />}
             </span>
-            <span>New workspace</span>
+            <span>{t('home.newWorkspace')}</span>
           </button>
         </div>
 
         <nav
           className={styles.sidebarNav}
           data-tour="workspace-filters"
-          aria-label="Filter workspaces"
+          aria-label={t('home.filterLabel')}
         >
           {FILTER_OPTIONS.map(opt => (
             <button
@@ -538,7 +569,7 @@ export default function HomePage() {
               onClick={() => setFilter(opt.value)}
               aria-current={filter === opt.value ? 'page' : undefined}
             >
-              <span>{opt.label}</span>
+              <span>{t(opt.label)}</span>
               {counts[opt.value] > 0 && (
                 <span className={styles.navCount}>{counts[opt.value]}</span>
               )}
@@ -547,8 +578,10 @@ export default function HomePage() {
         </nav>
 
         <div className={styles.sidebarBottom}>
+          <LanguageToggle style={{ alignSelf: 'flex-start', marginBottom: '8px' }} />
+
           <button className={styles.logoutBtn} onClick={() => setLogoutConfirm(true)}>
-            {user.isGuest ? 'Exit guest' : 'Sign out'}
+            {user.isGuest ? t('home.exitGuest') : t('home.signOut')}
           </button>
           <button
             data-tour="profile"
@@ -558,8 +591,8 @@ export default function HomePage() {
             }}
             disabled={user.isGuest}
             aria-haspopup="dialog"
-            aria-label={`Open profile settings for ${userName ?? 'you'}`}
-            title={user.isGuest ? 'Guest session' : 'Profile'}
+            aria-label={t('home.openProfile', { name: userName ?? t('intro.you') })}
+            title={user.isGuest ? t('home.guestSession') : t('home.profileShort')}
           >
             <div className={styles.userAvatar}>
               {userName?.charAt(0).toUpperCase() ?? '?'}
@@ -574,11 +607,13 @@ export default function HomePage() {
       <main className={styles.main}>
         <header className={styles.mainHeader}>
           <div className={styles.mainHeaderLeft}>
-            <h1 className={styles.mainTitle}>
-              {filter === 'All' ? 'All workspaces' : filter}
-            </h1>
+            <h1 className={styles.mainTitle}>{t(FILTER_TITLES[filter])}</h1>
             {hasAny && (
-              <p className={styles.mainSub}>{filtered.length} workspace{filtered.length === 1 ? '' : 's'}</p>
+              <p className={styles.mainSub}>
+                {filtered.length === 1
+                  ? t('home.oneWorkspace')
+                  : t('home.manyWorkspaces', { count: filtered.length })}
+              </p>
             )}
           </div>
 
@@ -591,10 +626,10 @@ export default function HomePage() {
               <input
                 className={styles.searchInput}
                 type="search"
-                placeholder="Search workspaces..."
+                placeholder={t('home.search')}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                aria-label="Search workspaces"
+                aria-label={t('home.searchLabel')}
               />
             </div>
           )}
@@ -604,10 +639,10 @@ export default function HomePage() {
         <div className={styles.content}>
           {error ? (
             <div className={styles.emptyState}>
-              <h3 className={styles.emptyTitle}>Can't connect</h3>
+              <h3 className={styles.emptyTitle}>{t('home.cantConnect')}</h3>
               <p className={styles.emptyBody}>{error}</p>
               <button className={styles.emptyBtn} onClick={loadWorkspaces}>
-                Try again
+                {t('home.tryAgain')}
               </button>
             </div>
           ) : loading ? (
@@ -620,12 +655,12 @@ export default function HomePage() {
             <EmptyState filter={filter} onNew={handleCreateWorkspace} loading={creating} />
           ) : filtered.length === 0 ? (
             <div className={styles.noResults}>
-              <p>No matching workspaces.</p>
+              <p>{t('home.noMatches')}</p>
               <button
                 className={styles.clearFilter}
                 onClick={() => { setFilter('All'); setSearchQuery('') }}
               >
-                Clear filters
+                {t('home.clearFilters')}
               </button>
             </div>
           ) : (
@@ -683,7 +718,7 @@ export default function HomePage() {
           onIndexChange={tour.setIndex}
           onFinish={tour.advance}
           onSkip={tour.skipAll}
-          finishLabel="Got it"
+          finishLabel={t('tour.gotIt')}
         />
       )}
     </div>

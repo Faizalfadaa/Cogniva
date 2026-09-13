@@ -7,16 +7,17 @@
  */
 
 import type { EvaluationFindingDTO } from '../../../dto/EvaluationReportDTO'
+import type { MessageKey } from '../../../i18n/messages'
 import styles from '../../../styles/Evaluation.module.css'
 
 type Category = EvaluationFindingDTO['category']
 
-/** Indonesian labels for the canonical English categories (§6.9). */
-export const CATEGORY_LABEL: Record<Category, string> = {
-  CORRECT: 'Tepat',
-  WRONG: 'Keliru',
-  CONFUSING: 'Rancu',
-  MISSED: 'Terlewat',
+/** Message keys for the canonical English categories (§6.9). */
+export const CATEGORY_LABEL: Record<Category, MessageKey> = {
+  CORRECT: 'evaluation.catCorrect',
+  WRONG: 'evaluation.catWrong',
+  CONFUSING: 'evaluation.catConfusing',
+  MISSED: 'evaluation.catMissed',
 }
 
 export const CATEGORY_BADGE_CLASS: Record<Category, string> = {

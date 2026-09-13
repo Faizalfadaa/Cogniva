@@ -1,16 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CognivaBridge } from '../../../bridge/CognivaBridge'
 import type { ChatMessageDTO } from '../../../dto/ChatMessageDTO'
+import type { LearnerSpeechDTO } from '../../../dto/LearnerSpeechDTO'
 import type { SessionError } from '../components/errorTypes'
+import { markHeardUrls, markSpeechHeard } from './useLearnerVoice'
 import { getGuestSessionId } from '../../../state/guestSession'
 
 const POLL_INTERVAL_MS = 2000
+
+/**
+ * While a reply is being voiced every poll can bring the next sentence's clip,
+ * so polling speeds up. It also speeds up for a while after sending a message,
+ * so the reply itself lands without waiting out the slow interval.
+ */
+const FAST_POLL_MS = 500
+const FAST_AFTER_SEND_MS = 20000
 
 export interface ChatToast {
   id: string
   content: string
   senderName: string
   avatarUrl: string
+  /** Kept current on every poll, so the toast reveals the reply as it is spoken. */
+  speech?: LearnerSpeechDTO
 }
 
 interface UseWorkspaceChatOptions {
@@ -66,6 +78,14 @@ function saveSessionMsgs(workspaceId: string, msgs: ChatMessageDTO[]) {
 
 // ── Hook ───────────────────────────────────────────────────────────────────
 
+/** Whether two snapshots of a reply's speech would render the same. */
+function sameSpeech(a: LearnerSpeechDTO | undefined, b: LearnerSpeechDTO | undefined): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  const clips = (speech: LearnerSpeechDTO) => speech.segments.filter((s) => s.audioUrl).length
+  return a.id === b.id && a.status === b.status && clips(a) === clips(b)
+}
+
 export function useWorkspaceChat(
   workspaceId: string,
   bridge: CognivaBridge,
@@ -78,6 +98,15 @@ export function useWorkspaceChat(
   // new seed timestamps would be newer than real backend messages and sort them
   // into the wrong position.
   const persistedOnMount = useRef<ChatMessageDTO[]>(loadSessionMsgs(workspaceId))
+
+  // A conversation restored from this tab's storage has already been heard.
+  // Marked before the first render uses it, so none of it is spoken again.
+  const restoredMarked = useRef(false)
+  if (!restoredMarked.current) {
+    restoredMarked.current = true
+    markSpeechHeard(persistedOnMount.current.map((m) => m.speech?.id))
+    markHeardUrls(persistedOnMount.current.map((m) => m.learnerAudioUrl))
+  }
 
   const seedRef = useRef<ChatMessageDTO[]>(
     persistedOnMount.current.length > 0
@@ -108,6 +137,11 @@ export function useWorkspaceChat(
   // -1 = first poll not yet done; used to suppress stale-message toasts on mount
   const prevLearnerCountRef = useRef<number>(-1)
 
+  // Adaptive polling: fast while a reply is still being voiced, or just after
+  // the user sent something; slow otherwise.
+  const pendingSpeechRef = useRef(false)
+  const fastUntilRef = useRef(0)
+
   function mergeMessages(seeds: ChatMessageDTO[], fetched: ChatMessageDTO[]): ChatMessageDTO[] {
     const seedIds = new Set(seeds.map((s) => s.id))
     const fresh = fetched.filter((m) => !seedIds.has(m.id))
@@ -119,17 +153,40 @@ export function useWorkspaceChat(
   useEffect(() => {
     if (!workspaceId) return
     let active = true
+    let timer: ReturnType<typeof setTimeout> | null = null
 
     async function poll() {
       try {
         const fetched = await bridge.getChatMessages(workspaceId)
         if (!active) return
 
+        // First poll: every reply already on the server predates this page.
+        // Marked heard before it reaches state, so no render ever treats it as
+        // new and starts speaking a conversation that already happened.
+        if (prevLearnerCountRef.current === -1) {
+          markSpeechHeard(fetched.map((m) => m.speech?.id))
+          markHeardUrls(fetched.map((m) => m.learnerAudioUrl))
+        }
+
         const merged = mergeMessages(seedRef.current, fetched)
         setMessages(merged)
         saveSessionMsgs(workspaceId, merged)
         // A poll that lands clears whatever the previous one complained about.
         setError(null)
+        pendingSpeechRef.current = merged.some((m) => m.speech?.status === 'pending')
+
+        // Toasts are snapshots taken when a reply first arrives. Keep their
+        // speech current, so they reveal the reply in step with the voice.
+        setToasts((prev) => {
+          let changed = false
+          const next = prev.map((toast) => {
+            const latest = merged.find((m) => m.id === toast.id)?.speech
+            if (sameSpeech(latest, toast.speech)) return toast
+            changed = true
+            return { ...toast, speech: latest }
+          })
+          return changed ? next : prev
+        })
 
         const learnerMsgs = merged.filter((m) => m.sender === 'learner')
         const learnerCount = learnerMsgs.length
@@ -152,6 +209,7 @@ export function useWorkspaceChat(
                 content: m.content,
                 senderName: learnerName,
                 avatarUrl: learnerAvatarUrl,
+                speech: m.speech,
               }))
             )
           }
@@ -159,10 +217,10 @@ export function useWorkspaceChat(
         }
       } catch (err) {
         if (!active) return
-        // Polling runs every 2s, so this fires repeatedly while the backend is
-        // down; setting the same shape each time keeps it to one banner rather
-        // than a stream. Offline is reported as such -- the poll failing is the
-        // symptom, not the cause.
+        // Polling repeats every few seconds, so this fires repeatedly while the
+        // backend is down; setting the same shape each time keeps it to one
+        // banner rather than a stream. Offline is reported as such -- the poll
+        // failing is the symptom, not the cause.
         console.error('[useWorkspaceChat] getChatMessages failed', err)
         setError(
           navigator.onLine
@@ -172,11 +230,19 @@ export function useWorkspaceChat(
       }
     }
 
-    poll()
-    const interval = setInterval(poll, POLL_INTERVAL_MS)
+    // A timeout chain rather than an interval, so the pace can change between
+    // polls and a slow request never stacks a second one behind it.
+    async function loop() {
+      await poll()
+      if (!active) return
+      const fast = pendingSpeechRef.current || Date.now() < fastUntilRef.current
+      timer = setTimeout(loop, fast ? FAST_POLL_MS : POLL_INTERVAL_MS)
+    }
+
+    void loop()
     return () => {
       active = false
-      clearInterval(interval)
+      if (timer) clearTimeout(timer)
     }
   }, [workspaceId, bridge, learnerName, learnerAvatarUrl])
 
@@ -188,6 +254,7 @@ export function useWorkspaceChat(
     async (content: string) => {
       const trimmed = content.trim()
       if (!trimmed) return
+      fastUntilRef.current = Date.now() + FAST_AFTER_SEND_MS
       try {
         const sent = await bridge.sendChatMessage(workspaceId, trimmed)
         setMessages((prev) => {

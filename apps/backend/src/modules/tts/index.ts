@@ -135,3 +135,56 @@ export async function ttsHealth(): Promise<Record<string, unknown> | null> {
     return null;
   }
 }
+
+/** A sentence shorter than this is merged into a neighbour before rendering. */
+const MIN_SEGMENT_WORDS = 4;
+
+/** Upper bound on clips per reply; whatever is past it rides with the last one. */
+const MAX_SEGMENTS = 4;
+
+/**
+ * Split a learner reply into the pieces that are rendered and played one by one.
+ *
+ * Cut at sentence boundaries, because that is where a speaker pauses anyway — a
+ * cut anywhere else is audible. Two corrections on top of that:
+ *
+ *   - A very short sentence ("Hmm." / "Right?") is merged into its neighbour. On
+ *     its own it renders with odd prosody and costs a whole request for half a
+ *     second of audio.
+ *   - The number of pieces is capped, because each one is a separate render.
+ *
+ * Joining the pieces with single spaces gives back the reply with its whitespace
+ * normalised; nothing is dropped.
+ */
+export function speechSegments(text: string): string[] {
+  const sentences = text
+    .replace(/\s+/g, " ")
+    .trim()
+    // After terminal punctuation, optionally followed by closing quotes/brackets.
+    .split(/(?<=[.!?…]["'”’)\]]*)\s+(?=\S)/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+
+  const pieces: string[] = [];
+  let carry = "";
+  for (const sentence of sentences) {
+    const piece = carry ? `${carry} ${sentence}` : sentence;
+    if (wordCount(piece) < MIN_SEGMENT_WORDS) {
+      carry = piece;
+      continue;
+    }
+    pieces.push(piece);
+    carry = "";
+  }
+  if (carry) {
+    if (pieces.length > 0) pieces[pieces.length - 1] = `${pieces[pieces.length - 1]} ${carry}`;
+    else pieces.push(carry);
+  }
+
+  if (pieces.length <= MAX_SEGMENTS) return pieces;
+  return [...pieces.slice(0, MAX_SEGMENTS - 1), pieces.slice(MAX_SEGMENTS - 1).join(" ")];
+}
+
+function wordCount(text: string): number {
+  return text.split(" ").filter(Boolean).length;
+}

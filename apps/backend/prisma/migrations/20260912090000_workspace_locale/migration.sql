@@ -1,0 +1,11 @@
+-- The language a session runs in, fixed at creation.
+--
+-- It lives on the workspace rather than in the browser because it is a property
+-- of the session, not of the device reading it: the Home grid labels every card
+-- with it, and reopening a workspace elsewhere has to show it in the language it
+-- was taught in.
+--
+-- Existing rows default to Indonesian. The product is Indonesian-first and every
+-- workspace that predates this column was made by an Indonesian-speaking user,
+-- so that is the honest guess -- there is nothing recorded to backfill from.
+ALTER TABLE "workspace" ADD COLUMN "locale" TEXT NOT NULL DEFAULT 'id';

@@ -1,6 +1,7 @@
 import type { CognivaBridge } from './CognivaBridge';
 import { getGuestSessionId } from '../state/guestSession';
 import type { WorkspaceDTO } from '../dto/WorkspaceDTO';
+import type { Locale } from '../i18n/messages';
 import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
 import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
@@ -82,8 +83,8 @@ export class RealCognivaBridge implements CognivaBridge {
     return getJson<WorkspaceDTO[]>('/api/workspaces');
   }
 
-  createWorkspace(): Promise<WorkspaceDTO> {
-    return sendJson<WorkspaceDTO>('/api/workspaces', 'POST');
+  createWorkspace(locale: Locale): Promise<WorkspaceDTO> {
+    return sendJson<WorkspaceDTO>('/api/workspaces', 'POST', { locale });
   }
 
   async deleteWorkspace(workspaceId: string): Promise<void> {

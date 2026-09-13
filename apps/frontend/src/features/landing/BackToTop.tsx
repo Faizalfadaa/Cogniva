@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import styles from '../../styles/LandingPage.module.css'
+import { useT } from '../../i18n/LanguageProvider'
 
 /** How far down the page the button starts being useful. */
 const SHOW_AFTER_PX = 400
@@ -13,6 +14,7 @@ const SHOW_AFTER_PX = 400
  * ever useful.
  */
 export function BackToTop() {
+  const t = useT()
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export function BackToTop() {
       type="button"
       className={visible ? `${styles.backToTop} ${styles.backToTopIn}` : styles.backToTop}
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-      aria-label="Back to top"
+      aria-label={t('landing.backToTop')}
       // Hidden from keyboard and screen readers while it is faded out, so it is
       // never a focus stop that does nothing visible.
       aria-hidden={!visible}

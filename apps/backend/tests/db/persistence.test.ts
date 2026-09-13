@@ -56,6 +56,7 @@ async function makeWorkspace(ownerId = owner): Promise<Workspace> {
   const workspace: Workspace = {
     id: `ws_${randomUUID().replace(/-/g, "").slice(0, 8)}`,
     state: "Draft",
+    locale: "id",
     createdAt: now,
     updatedAt: now,
   };

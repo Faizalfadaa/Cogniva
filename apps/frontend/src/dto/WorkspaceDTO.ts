@@ -1,6 +1,7 @@
 export type WorkspaceState = 'Draft' | 'Teaching' | 'Evaluating' | 'Completed';
 
 import type { ReferenceSourceDTO } from './ReferenceDTO';
+import type { Locale } from '../i18n/messages';
 
 export interface WorkspaceDTO {
   id: string;
@@ -30,6 +31,14 @@ export interface WorkspaceDTO {
    * workspaces made before the picker existed.
    */
   learnerId?: string;
+  /**
+   * The language this session runs in, fixed when the workspace was created.
+   *
+   * Server-side rather than in localStorage because it labels every card on the
+   * Home grid and has to be right on another device too — the same reason
+   * learnerId moved onto the wire.
+   */
+  locale: Locale;
   createdAt: string;
   updatedAt: string;
 }

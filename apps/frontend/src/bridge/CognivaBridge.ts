@@ -8,11 +8,13 @@ import type {
   SaveReferenceTextResultDTO,
   UseReferenceResultDTO,
 } from '../dto/ReferenceDTO';
+import type { Locale } from '../i18n/messages';
 
 export interface CognivaBridge {
   // Home
   listWorkspaces(): Promise<WorkspaceDTO[]>;
-  createWorkspace(): Promise<WorkspaceDTO>;
+  /** `locale` fixes the language of the new session; it cannot be changed later. */
+  createWorkspace(locale: Locale): Promise<WorkspaceDTO>;
   deleteWorkspace(workspaceId: string): Promise<void>;
 
   // Workspace meta

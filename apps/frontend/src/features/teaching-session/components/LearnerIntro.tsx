@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import styles from '../../../styles/TeachingSession.module.css'
 import { resolveFirstMessages, type LearnerCharacter } from '../../../lib/Learner'
+import { useLocale, useT } from '../../../i18n/LanguageProvider'
 
 interface LearnerIntroProps {
   learner: LearnerCharacter
@@ -19,8 +20,10 @@ export function LearnerIntro({ learner, userName, onDone }: LearnerIntroProps) {
   const [connectStep, setConnectStep] = useState(0)
   const [visibleMessages, setVisibleMessages] = useState<number[]>([])
   const [messageIndex, setMessageIndex] = useState(0)
+  const t = useT()
+  const { locale } = useLocale()
 
-  const messages = resolveFirstMessages(learner, userName || 'you')
+  const messages = resolveFirstMessages(learner, userName || t('intro.you'), locale)
 
   useEffect(() => {
     if (phase !== 'connecting') return
@@ -57,7 +60,7 @@ export function LearnerIntro({ learner, userName, onDone }: LearnerIntroProps) {
       {phase === 'connecting' && (
         <div className={styles.introOverlay}>
           <button className={styles.introSkip} onClick={onDone}>
-            Skip
+            {t('setup.skip')}
           </button>
           <div className={styles.introCard}>
             <img
@@ -67,10 +70,12 @@ export function LearnerIntro({ learner, userName, onDone }: LearnerIntroProps) {
             />
             <div className={styles.introCardText}>
               <span className={connectStep >= 1 ? styles.introLine1Visible : styles.introLine1Hidden}>
-                Connecting you to a student...
+                {t('intro.connecting')}
               </span>
               <span className={connectStep >= 2 ? styles.introLine2Visible : styles.introLine2Hidden}>
-                Greetings from,<br />{learner.name}!
+                {t('intro.greetings')}
+                <br />
+                {learner.name}!
               </span>
             </div>
           </div>

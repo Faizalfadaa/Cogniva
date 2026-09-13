@@ -61,15 +61,15 @@ services:
     networks:
       - cogniva
 
-  # Learner voice (Chatterbox, MIT). Opt-in: it adds a ~3.2 GB model download
-  # and, on CPU, 10-30s per reply. Start it explicitly with a profile:
+  # Learner voice (Chatterbox Turbo, MIT). Opt-in: it adds a ~2.9 GB model
+  # download and, on CPU, 10-30s per reply. Start it explicitly with a profile:
   #
   #   docker compose --profile voice up -d --build
   #
   # The backend degrades to silence when it is absent, so the default stack is
   # unaffected. The XTTS v2 engine is still selectable with TTS_ENGINE=xtts, but
-  # it is licensed for NON-COMMERCIAL use only (CPML) — Chatterbox is the
-  # default for that reason.
+  # it is licensed for NON-COMMERCIAL use only (CPML) — the MIT-licensed
+  # Chatterbox engines are the default for that reason.
   tts:
     profiles: ["voice"]
     build:
@@ -77,13 +77,16 @@ services:
     image: cogniva-tts:latest
     restart: unless-stopped
     environment:
+      # "chatterbox-turbo" (default, fastest), "chatterbox", or "xtts".
+      TTS_ENGINE: ${TTS_ENGINE:-chatterbox-turbo}
       TTS_DEVICE: ${TTS_DEVICE:-cpu}
       TTS_DEFAULT_LANGUAGE: ${TTS_DEFAULT_LANGUAGE:-en}
     volumes:
       # Reference recordings stay on the host — personal data, never in an image.
       - ./services/tts/voices:/app/voices:ro
       - tts_cache:/app/.cache
-      # Model weights survive a rebuild instead of downloading again.
+      # Coqui's model cache, which only the xtts engine uses. The Chatterbox
+      # engines download into the container's own filesystem — see the Dockerfile.
       - tts_models:/root/.local/share/tts
     expose:
       - "8020"

@@ -3,6 +3,8 @@ import { useBridge } from '../../../bridge/BridgeProvider'
 import type { WorkspaceDTO } from '../../../dto/WorkspaceDTO'
 import type { LearnerCharacter } from '../../../lib/Learner'
 import { ReferenceFinder } from './ReferenceFinder'
+import { useLocale, useT } from '../../../i18n/LanguageProvider'
+import { LOCALE_TAGS } from '../../../i18n/messages'
 import styles from '../../../styles/SessionSetup.module.css'
 
 interface SessionSetupProps {
@@ -41,6 +43,8 @@ export function SessionSetup({
   onDone,
 }: SessionSetupProps) {
   const bridge = useBridge()
+  const t = useT()
+  const { locale } = useLocale()
   const [topic, setTopic] = useState(workspace?.title ?? '')
   const [scope, setScope] = useState(workspace?.description ?? '')
   const [mode, setMode] = useState<ReferenceMode>('none')
@@ -67,6 +71,7 @@ export function SessionSetup({
   }, [workspace?.title, workspace?.description])
 
   const trimmedTopic = topic.trim()
+  const countOf = (value: number): string => value.toLocaleString(LOCALE_TAGS[locale])
 
   /** Persist topic and scope. Returns false when the write failed. */
   const saveMeta = useCallback(async (): Promise<boolean> => {
@@ -79,7 +84,7 @@ export function SessionSetup({
       return true
     } catch (err) {
       console.error('[SessionSetup] updateWorkspaceMeta failed', err)
-      if (alive.current) setError('Could not save the topic. Try again.')
+      if (alive.current) setError(t('setup.titleFailed'))
       return false
     }
   }, [bridge, workspaceId, trimmedTopic, scope, onWorkspaceChange])
@@ -92,15 +97,16 @@ export function SessionSetup({
         const ws = await bridge.uploadWorkspacePdf(workspaceId, file)
         if (!alive.current) return
         onWorkspaceChange(ws)
-        setAttached(`PDF attached: ${file.name}`)
+        setAttached(t('setup.pdfAttached', { name: file.name }))
       } catch (err) {
         console.error('[SessionSetup] uploadWorkspacePdf failed', err)
-        if (alive.current) setError('Could not upload the PDF. Try another file.')
+        if (alive.current) setError(t('setup.uploadFailed'))
       } finally {
         if (alive.current) setBusy(false)
       }
     },
-    [bridge, workspaceId, onWorkspaceChange],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bridge, workspaceId, onWorkspaceChange, t],
   )
 
   const handleSavePaste = useCallback(async () => {
@@ -111,14 +117,15 @@ export function SessionSetup({
       const result = await bridge.saveReferenceText(workspaceId, pasted)
       if (!alive.current) return
       onWorkspaceChange(result.workspace)
-      setAttached(`Material saved (${result.chars.toLocaleString('en-US')} characters).`)
+      setAttached(t('setup.savedMaterial', { count: countOf(result.chars) }))
     } catch (err) {
       console.error('[SessionSetup] saveReferenceText failed', err)
-      if (alive.current) setError('Could not save the material. Try again.')
+      if (alive.current) setError(t('setup.materialFailed'))
     } finally {
       if (alive.current) setBusy(false)
     }
-  }, [bridge, workspaceId, pasted, onWorkspaceChange])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridge, workspaceId, pasted, onWorkspaceChange, t, locale])
 
   // The finder searches on the topic the backend has stored, so the title has to
   // be written before it opens — otherwise it would search for the old one, or
@@ -146,25 +153,22 @@ export function SessionSetup({
 
   return (
     <>
-      <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="Set up the session">
+      <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={t('setup.dialog')}>
         <div className={styles.panel}>
           <div className={styles.intro}>
             <img src={learner.avatarUrl} alt="" aria-hidden="true" className={styles.avatar} />
             <div>
-              <h2 className={styles.title}>What are you teaching today?</h2>
-              <p className={styles.subtitle}>
-                {learner.name} will learn from your explanation. Write the topic down first, so
-                the evaluation at the end highlights what you actually meant to test.
-              </p>
+              <h2 className={styles.title}>{t('setup.title')}</h2>
+              <p className={styles.subtitle}>{t('setup.subtitle', { name: learner.name })}</p>
             </div>
           </div>
 
           <label className={styles.field}>
-            <span className={styles.label}>Topic to be assessed</span>
+            <span className={styles.label}>{t('setup.topicLabel')}</span>
             <input
               className={styles.input}
               value={topic}
-              placeholder="For example: Photosynthesis, Newton's laws, the stack data structure"
+              placeholder={t('setup.topicPlaceholder')}
               onChange={(event) => setTopic(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && trimmedTopic && !busy) void handleStart()
@@ -176,13 +180,13 @@ export function SessionSetup({
 
           <label className={styles.field}>
             <span className={styles.label}>
-              Which part should it focus on? <em className={styles.optional}>optional</em>
+              {t('setup.scopeLabel')} <em className={styles.optional}>{t('common.optional')}</em>
             </span>
             <textarea
               className={styles.textarea}
               value={scope}
               rows={2}
-              placeholder="For example: just the light-dependent reactions, up to the role of chlorophyll"
+              placeholder={t('setup.scopePlaceholder')}
               onChange={(event) => setScope(event.target.value)}
               disabled={busy}
             />
@@ -192,12 +196,10 @@ export function SessionSetup({
               answer key still runs, it is simply graded on the explanation alone. */}
           <div className={styles.referenceBlock}>
             <div className={styles.label}>
-              Reference material for grading <em className={styles.optional}>optional</em>
+              {t('setup.referenceLabel')}{' '}
+              <em className={styles.optional}>{t('common.optional')}</em>
             </div>
-            <p className={styles.hint}>
-              Used by the evaluator at the end of the session to check your explanation.
-              {learner.name} never sees it.
-            </p>
+            <p className={styles.hint}>{t('setup.referenceHint', { name: learner.name })}</p>
 
             <div className={styles.modes}>
               <button
@@ -206,11 +208,11 @@ export function SessionSetup({
                 onClick={() => setMode(mode === 'paste' ? 'none' : 'paste')}
                 disabled={busy}
               >
-                ✍️ Write / paste material
+                ✍️ {t('setup.paste')}
               </button>
 
               <label className={styles.mode} aria-disabled={busy}>
-                📎 Upload PDF
+                📎 {t('setup.upload')}
                 <input
                   type="file"
                   accept="application/pdf,.pdf"
@@ -229,13 +231,9 @@ export function SessionSetup({
                 className={styles.mode}
                 onClick={() => void handleOpenFinder()}
                 disabled={busy || !trimmedTopic}
-                title={
-                  trimmedTopic
-                    ? 'Find sources for this topic'
-                    : 'Write the topic first so the search knows what to look for'
-                }
+                title={trimmedTopic ? t('setup.findEnabled') : t('setup.findDisabled')}
               >
-                🔎 Find reference material
+                🔎 {t('setup.find')}
               </button>
             </div>
 
@@ -245,13 +243,13 @@ export function SessionSetup({
                   className={styles.pasteArea}
                   value={pasted}
                   rows={7}
-                  placeholder="Paste notes, a chapter summary, or the points you need to cover…"
+                  placeholder={t('setup.pastePlaceholder')}
                   onChange={(event) => setPasted(event.target.value)}
                   disabled={busy}
                 />
                 <div className={styles.pasteFoot}>
                   <span className={styles.counter}>
-                    {pasted.trim().length.toLocaleString('en-US')} characters
+                    {t('setup.characters', { count: countOf(pasted.trim().length) })}
                   </span>
                   <button
                     type="button"
@@ -259,7 +257,7 @@ export function SessionSetup({
                     onClick={() => void handleSavePaste()}
                     disabled={busy || !pasted.trim()}
                   >
-                    Save material
+                    {t('setup.saveMaterial')}
                   </button>
                 </div>
               </div>
@@ -270,8 +268,8 @@ export function SessionSetup({
                 ✓{' '}
                 {attached ||
                   (workspace?.pdfUrl
-                    ? 'Reference PDF attached.'
-                    : `Reference: ${workspace?.referenceSource?.title}`)}
+                    ? t('setup.pdfReady')
+                    : t('setup.sourceReady', { title: workspace?.referenceSource?.title ?? '' }))}
               </p>
             )}
           </div>
@@ -282,7 +280,7 @@ export function SessionSetup({
             {/* Skipping is a real answer: someone who wants to start explaining
                 immediately can, and the header keeps every one of these controls. */}
             <button type="button" className={styles.ghostBtn} onClick={onDone} disabled={busy}>
-              Skip
+              {t('setup.skip')}
             </button>
             <button
               type="button"
@@ -290,7 +288,7 @@ export function SessionSetup({
               onClick={() => void handleStart()}
               disabled={busy || !trimmedTopic}
             >
-              {busy ? 'Saving…' : 'Start teaching'}
+              {busy ? t('setup.starting') : t('setup.start')}
             </button>
           </footer>
         </div>

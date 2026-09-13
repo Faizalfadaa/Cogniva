@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useBridge } from '../../../bridge/BridgeProvider'
 import type { ReferenceOptionDTO, ReferenceSuggestionsDTO } from '../../../dto/ReferenceDTO'
+import { useLocale, useT } from '../../../i18n/LanguageProvider'
+import { LOCALE_TAGS } from '../../../i18n/messages'
 import styles from '../../../styles/ReferenceFinder.module.css'
 
 interface ReferenceFinderProps {
@@ -21,47 +23,12 @@ const KIND_ICON: Record<ReferenceOptionDTO['kind'], string> = {
 }
 
 /**
- * What the trust tier means, in the user's words.
- *
- * Two different claims sit side by side on each card and the labels have to keep
- * them apart: 'confirmed' means the link is real (a search returned it),
- * while these say who is answerable for its contents. A link can be perfectly
- * real and still be a source nobody stands behind.
- */
-const TRUST_BADGE: Record<
-  ReferenceOptionDTO['trust'],
-  { label: string; title: string; className: keyof typeof styles }
-> = {
-  high: {
-    label: 'institutional',
-    title: 'A university, government body, journal, or open-textbook publisher',
-    className: 'badgeHigh',
-  },
-  medium: {
-    label: 'edited',
-    title: 'A publisher with a named editorial process',
-    className: 'badgeMid',
-  },
-  low: {
-    label: 'unrecognised',
-    title: 'Not a publisher this app recognises — open it and check before using it',
-    className: 'badgeLow',
-  },
-}
-
-/**
  * Finds reference material for a user who has none.
  *
  * The whole point of the dialog is that the user *chooses*: the agent searches
  * and describes, but a suggestion only becomes this session's answer key when
  * someone picks it. So every option keeps its real link, openable in a new tab
- * before deciding, and both flags on a card are shown rather than hidden: who
- * answers for the source, and whether a search actually returned the link.
- *
- * The list can therefore come back shorter than the user asked for. That is the
- * backend refusing to offer a page nobody is accountable for, and the notice
- * above the list says so — a short list here is a filtered one, not a failed
- * search.
+ * before deciding, and the corroboration flag is shown rather than hidden.
  *
  * Adopting is the slow step — the page has to be fetched and turned into notes —
  * so it reports its own outcome instead of closing optimistically. A source that
@@ -70,6 +37,8 @@ const TRUST_BADGE: Record<
  */
 export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: ReferenceFinderProps) {
   const bridge = useBridge()
+  const t = useT()
+  const { locale } = useLocale()
   const [hint, setHint] = useState('')
   const [searching, setSearching] = useState(false)
   const [suggestions, setSuggestions] = useState<ReferenceSuggestionsDTO | null>(null)
@@ -100,11 +69,12 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       setSelected(result.options[0]?.id ?? null)
     } catch (err) {
       console.error('[ReferenceFinder] suggestReferences failed', err)
-      if (alive.current) setError('The search failed. Try again in a moment.')
+      if (alive.current) setError(t('reference.searchFailed'))
     } finally {
       if (alive.current) setSearching(false)
     }
-  }, [bridge, workspaceId, hint])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridge, workspaceId, hint, t])
 
   // Search on open: the user already said what the topic is by naming the
   // workspace, so making them press a button first would be asking twice.
@@ -138,18 +108,21 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       })
       if (!alive.current) return
       if (!result.ok) {
-        setError(result.problem || 'That source cannot be used.')
+        setError(result.problem || t('reference.unusable'))
         return
       }
-      setDone(`Reference saved (${result.chars.toLocaleString('en-US')} characters).`)
+      setDone(
+        t('reference.saved', { count: result.chars.toLocaleString(LOCALE_TAGS[locale]) }),
+      )
       onAdopted()
     } catch (err) {
       console.error('[ReferenceFinder] useReference failed', err)
-      if (alive.current) setError('Could not save the reference. Try again.')
+      if (alive.current) setError(t('reference.useFailed'))
     } finally {
       if (alive.current) setAdopting(false)
     }
-  }, [bridge, workspaceId, suggestions, selected, onAdopted])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridge, workspaceId, suggestions, selected, onAdopted, t, locale])
 
   const options = suggestions?.options ?? []
 
@@ -158,7 +131,7 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       className={styles.overlay}
       role="dialog"
       aria-modal="true"
-      aria-label="Find reference material"
+      aria-label={t('reference.title')}
       onClick={(event) => {
         // Backdrop click closes, but only the backdrop — a click that started
         // inside the panel and drifted out should not throw the list away.
@@ -168,13 +141,15 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       <div className={styles.panel}>
         <header className={styles.head}>
           <div>
-            <h2 className={styles.title}>Find reference material</h2>
-            <p className={styles.subtitle}>
-              No material of your own? Pick one source to grade your explanation against
-              later. The learner never sees it — only the evaluator does.
-            </p>
+            <h2 className={styles.title}>{t('reference.title')}</h2>
+            <p className={styles.subtitle}>{t('reference.subtitle')}</p>
           </div>
-          <button className={styles.close} onClick={onClose} aria-label="Close" disabled={adopting}>
+          <button
+            className={styles.close}
+            onClick={onClose}
+            aria-label={t('common.close')}
+            disabled={adopting}
+          >
             ✕
           </button>
         </header>
@@ -183,30 +158,34 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
           <input
             className={styles.hintInput}
             value={hint}
-            placeholder={`Topic: ${topic || 'untitled'} — add a steer, e.g. "high school level"`}
+            placeholder={t('reference.hintPlaceholder', {
+              topic: topic || t('reference.noTopic'),
+            })}
             onChange={(event) => setHint(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !searching) void search()
             }}
             disabled={searching || adopting}
-            aria-label="Search steer"
+            aria-label={t('reference.hintLabel')}
           />
           <button
             className={styles.searchBtn}
             onClick={() => void search()}
             disabled={searching || adopting}
           >
-            {searching ? 'Searching…' : 'Search again'}
+            {searching ? t('reference.searching') : t('reference.search')}
           </button>
         </div>
 
         {suggestions?.notice && <p className={styles.notice}>{suggestions.notice}</p>}
 
         <div className={styles.list}>
-          {searching && <p className={styles.status}>Searching for sources on “{topic}”…</p>}
+          {searching && (
+            <p className={styles.status}>{t('reference.searchingFor', { topic })}</p>
+          )}
 
           {!searching && options.length === 0 && (
-            <p className={styles.status}>No sources can be offered.</p>
+            <p className={styles.status}>{t('reference.empty')}</p>
           )}
 
           {!searching &&
@@ -233,22 +212,13 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
 
                   <div className={styles.meta}>
                     <span className={styles.publisher}>{option.source}</span>
-                    <span
-                      className={styles[TRUST_BADGE[option.trust].className]}
-                      title={TRUST_BADGE[option.trust].title}
-                    >
-                      {TRUST_BADGE[option.trust].label}
-                    </span>
                     {option.verified ? (
-                      <span className={styles.badgeOk} title="Appeared in the search results">
-                        confirmed
+                      <span className={styles.badgeOk} title={t('reference.verifiedTitle')}>
+                        {t('reference.verified')}
                       </span>
                     ) : (
-                      <span
-                        className={styles.badgeWarn}
-                        title="Not confirmed in the search results"
-                      >
-                        unconfirmed
+                      <span className={styles.badgeWarn} title={t('reference.unverifiedTitle')}>
+                        {t('reference.unverified')}
                       </span>
                     )}
                     <a
@@ -258,7 +228,7 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
                       rel="noreferrer"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      open ↗
+                      {t('reference.open')} ↗
                     </a>
                   </div>
 
@@ -274,14 +244,14 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
 
         <footer className={styles.foot}>
           <button className={styles.ghostBtn} onClick={onClose} disabled={adopting}>
-            {done ? 'Done' : 'Cancel'}
+            {done ? t('common.done') : t('common.cancel')}
           </button>
           <button
             className={styles.primaryBtn}
             onClick={() => void adopt()}
             disabled={!selected || adopting || searching}
           >
-            {adopting ? 'Preparing…' : 'Use this source'}
+            {adopting ? t('reference.preparing') : t('reference.use')}
           </button>
         </footer>
       </div>

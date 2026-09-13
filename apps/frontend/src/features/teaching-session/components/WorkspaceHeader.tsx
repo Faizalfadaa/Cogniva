@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { TeachButton } from './TeachButton'
 import type { TitleSaveStatus } from '../hooks/useWorkspaceTitleAutosave'
 import { useLearnerVoice } from '../hooks/useLearnerVoice'
+import { useT, type Translate } from '../../../i18n/LanguageProvider'
+import { LanguageToggle } from '../../../i18n/LanguageToggle'
 import styles from '../../../styles/TeachingSession.module.css'
 
 interface WorkspaceHeaderProps {
@@ -50,14 +52,14 @@ const pdfBtnStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
-function saveStatusLabel(status: TitleSaveStatus): string {
+function saveStatusLabel(status: TitleSaveStatus, t: Translate): string {
   switch (status) {
     case 'saving':
-      return 'Saving...'
+      return t('common.saving')
     case 'saved':
-      return 'Saved'
+      return t('common.saved')
     case 'error':
-      return 'Failed to save'
+      return t('common.saveFailed')
     default:
       return ''
   }
@@ -84,19 +86,24 @@ export function WorkspaceHeader({
 }: WorkspaceHeaderProps) {
   const navigate = useNavigate()
   const voice = useLearnerVoice()
+  const t = useT()
 
   return (
     <header className={styles.header}>
       <div className={styles.headerLeft}>
-        <button className={styles.backBtn} onClick={() => navigate('/home')} aria-label="Back to dashboard">
+        <button
+          className={styles.backBtn}
+          onClick={() => navigate('/home')}
+          aria-label={t('header.backToHome')}
+        >
           ←
         </button>
 
         {/* Separate from the arrow above: that one goes to the dashboard, this
             one leaves the app entirely for the public site. */}
-        <Link to="/" className={styles.landingLink} title="Back to the Cogniva home page">
+        <Link to="/" className={styles.landingLink} title={t('header.homeTitle')}>
           <img src="/cogniva_logo.png" alt="" aria-hidden="true" className={styles.landingLinkLogo} />
-          <span>Home</span>
+          <span>{t('header.home')}</span>
         </Link>
 
         {/* "Untitled Document" is only a placeholder - the value stays the real
@@ -105,13 +112,13 @@ export function WorkspaceHeader({
         <input
           className={styles.titleInput}
           value={title}
-          placeholder="Untitled Document"
+          placeholder={t('header.untitled')}
           onChange={(e) => onTitleChange(e.target.value)}
-          aria-label="Workspace title"
+          aria-label={t('header.workspaceTitle')}
         />
 
         <span className={styles.saveStatus} aria-live="polite">
-          {saveStatusLabel(saveStatus)}
+          {saveStatusLabel(saveStatus, t)}
         </span>
 
         {/* Reference material: upload a PDF that grounds the post-session
@@ -123,9 +130,9 @@ export function WorkspaceHeader({
               target="_blank"
               rel="noreferrer"
               style={{ ...pdfBtnStyle, textDecoration: 'none' }}
-              title="View reference material"
+              title={t('header.viewReference')}
             >
-              📄 Reference attached
+              📄 {t('header.referenceAttached')}
             </a>
           )}
 
@@ -149,9 +156,13 @@ export function WorkspaceHeader({
           <label
             data-tour="pdf-upload"
             style={{ ...pdfBtnStyle, opacity: uploadingPdf ? 0.6 : 1 }}
-            title="Upload reference material (PDF) to ground your evaluation"
+            title={t('header.uploadPdfTitle')}
           >
-            {uploadingPdf ? 'Uploading…' : pdfUrl ? 'Replace' : '📎 Reference (PDF)'}
+            {uploadingPdf
+              ? t('header.uploading')
+              : pdfUrl
+                ? t('header.replace')
+                : `📎 ${t('header.uploadPdf')}`}
             <input
               type="file"
               accept="application/pdf,.pdf"
@@ -172,9 +183,9 @@ export function WorkspaceHeader({
             data-tour="reference-finder"
             onClick={onFindReference}
             style={{ ...pdfBtnStyle }}
-            title="Find reference material for this topic"
+            title={t('header.findReferenceTitle')}
           >
-            🔎 Find reference
+            🔎 {t('header.findReference')}
           </button>
         </div>
       </div>
@@ -182,14 +193,23 @@ export function WorkspaceHeader({
       <div className={styles.headerRight}>
         {/* Mute the learner's synthesized voice. Reads its state from the shared
             player, so no prop drilling is needed. */}
+        <LanguageToggle style={{ marginRight: '4px' }} />
+
         <button
-          className={voice.muted ? styles.voiceBtnMuted : styles.voiceBtn}
+          className={voice.muted || !voice.available ? styles.voiceBtnMuted : styles.voiceBtn}
           onClick={voice.toggleMuted}
-          aria-label={voice.muted ? "Unmute learner's voice" : "Mute learner's voice"}
+          disabled={!voice.available}
+          aria-label={voice.muted ? t('header.unmute') : t('header.mute')}
           aria-pressed={voice.muted}
-          title={voice.muted ? 'Voice off' : 'Voice on'}
+          title={
+            !voice.available
+              ? t('header.voiceUnavailable')
+              : voice.muted
+                ? t('header.voiceOff')
+                : t('header.voiceOn')
+          }
         >
-          {voice.muted ? '🔇' : '🔊'}
+          {voice.muted || !voice.available ? '🔇' : '🔊'}
         </button>
 
         {!micPermissionDenied && (
@@ -197,11 +217,13 @@ export function WorkspaceHeader({
             data-tour="mic-button"
             className={isRecording ? styles.micBtnActive : styles.micBtnIdle}
             onClick={onToggleRecording}
-            aria-label={isRecording ? 'Stop recording' : 'Start recording'}
-            title={isRecording ? 'Stop recording audio' : 'Start recording audio'}
+            aria-label={isRecording ? t('header.stopRecording') : t('header.startRecording')}
+            title={isRecording ? t('header.stopRecordAudio') : t('header.recordAudio')}
           >
             <span className={styles.micBtnIcon}>{isRecording ? '⏹' : '🎙'}</span>
-            <span className={styles.micBtnLabel}>{isRecording ? 'Stop' : 'Record'}</span>
+            <span className={styles.micBtnLabel}>
+              {isRecording ? t('header.stop') : t('header.record')}
+            </span>
             {isRecording && <span className={styles.micDot} />}
           </button>
         )}
@@ -210,9 +232,9 @@ export function WorkspaceHeader({
           className={styles.finishBtn}
           onClick={onFinishSession}
           disabled={finishingSession || pending}
-          aria-label="Finish teaching"
+          aria-label={t('header.finishTeaching')}
         >
-          {finishingSession ? 'Finishing...' : 'Finish Session'}
+          {finishingSession ? t('header.finishing') : t('header.finishSession')}
         </button>
         {/* Chat now opens from ChatLauncher, floating bottom-right of the canvas. */}
         <TeachButton mode={mode} pending={pending} onTeach={onTeach} onContinueEditing={onContinueEditing} />

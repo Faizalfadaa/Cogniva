@@ -9,6 +9,7 @@ partial file instead of starting over, and retries with backoff.
 
     .venv\Scripts\python.exe fetch_model.py                  # configured engine
     .venv\Scripts\python.exe fetch_model.py --engine xtts
+    .venv\Scripts\python.exe fetch_model.py --engine chatterbox-turbo
 
 Safe to re-run at any time: complete files are skipped, partial ones resume.
 """
@@ -46,6 +47,21 @@ CHATTERBOX_FILES = [
     "s3gen.safetensors",
     "tokenizer.json",
     "conds.pt",
+]
+
+# Exactly what ChatterboxTurboTTS.from_local opens. The repo also carries
+# s3gen.safetensors (1 GB); Turbo decodes with s3gen_meanflow and never loads it.
+CHATTERBOX_TURBO_REPO = "ResembleAI/chatterbox-turbo"
+CHATTERBOX_TURBO_FILES = [
+    "ve.safetensors",
+    "t3_turbo_v1.safetensors",
+    "s3gen_meanflow.safetensors",
+    "conds.pt",
+    "tokenizer_config.json",
+    "vocab.json",
+    "merges.txt",
+    "special_tokens_map.json",
+    "added_tokens.json",
 ]
 
 XTTS_REPO = "coqui/XTTS-v2"
@@ -114,22 +130,22 @@ def download_resumable(url: str, dest: Path, chunk: int = 1 << 20) -> None:
     part.replace(dest)
 
 
-def fetch_chatterbox() -> int:
-    destination = config.MODELS_DIR / "chatterbox"
+def fetch_hf_files(label: str, repo: str, files: list[str], destination: Path) -> int:
+    """Pull `files` from `repo` into `destination`, resuming and retrying each."""
     destination.mkdir(parents=True, exist_ok=True)
-    print(f"engine: chatterbox ({CHATTERBOX_REPO})")
+    print(f"engine: {label} ({repo})")
     print(f"target: {destination}\n")
 
-    reuse_from_hf_cache(destination)
+    reuse_from_hf_cache(repo, files, destination)
 
     failed = []
-    for name in CHATTERBOX_FILES:
+    for name in files:
         target = destination / name
         if target.is_file() and target.stat().st_size > 0:
             print(f"  {name}: already here ({target.stat().st_size/1e6:.0f} MB)")
             continue
         print(f"  {name}")
-        url = f"https://huggingface.co/{CHATTERBOX_REPO}/resolve/main/{name}"
+        url = f"https://huggingface.co/{repo}/resolve/main/{name}"
         if with_retries(name, lambda u=url, t=target: download_resumable(u, t) or True) is None:
             failed.append(name)
         else:
@@ -138,22 +154,37 @@ def fetch_chatterbox() -> int:
     if failed:
         print(f"\nstill missing: {failed}. Re-run this script — it resumes.")
         return 1
-    print(f"\nall Chatterbox weights present in {destination}")
+    print(f"\nall {label} weights present in {destination}")
     return 0
 
 
-def reuse_from_hf_cache(destination: Path) -> None:
+def fetch_chatterbox() -> int:
+    return fetch_hf_files(
+        "chatterbox", CHATTERBOX_REPO, CHATTERBOX_FILES, config.MODELS_DIR / "chatterbox"
+    )
+
+
+def fetch_chatterbox_turbo() -> int:
+    return fetch_hf_files(
+        "chatterbox-turbo",
+        CHATTERBOX_TURBO_REPO,
+        CHATTERBOX_TURBO_FILES,
+        config.MODELS_DIR / "chatterbox-turbo",
+    )
+
+
+def reuse_from_hf_cache(repo: str, files: list[str], destination: Path) -> None:
     """
     Copy anything an earlier huggingface_hub run already finished.
 
-    Two of these files are over 2 GB combined; re-downloading them because they
-    happen to sit in a different directory would be pure waste.
+    These checkpoints run to gigabytes; re-downloading one because it happens to
+    sit in a different directory would be pure waste.
     """
     cache = Path.home() / ".cache" / "huggingface" / "hub"
-    snapshots = cache / f"models--{CHATTERBOX_REPO.replace('/', '--')}" / "snapshots"
+    snapshots = cache / f"models--{repo.replace('/', '--')}" / "snapshots"
     if not snapshots.is_dir():
         return
-    for name in CHATTERBOX_FILES:
+    for name in files:
         target = destination / name
         if target.is_file() and target.stat().st_size > 0:
             continue
@@ -211,12 +242,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--engine",
-        choices=["chatterbox", "xtts"],
+        choices=["chatterbox", "chatterbox-turbo", "xtts"],
         default=config.ENGINE,
         help="which engine's weights to fetch (default: the configured one)",
     )
     args = parser.parse_args()
-    return fetch_chatterbox() if args.engine == "chatterbox" else fetch_xtts()
+    fetchers = {
+        "chatterbox": fetch_chatterbox,
+        "chatterbox-turbo": fetch_chatterbox_turbo,
+        "xtts": fetch_xtts,
+    }
+    return fetchers[args.engine]()
 
 
 if __name__ == "__main__":

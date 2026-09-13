@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import styles from '../../styles/LandingPage.module.css'
+import { useT } from '../../i18n/LanguageProvider'
 
 interface TeamSliderProps {
   people: string[]
@@ -24,6 +25,7 @@ const CLONES = 3
  * sitting in the centre highlights exactly like the original.
  */
 export function TeamSlider({ people }: TeamSliderProps) {
+  const t = useT()
   const trackRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
   const [active, setActive] = useState(CLONES)
@@ -147,7 +149,7 @@ export function TeamSlider({ people }: TeamSliderProps) {
         type="button"
         className={`${styles.sliderArrow} ${styles.sliderArrowLeft}`}
         onClick={() => nudge(-1)}
-        aria-label="Previous"
+        aria-label={t('landing.previous')}
       >
         ‹
       </button>
@@ -182,7 +184,7 @@ export function TeamSlider({ people }: TeamSliderProps) {
         type="button"
         className={`${styles.sliderArrow} ${styles.sliderArrowRight}`}
         onClick={() => nudge(1)}
-        aria-label="Next"
+        aria-label={t('landing.next')}
       >
         ›
       </button>

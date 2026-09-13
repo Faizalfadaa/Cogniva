@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import styles from '../../styles/HomePage.module.css'
+import { useT } from '../../i18n/LanguageProvider'
+import type { MessageKey } from '../../i18n/messages'
 
 // ─── Step illustrations ──────────────────────────────────────────────────────
 
@@ -38,32 +40,29 @@ function IconReport() {
 
 interface Step {
   icon: () => ReactNode
-  title: string
-  body: string
-  cta: string
+  title: MessageKey
+  body: MessageKey
+  cta: MessageKey
 }
 
 const STEPS: Step[] = [
   {
     icon: IconBoard,
-    title: 'Here, you are the teacher',
-    body:
-      'Cogniva flips the classroom. Instead of re-reading your notes, you explain the topic in your own words — and the parts you only half-understand show up immediately.',
-    cta: 'How does it work?',
+    title: 'onb.step1Title',
+    body: 'onb.step1Body',
+    cta: 'onb.step1Cta',
   },
   {
     icon: IconStudent,
-    title: 'Teach an AI student',
-    body:
-      'Open a workspace, write or draw your material on the whiteboard, then teach. Your AI student follows along and asks questions whenever something does not click.',
-    cta: 'And after that?',
+    title: 'onb.step2Title',
+    body: 'onb.step2Body',
+    cta: 'onb.step2Cta',
   },
   {
     icon: IconReport,
-    title: 'Finish with a report',
-    body:
-      'End the session and Cogniva evaluates your explanation: what landed clearly, what stayed fuzzy, and which parts are worth reviewing again.',
-    cta: "Got it, let's start",
+    title: 'onb.step3Title',
+    body: 'onb.step3Body',
+    cta: 'onb.step3Cta',
   },
 ]
 
@@ -80,17 +79,18 @@ function BackRow({
   onBack: () => void
   onSkip?: () => void
 }) {
+  const t = useT()
   const canGoBack = step > 0
   return (
     <div className={styles.onbNav}>
       {canGoBack && (
         <button className={styles.modalBtnGhost} onClick={onBack}>
-          ← Back
+          ← {t('onb.back')}
         </button>
       )}
       {onSkip && (
         <button className={styles.modalBtnGhost} onClick={onSkip}>
-          Skip intro
+          {t('onb.skip')}
         </button>
       )}
     </div>
@@ -105,6 +105,7 @@ export default function Onboarding({ onDone }: { onDone: (name: string) => void 
   const [step, setStep] = useState(0)
   const [name, setName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const t = useT()
 
   const isNameStep = step === STEPS.length
   const totalSteps = STEPS.length + 1
@@ -139,33 +140,31 @@ export default function Onboarding({ onDone }: { onDone: (name: string) => void 
         {isNameStep ? (
           <>
             <div className={styles.modalMark}>✦</div>
-            <h2 id="onboarding-title" className={styles.modalTitle}>Hey, what's your name?</h2>
-            <p className={styles.modalBody}>
-              Your AI student will call you by this name throughout the session.
-            </p>
+            <h2 id="onboarding-title" className={styles.modalTitle}>{t('home.askName')}</h2>
+            <p className={styles.modalBody}>{t('onb.nameBody')}</p>
             <input
               ref={inputRef}
               className={styles.modalInput}
               type="text"
-              placeholder="Your name..."
+              placeholder={t('home.yourName')}
               value={name}
               onChange={e => setName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSubmit()}
               maxLength={40}
-              aria-label="Your name"
+              aria-label={t('home.yourNameLabel')}
             />
             <button className={styles.modalBtn} onClick={handleSubmit} disabled={!name.trim()}>
-              Enter Cogniva →
+              {t('onb.enter')} →
             </button>
             <BackRow step={step} onBack={() => setStep(step - 1)} />
           </>
         ) : (
           <>
             <div className={styles.onbIcon}>{STEPS[step].icon()}</div>
-            <h2 id="onboarding-title" className={styles.modalTitle}>{STEPS[step].title}</h2>
-            <p className={styles.onbBody}>{STEPS[step].body}</p>
+            <h2 id="onboarding-title" className={styles.modalTitle}>{t(STEPS[step].title)}</h2>
+            <p className={styles.onbBody}>{t(STEPS[step].body)}</p>
             <button className={styles.modalBtn} onClick={() => setStep(step + 1)}>
-              {STEPS[step].cta} →
+              {t(STEPS[step].cta)} →
             </button>
             <BackRow
               step={step}

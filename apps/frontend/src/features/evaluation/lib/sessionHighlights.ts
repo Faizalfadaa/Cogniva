@@ -9,6 +9,7 @@
  */
 
 import type { EvaluationFindingDTO } from '../../../dto/EvaluationReportDTO'
+import type { Translate } from '../../../i18n/LanguageProvider'
 import type { ScoreAxis } from './scoreAxes'
 
 export interface SessionHighlight {
@@ -29,12 +30,13 @@ const PRIORITY_ORDER: EvaluationFindingDTO['category'][] = ['WRONG', 'CONFUSING'
 export function buildSessionHighlights(
   findings: EvaluationFindingDTO[],
   axes: ScoreAxis[],
+  t: Translate,
 ): SessionHighlights {
   const measured = axes.filter((a) => a.value !== null) as (ScoreAxis & { value: number })[]
 
   return {
-    strength: pickStrength(findings, measured),
-    priority: pickPriority(findings, measured),
+    strength: pickStrength(findings, measured, t),
+    priority: pickPriority(findings, measured, t),
   }
 }
 
@@ -45,6 +47,7 @@ export function buildSessionHighlights(
 function pickStrength(
   findings: EvaluationFindingDTO[],
   measured: (ScoreAxis & { value: number })[],
+  t: Translate,
 ): SessionHighlight | null {
   const correct = findings.filter((f) => f.category === 'CORRECT')
   if (correct.length > 0) {
@@ -53,14 +56,20 @@ function pickStrength(
       headline: best.concept,
       support:
         correct.length > 1
-          ? `${best.detail} Ditambah ${correct.length - 1} konsep lain yang juga tepat.`
+          ? t('evaluation.plusOthers', {
+              detail: best.detail,
+              count: correct.length - 1,
+            })
           : best.detail,
     }
   }
 
   const top = [...measured].sort((a, b) => b.value - a.value)[0]
   if (!top) return null
-  return { headline: top.label, support: `Nilai tertinggimu sesi ini, ${top.value} dari 100.` }
+  return {
+    headline: top.label,
+    support: t('evaluation.highestScore', { value: top.value }),
+  }
 }
 
 /**
@@ -70,6 +79,7 @@ function pickStrength(
 function pickPriority(
   findings: EvaluationFindingDTO[],
   measured: (ScoreAxis & { value: number })[],
+  t: Translate,
 ): SessionHighlight | null {
   for (const category of PRIORITY_ORDER) {
     const hit = findings.find((f) => f.category === category)
@@ -79,5 +89,8 @@ function pickPriority(
 
   const low = [...measured].sort((a, b) => a.value - b.value)[0]
   if (!low) return null
-  return { headline: low.label, support: `Nilai terendahmu sesi ini, ${low.value} dari 100.` }
+  return {
+    headline: low.label,
+    support: t('evaluation.lowestScore', { value: low.value }),
+  }
 }

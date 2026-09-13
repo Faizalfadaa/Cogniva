@@ -5,6 +5,7 @@ import { buildSessionHighlights } from '../lib/sessionHighlights'
 import { AXIS_ICON } from '../lib/axisIcons'
 import { AxisRadar } from './AxisRadar'
 import { SessionHighlights } from './SessionHighlights'
+import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/Evaluation.module.css'
 
 interface ScoreBreakdownProps {
@@ -23,22 +24,21 @@ interface ScoreBreakdownProps {
  * much, and counted from what".
  */
 export function ScoreBreakdown({ score, depthScore, findings, learner }: ScoreBreakdownProps) {
-  const axes = buildScoreAxes(findings, depthScore)
-  const highlights = buildSessionHighlights(findings, axes)
+  const t = useT()
+  const axes = buildScoreAxes(findings, depthScore, t)
+  const highlights = buildSessionHighlights(findings, axes, t)
 
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>
-        <span>Skor Sesi</span>
+        <span>{t('evaluation.scoreTitle')}</span>
       </div>
 
       <div className={styles.scoreCard}>
         <div className={styles.scoreHeadline}>
           <span className={styles.scoreValue}>{score}</span>
           <span className={styles.scoreOutOf}>/ 100</span>
-          <p className={styles.scoreCaption}>
-            Ketepatan dan kelengkapan penjelasanmu dibanding materi rujukan.
-          </p>
+          <p className={styles.scoreCaption}>{t('evaluation.scoreCaption')}</p>
         </div>
 
         <SessionHighlights highlights={highlights} learner={learner} />

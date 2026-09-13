@@ -12,6 +12,9 @@ type TeachingMode = 'editing' | 'locked'
 
 const POLL_INTERVAL_MS = 1000
 
+/** Once the text is in, a voiced reply is polled faster: each poll can bring the next sentence. */
+const SPEECH_POLL_INTERVAL_MS = 500
+
 /**
  * Rebase the editor's wall-clock board changes onto the recording's origin
  * (Phase 1 of audio-visual sync: captured and sent, not yet used for anything).
@@ -48,11 +51,11 @@ export function useTeachingSession(
   const [error, setError] = useState<SessionError | null>(null)
   const online = useNetworkStatus()
   const audio = useAudioRecorder()
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
-      clearInterval(pollRef.current)
+      clearTimeout(pollRef.current)
       pollRef.current = null
     }
   }, [])
@@ -60,15 +63,35 @@ export function useTeachingSession(
   const pollForResponse = useCallback(
     (checkpointId: string) => {
       stopPolling()
-      pollRef.current = setInterval(async () => {
-        const list = await bridge.getCheckpoints(workspaceId)
-        const found = list.find((c) => c.id === checkpointId)
+      const tick = async () => {
+        let found: TeachingCheckpointDTO | undefined
+        try {
+          const list = await bridge.getCheckpoints(workspaceId)
+          found = list.find((c) => c.id === checkpointId)
+        } catch (err) {
+          // Keep polling: one dropped request is not a failed turn, and the
+          // network banner already reports a real outage on its own.
+          console.error('[useTeachingSession] getCheckpoints failed', err)
+        }
+        // Stopped while the request was in flight (continue editing, unmount).
+        if (pollRef.current === null) return
+
         if (found?.learnerResponse) {
           setLatestCheckpoint(found)
           setPending(false)
-          stopPolling()
+          // The text is in, but a voiced reply keeps arriving one sentence at a
+          // time: keep polling until every clip has landed.
+          if (found.speech?.status !== 'pending') {
+            stopPolling()
+            return
+          }
         }
-      }, POLL_INTERVAL_MS)
+        pollRef.current = setTimeout(
+          tick,
+          found?.speech?.status === 'pending' ? SPEECH_POLL_INTERVAL_MS : POLL_INTERVAL_MS
+        )
+      }
+      pollRef.current = setTimeout(tick, POLL_INTERVAL_MS)
     },
     [bridge, workspaceId, stopPolling]
   )

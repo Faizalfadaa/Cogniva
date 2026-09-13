@@ -1,5 +1,6 @@
 import styles from '../../../styles/TeachingSession.module.css'
-import { LEARNERS } from '../../../lib/Learner'
+import { LEARNERS, learnerCopy } from '../../../lib/Learner'
+import { useLocale, useT } from '../../../i18n/LanguageProvider'
 
 interface LearnerSelectProps {
   onSelect: (learnerId: string) => void
@@ -16,34 +17,43 @@ interface LearnerSelectProps {
  * hash-derived default (see resolveLearner).
  */
 export function LearnerSelect({ onSelect }: LearnerSelectProps) {
+  const t = useT()
+  const { locale } = useLocale()
+
   return (
-    <div className={styles.selectOverlay} role="dialog" aria-modal="true" aria-label="Choose your student">
+    <div
+      className={styles.selectOverlay}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('learnerSelect.dialog')}
+    >
       <div className={styles.selectPanel}>
-        <h2 className={styles.selectTitle}>Who would you like to teach?</h2>
-        <p className={styles.selectSubtitle}>
-          Pick a student for this workspace. They will stay with you for the whole session.
-        </p>
+        <h2 className={styles.selectTitle}>{t('learnerSelect.title')}</h2>
+        <p className={styles.selectSubtitle}>{t('learnerSelect.subtitle')}</p>
 
         <div className={styles.selectGrid}>
-          {LEARNERS.map((learner) => (
-            <button
-              key={learner.id}
-              type="button"
-              className={styles.selectCard}
-              onClick={() => onSelect(learner.id)}
-              aria-label={`Teach ${learner.name}`}
-            >
-              <img
-                src={learner.introImageUrl}
-                alt=""
-                aria-hidden="true"
-                className={styles.selectCardImage}
-              />
-              <span className={styles.selectCardName}>{learner.name}</span>
-              <span className={styles.selectCardTraits}>{learner.traits}</span>
-              <span className={styles.selectCardDesc}>{learner.description}</span>
-            </button>
-          ))}
+          {LEARNERS.map((learner) => {
+            const copy = learnerCopy(learner, locale)
+            return (
+              <button
+                key={learner.id}
+                type="button"
+                className={styles.selectCard}
+                onClick={() => onSelect(learner.id)}
+                aria-label={t('learnerSelect.teach', { name: learner.name })}
+              >
+                <img
+                  src={learner.introImageUrl}
+                  alt=""
+                  aria-hidden="true"
+                  className={styles.selectCardImage}
+                />
+                <span className={styles.selectCardName}>{learner.name}</span>
+                <span className={styles.selectCardTraits}>{copy.traits}</span>
+                <span className={styles.selectCardDesc}>{copy.description}</span>
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>

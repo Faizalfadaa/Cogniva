@@ -5,6 +5,7 @@ import type {
 } from '../../../dto/EvaluationReportDTO'
 import { findingsForTurn, segmentTextForFindings, type QuoteField } from '../lib/highlightQuote'
 import { CATEGORY_BADGE_CLASS, CATEGORY_LABEL, CATEGORY_MARK_CLASS } from '../lib/findingLabels'
+import { useT, type Translate } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/Evaluation.module.css'
 
 interface TranscriptReviewProps {
@@ -29,6 +30,7 @@ interface TranscriptReviewProps {
  * panel that opens under it always agree on which note is showing.
  */
 export function TranscriptReview({ transcript, findings }: TranscriptReviewProps) {
+  const t = useT()
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   const indexOf = useMemo(() => {
@@ -64,20 +66,14 @@ export function TranscriptReview({ transcript, findings }: TranscriptReviewProps
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>
-        <span>Yang Kamu Ajarkan</span>
+        <span>{t('evaluation.transcriptTitle')}</span>
       </div>
-      <p className={styles.notesIntro}>
-        Bagian yang ditandai punya catatan penilaian. Klik untuk membukanya di tempat.
-      </p>
+      <p className={styles.notesIntro}>{t('evaluation.transcriptIntro')}</p>
 
       {transcript.length === 0 ? (
         <div className={styles.findingsEmpty}>
-          <p className={styles.findingsEmptyTitle}>Transkrip tidak tersimpan.</p>
-          <p className={styles.findingsEmptyHint}>
-            Sesi ini selesai sebelum transkrip sempat direkam, atau laporannya dibuat
-            lewat jalur pemulihan. Penilaian di bawah tetap berlaku, hanya tidak bisa
-            ditunjukkan di teks aslinya.
-          </p>
+          <p className={styles.findingsEmptyTitle}>{t('evaluation.transcriptEmpty')}</p>
+          <p className={styles.findingsEmptyHint}>{t('evaluation.transcriptEmptyHint')}</p>
         </div>
       ) : (
         <ol className={styles.transcriptList}>
@@ -95,25 +91,23 @@ export function TranscriptReview({ transcript, findings }: TranscriptReviewProps
                 <p className={styles.turnIndex}>Giliran {turn.turnIndex}</p>
 
                 <p className={styles.turnBody}>
-                  {renderChannel(turn.boardText, quoted, 'boardText', indexOf, openIndex, toggle, openAndScroll)}
+                  {renderChannel(turn.boardText, quoted, 'boardText', indexOf, openIndex, toggle, openAndScroll, t)}
                 </p>
 
                 {turn.speech && (
                   <p className={styles.turnSpeech}>
                     <span className={styles.turnSpeechLabel}>Lisan</span>
-                    {renderChannel(turn.speech, quoted, 'speech', indexOf, openIndex, toggle, openAndScroll)}
+                    {renderChannel(turn.speech, quoted, 'speech', indexOf, openIndex, toggle, openAndScroll, t)}
                   </p>
                 )}
 
                 {quoted.length === 0 && wholeTurn.length === 0 && (
-                  <p className={styles.turnNoNotes}>Tidak ada catatan khusus untuk giliran ini.</p>
+                  <p className={styles.turnNoNotes}>{t('evaluation.turnNoNotes')}</p>
                 )}
 
                 {wholeTurn.length > 0 && (
                   <div className={styles.turnWholeList}>
-                    <p className={styles.turnWholeLabel}>
-                      Catatan untuk giliran ini, tanpa kutipan presisi
-                    </p>
+                    <p className={styles.turnWholeLabel}>{t('evaluation.turnWholeLabel')}</p>
                     {wholeTurn.map((finding) => {
                       const i = indexOf.get(finding)!
                       return (
@@ -129,7 +123,7 @@ export function TranscriptReview({ transcript, findings }: TranscriptReviewProps
                           <span
                             className={`${styles.findingBadge} ${CATEGORY_BADGE_CLASS[finding.category]}`}
                           >
-                            {CATEGORY_LABEL[finding.category]}
+                            {t(CATEGORY_LABEL[finding.category])}
                           </span>
                           <span className={styles.turnWholeConcept}>{finding.concept}</span>
                           <Chevron open={openIndex === i} />
@@ -154,7 +148,7 @@ export function TranscriptReview({ transcript, findings }: TranscriptReviewProps
 
       {orphans.length > 0 && (
         <div className={styles.orphanBlock}>
-          <p className={styles.turnWholeLabel}>Catatan tanpa giliran terkait</p>
+          <p className={styles.turnWholeLabel}>{t('evaluation.orphanLabel')}</p>
           {orphans.map((finding) => {
             const i = indexOf.get(finding)!
             return (
@@ -170,7 +164,7 @@ export function TranscriptReview({ transcript, findings }: TranscriptReviewProps
                   <span
                     className={`${styles.findingBadge} ${CATEGORY_BADGE_CLASS[finding.category]}`}
                   >
-                    {CATEGORY_LABEL[finding.category]}
+                    {t(CATEGORY_LABEL[finding.category])}
                   </span>
                   <span className={styles.turnWholeConcept}>{finding.concept}</span>
                   <Chevron open={openIndex === i} />
@@ -222,20 +216,26 @@ function FindingDetail({
   index: number
   onClose: () => void
 }) {
+  const t = useT()
+
   return (
-    <div className={styles.inlineDetail} role="region" aria-label={`Penilaian: ${finding.concept}`}>
+    <div
+      className={styles.inlineDetail}
+      role="region"
+      aria-label={t('evaluation.findingAria', { concept: finding.concept })}
+    >
       <div className={styles.inlineDetailTop}>
         <span className={`${styles.findingBadge} ${CATEGORY_BADGE_CLASS[finding.category]}`}>
-          {CATEGORY_LABEL[finding.category]}
+          {t(CATEGORY_LABEL[finding.category])}
         </span>
         <span className={styles.inlineDetailConcept}>{finding.concept}</span>
         <button
           type="button"
           className={styles.inlineDetailClose}
           onClick={onClose}
-          aria-label="Tutup catatan"
+          aria-label={t('evaluation.closeNote')}
         >
-          Tutup
+          {t('evaluation.close')}
         </button>
       </div>
 
@@ -243,7 +243,7 @@ function FindingDetail({
 
       {finding.followUp && (
         <div className={styles.followUpBox} id={followUpDomId(index)}>
-          <p className={styles.followUpLabel}>Saran perbaikan</p>
+          <p className={styles.followUpLabel}>{t('evaluation.followUpLabel')}</p>
           <p className={styles.followUpText}>{finding.followUp}</p>
         </div>
       )}
@@ -260,6 +260,7 @@ function renderChannel(
   openIndex: number | null,
   toggle: (i: number) => void,
   openAndScroll: (i: number) => void,
+  t: Translate,
 ) {
   const matches = quoted
     .filter((q) => q.match.field === field)
@@ -294,7 +295,7 @@ function renderChannel(
           <span
             className={`${styles.findingBadge} ${CATEGORY_BADGE_CLASS[finding.category]}`}
           >
-            {CATEGORY_LABEL[finding.category]}
+            {t(CATEGORY_LABEL[finding.category])}
           </span>
           <span className={styles.coachConcept}>{finding.concept}</span>
           <span className={styles.coachDetail}>{finding.detail}</span>
@@ -306,7 +307,7 @@ function renderChannel(
                 openAndScroll(at)
               }}
             >
-              Lihat saran perbaikan
+              {t('evaluation.seeFollowUp')}
             </button>
           )}
         </span>

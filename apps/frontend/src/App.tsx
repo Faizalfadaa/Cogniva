@@ -1,10 +1,22 @@
+import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import LandingPage from './features/landing/LandingPage'
 import HomePage from './features/home/HomePage'
 import WorkspacePage from './routes/workspace/Workspace'
 import EvaluationPage from './routes/evaluation/Evaluation'
+import { useLocale } from './i18n/LanguageProvider'
+import { setVoiceAvailable } from './features/teaching-session/hooks/useLearnerVoice'
 
 export default function App() {
+  const { locale } = useLocale()
+
+  // The learner only has an English voice, so an Indonesian session runs silent.
+  // Wired here rather than inside the player: the player knows whether it has a
+  // voice, and the language layer knows nothing about audio.
+  useEffect(() => {
+    setVoiceAvailable(locale === 'en')
+  }, [locale])
+
   return (
     <Routes>
       {/* Public marketing page is the front door; the workspace dashboard that

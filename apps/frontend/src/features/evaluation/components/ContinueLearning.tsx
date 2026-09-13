@@ -1,3 +1,4 @@
+import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/Evaluation.module.css'
 
 interface ContinueLearningProps {
@@ -8,15 +9,17 @@ interface ContinueLearningProps {
 }
 
 export function ContinueLearning({ topics, onNewSession, onResumeSession, resuming = false }: ContinueLearningProps) {
+  const t = useT()
+
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>
-        <span>Lanjut Belajar</span>
+        <span>{t('evaluation.continueLearning')}</span>
       </div>
 
       <div className={styles.continueCard}>
         {topics.length === 0 ? (
-          <p className={styles.continueEmpty}>No recommendations right now.</p>
+          <p className={styles.continueEmpty}>{t('evaluation.noRecommendations')}</p>
         ) : (
           <ul className={styles.continueList}>
             {topics.map((topic, i) => (
@@ -29,19 +32,17 @@ export function ContinueLearning({ topics, onNewSession, onResumeSession, resumi
         )}
 
         <div className={styles.continueFooter}>
-          <p className={styles.continueFooterText}>
-            Ready to teach new topics? Start a new session or continue this one.
-          </p>
+          <p className={styles.continueFooterText}>{t('evaluation.continueHint')}</p>
           <div className={styles.continueActions}>
             <button
               className={styles.continueSecondaryBtn}
               onClick={onResumeSession}
               disabled={resuming}
             >
-              {resuming ? 'Membuka...' : 'Lanjutkan Sesi Ini'}
+              {resuming ? t('evaluation.opening') : t('evaluation.continueSession')}
             </button>
             <button className={styles.continueBtn} onClick={onNewSession} disabled={resuming}>
-              Mulai Sesi Baru
+              {t('evaluation.newSession')}
             </button>
           </div>
         </div>

@@ -1,12 +1,16 @@
 # syntax=docker/dockerfile:1
 #
-# Cogniva voice service — XTTS v2 behind FastAPI.
+# Cogniva voice service — Chatterbox Turbo behind FastAPI.
 #
-# CPU image. XTTS on CPU takes ~10-30s per reply, which is fine for a demo but
-# not for a live session; for real use, run this on a GPU host with the CUDA
-# torch wheel and the nvidia container runtime.
+# CPU image. On CPU a reply takes ~10-30s, which is fine for a demo but not for a
+# live session; for real use, run this on a GPU host with the CUDA torch wheel and
+# the nvidia container runtime.
 #
-# Python is pinned to 3.11 because coqui-tts does not support 3.13.
+# Weights are NOT baked in: the engine downloads them on first use, into the
+# container's own filesystem. Nothing here persists them across a recreate — mount
+# a volume over the model directory if that download is worth avoiding.
+#
+# Python is pinned to 3.11: neither engine supports 3.13.
 
 FROM python:3.11-slim
 

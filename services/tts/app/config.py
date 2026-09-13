@@ -35,11 +35,17 @@ def _bool(name: str, fallback: bool) -> bool:
 
 # Which engine renders speech. See app/engines.py.
 #
-#   chatterbox  Resemble AI Chatterbox (MIT). Default: better prosody on
-#               expressive character voices, and usable commercially.
+#   chatterbox-turbo
+#               Chatterbox Turbo (MIT). Default: measured through the app, the
+#               first sentence of a reply is ready in about half the time, and
+#               every sentence renders faster than it plays — so a reply speaks
+#               without gaps. It ignores the per-voice exaggeration and
+#               cfg_weight tuning in voices.json.
+#   chatterbox  Resemble AI Chatterbox (MIT). Slower here, but it honours that
+#               per-voice delivery tuning.
 #   xtts        Coqui XTTS v2 (CPML, non-commercial). Kept so the switch is
 #               reversible with one variable.
-ENGINE = _str("TTS_ENGINE", "chatterbox")
+ENGINE = _str("TTS_ENGINE", "chatterbox-turbo")
 
 XTTS_MODEL_NAME = _str("TTS_MODEL", "tts_models/multilingual/multi-dataset/xtts_v2")
 
@@ -54,6 +60,17 @@ DEVICE = _str("TTS_DEVICE", "auto")
 # Warm the model during startup so the service only reports healthy once it can
 # actually answer. Set false for a fast boot that loads on the first request.
 WARM_ON_STARTUP = _bool("TTS_WARM_ON_STARTUP", True)
+
+# Render a short line in every voice before reporting ready. The first render
+# after a load pays one-off CUDA setup; this moves that cost off the first real
+# reply, at the price of a few extra seconds of startup.
+WARM_RENDER = _bool("TTS_WARM_RENDER", True)
+
+# Windows scheduling for this process (see app/process_tuning.py). Started in the
+# background on a hybrid laptop CPU, the service was measured decoding ~6x slower
+# than the same model in the foreground. "normal", "abovenormal" or "high".
+PROCESS_PRIORITY = _str("TTS_PROCESS_PRIORITY", "abovenormal")
+DISABLE_ECOQOS = _bool("TTS_DISABLE_ECOQOS", True)
 
 
 # --- Voices -----------------------------------------------------------------

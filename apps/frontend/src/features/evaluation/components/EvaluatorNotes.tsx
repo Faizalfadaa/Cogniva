@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { EvaluationFindingDTO } from '../../../dto/EvaluationReportDTO'
 import { CATEGORY_BADGE_CLASS, CATEGORY_LABEL } from '../lib/findingLabels'
+import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/Evaluation.module.css'
 
 interface EvaluatorNotesProps {
@@ -23,6 +24,7 @@ interface EvaluatorNotesProps {
  * stop at the ends instead.
  */
 export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
+  const t = useT()
   const trackRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
   const [active, setActive] = useState(0)
@@ -159,15 +161,11 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
     return (
       <section className={styles.section}>
         <div className={styles.sectionLabel}>
-          <span>Penilaian Sesi Ini</span>
+          <span>{t('evaluation.notesTitle')}</span>
         </div>
         <div className={styles.findingsEmpty}>
-          <p className={styles.findingsEmptyTitle}>Belum ada yang bisa dinilai.</p>
-          <p className={styles.findingsEmptyHint}>
-            Penilaian dibuat per konsep dari materi rujukan. Sesi yang sangat singkat,
-            atau workspace tanpa materi rujukan, belum menghasilkan apa pun di sini.
-            Lanjutkan sesi dan ajarkan satu konsep lagi untuk mengisinya.
-          </p>
+          <p className={styles.findingsEmptyTitle}>{t('evaluation.nothingToAssess')}</p>
+          <p className={styles.findingsEmptyHint}>{t('evaluation.notesEmptyHint')}</p>
         </div>
       </section>
     )
@@ -176,12 +174,9 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
   return (
     <section className={styles.section}>
       <div className={styles.sectionLabel}>
-        <span>Penilaian Sesi Ini</span>
+        <span>{t('evaluation.notesTitle')}</span>
       </div>
-      <p className={styles.notesIntro}>
-        Dinilai otomatis dari materi rujukan, bukan catatan pribadi muridmu.
-        Geser untuk membaca satu per satu.
-      </p>
+      <p className={styles.notesIntro}>{t('evaluation.notesIntro')}</p>
 
       <div className={styles.notesSlider}>
         <button
@@ -189,7 +184,7 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
           className={`${styles.notesArrow} ${styles.notesArrowLeft}`}
           onClick={() => nudge(-1)}
           disabled={active === 0}
-          aria-label="Temuan sebelumnya"
+          aria-label={t('evaluation.prevFinding')}
         >
           {'‹'}
         </button>
@@ -209,7 +204,7 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
                 <span
                   className={`${styles.findingBadge} ${CATEGORY_BADGE_CLASS[finding.category]}`}
                 >
-                  {CATEGORY_LABEL[finding.category]}
+                  {t(CATEGORY_LABEL[finding.category])}
                 </span>
                 <span className={styles.noteCardCount}>
                   {i + 1} / {findings.length}
@@ -221,7 +216,7 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
 
               {finding.followUp && (
                 <div className={styles.followUpBox}>
-                  <p className={styles.followUpLabel}>Saran perbaikan</p>
+                  <p className={styles.followUpLabel}>{t('evaluation.followUpLabel')}</p>
                   <p className={styles.followUpText}>{finding.followUp}</p>
                 </div>
               )}
@@ -234,7 +229,7 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
           className={`${styles.notesArrow} ${styles.notesArrowRight}`}
           onClick={() => nudge(1)}
           disabled={active === findings.length - 1}
-          aria-label="Temuan berikutnya"
+          aria-label={t('evaluation.nextFinding')}
         >
           {'›'}
         </button>

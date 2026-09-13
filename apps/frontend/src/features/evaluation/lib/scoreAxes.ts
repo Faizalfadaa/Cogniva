@@ -11,6 +11,7 @@
  */
 
 import type { EvaluationFindingDTO } from '../../../dto/EvaluationReportDTO'
+import type { Translate } from '../../../i18n/LanguageProvider'
 
 /** Each CONFUSING finding costs this much clarity. Five of them reach zero. */
 const CONFUSION_PENALTY = 20
@@ -29,6 +30,7 @@ export interface ScoreAxis {
 export function buildScoreAxes(
   findings: EvaluationFindingDTO[],
   depthScore: number,
+  t: Translate,
 ): ScoreAxis[] {
   const correct = findings.filter((f) => f.category === 'CORRECT').length
   const wrong = findings.filter((f) => f.category === 'WRONG').length
@@ -39,52 +41,58 @@ export function buildScoreAxes(
   return [
     {
       key: 'accuracy',
-      short: 'Tepat',
-      label: 'Ketepatan',
+      short: t('evaluation.axisAccuracyShort'),
+      label: t('evaluation.axisAccuracy'),
       value: judged === 0 ? null : Math.round((correct / judged) * 100),
       caption:
         judged === 0
-          ? 'Belum ada poin yang dinilai benar atau salah'
-          : `${correct} tepat dari ${judged} poin yang dinilai`,
+          ? t('evaluation.accuracyNone')
+          : judged === 1
+            ? t('evaluation.accuracyOne', { correct })
+            : t('evaluation.accuracyCount', { correct, judged }),
     },
     {
       key: 'completeness',
-      short: 'Lengkap',
-      label: 'Kelengkapan',
+      short: t('evaluation.axisCompletenessShort'),
+      label: t('evaluation.axisCompleteness'),
       value:
         findings.length === 0
           ? null
           : Math.round(((findings.length - missed) / findings.length) * 100),
       caption:
         findings.length === 0
-          ? 'Belum ada temuan untuk diukur'
+          ? t('evaluation.nothingMeasured')
           : missed === 0
-            ? 'Tidak ada konsep yang terlewat'
-            : `${missed} konsep belum disinggung`,
+            ? t('evaluation.nothingMissed')
+            : missed === 1
+              ? t('evaluation.missedOne')
+              : t('evaluation.missedCount', { count: missed }),
     },
     {
       key: 'clarity',
-      short: 'Jelas',
-      label: 'Kejelasan',
+      short: t('evaluation.axisClarityShort'),
+      label: t('evaluation.axisClarity'),
       value:
         findings.length === 0
           ? null
           : Math.max(0, 100 - confusing * CONFUSION_PENALTY),
       caption:
         findings.length === 0
-          ? 'Belum ada temuan untuk diukur'
+          ? t('evaluation.nothingMeasured')
           : confusing === 0
-            ? 'Tidak ada bagian yang membingungkan'
-            : `${confusing} bagian terbaca rancu`,
+            ? t('evaluation.nothingConfusingAxis')
+            : confusing === 1
+              ? t('evaluation.confusingOne')
+              : t('evaluation.confusingCount', { count: confusing }),
     },
     {
       key: 'depth',
-      short: 'Dalam',
-      label: 'Kedalaman Pemahaman',
+      short: t('evaluation.axisDepthShort'),
+      label: t('evaluation.axisDepth'),
       // Straight from the Evaluator: depth is a judgement about mechanism that
       // counting findings cannot reach.
       value: depthScore,
-      caption: 'Seberapa jauh kamu menjelaskan cara kerjanya, bukan hanya namanya',
+      caption: t('evaluation.depthCaption'),
     },
   ]
 }

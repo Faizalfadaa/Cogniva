@@ -33,7 +33,9 @@ import type { Topic } from "../../contracts/topic.js";
 import type {
   ChatMessage,
   CheckpointErrorKind,
+  LearnerSpeech,
   ReferenceSource,
+  Locale,
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
@@ -46,7 +48,7 @@ import {
   type ReferenceExcerpt,
 } from "../retrieval/index.js";
 import { newId, sessions } from "../storage/sessionStore.js";
-import { synthesizeSpeech, voiceForWorkspace } from "../tts/index.js";
+import { speechSegments, synthesizeSpeech, voiceForWorkspace } from "../tts/index.js";
 import { buildEvaluationReport } from "./evaluationReport.js";
 import { newWorkspaceId, workspaces } from "./workspaceStore.js";
 
@@ -67,10 +69,16 @@ export async function isOwner(id: string, ownerId: string = ANON_OWNER): Promise
   return workspaces.isOwner(id, ownerId);
 }
 
-export async function createWorkspace(ownerId: string = ANON_OWNER): Promise<Workspace> {
+export async function createWorkspace(
+  ownerId: string = ANON_OWNER,
+  locale: Locale = "id",
+): Promise<Workspace> {
   const id = newWorkspaceId();
   const now = utcNowIso();
-  const workspace: Workspace = { id, state: "Draft", createdAt: now, updatedAt: now };
+  // The language is settled here and never written again: a session's
+  // transcript, report and (in English) spoken replies all end up in it, so a
+  // workspace that changed language halfway would be half in each.
+  const workspace: Workspace = { id, state: "Draft", locale, createdAt: now, updatedAt: now };
 
   // Back it with a Session so the orchestrator/Evaluator drive it unchanged.
   // The session is written first: the workspace row references it.
@@ -373,35 +381,38 @@ export async function submitCheckpoint(
       };
     }
     if (!(await stillExists(id))) return;
-    // Publish the text immediately; the voice is attached once it is ready.
-    //
-    // Speech used to be rendered first so both landed on the same poll. That
-    // only held while a render took a few seconds — one was measured at over
-    // three minutes, well past the client timeout, and the reply would have
-    // been held back that long for audio that never arrived. Text is what the
-    // user is waiting for; the voice catches up on a later poll.
-    await workspaces.updateCheckpoint(id, checkpoint.id, {
-      learnerResponse: reply.text,
-      errorKind: reply.errorKind,
-    });
-    // Still mirrored into chat: the text is written in the student's voice, and
-    // dropping it would leave a silent gap in the conversation history.
-    const message = await workspaces.addMessage(id, learnerMessage(reply.text));
-    await bump(id);
-
     // A tagged turn is a system message, not something the student said —
     // speaking "you are out of budget" in the learner's voice would be odd, and
     // it would spend GPU time on a session that just hit its ceiling.
-    if (reply.errorKind) return;
+    const speech = reply.errorKind ? undefined : planSpeech(reply.text);
 
-    const learnerAudioUrl = await speakLearnerReply(id, reply.text);
-    // Re-check: synthesis can take minutes, and the workspace may have been
-    // deleted while it ran.
-    if (learnerAudioUrl && (await stillExists(id))) {
-      await workspaces.updateCheckpoint(id, checkpoint.id, { learnerAudioUrl });
-      await workspaces.updateMessage(id, message.id, { learnerAudioUrl });
-      await bump(id);
-    }
+    // The text and the plan for speaking it land in the same write. With the
+    // voice on, the UI holds the words and reveals each sentence as its clip
+    // starts; with it off (or on a tagged turn) there is no plan, and the text
+    // shows at once exactly as before.
+    //
+    // This replaces rendering the whole reply and attaching one clip afterwards,
+    // which left the voice trailing the text by the full render time. Per
+    // sentence, the first clip is ready after rendering only that sentence and
+    // the rest render behind it.
+    await workspaces.updateCheckpoint(id, checkpoint.id, {
+      learnerResponse: reply.text,
+      errorKind: reply.errorKind,
+      speech,
+    });
+    // Still mirrored into chat: the text is written in the student's voice, and
+    // dropping it would leave a silent gap in the conversation history. Both
+    // carry the same speech id, so a client showing both speaks the line once.
+    const message = await workspaces.addMessage(id, learnerMessage(reply.text, speech));
+    await bump(id);
+
+    if (!speech) return;
+    await speakSegments(id, speech, (next) =>
+      Promise.all([
+        workspaces.updateCheckpoint(id, checkpoint.id, { speech: next }),
+        workspaces.updateMessage(id, message.id, { speech: next }),
+      ]),
+    );
   });
 
   return checkpoint;
@@ -441,15 +452,16 @@ export async function sendChatMessage(
       reply = "Oh, sorry, I blanked for a second there... could you say that again?";
     }
     if (!(await stillExists(id))) return;
-    const message = await workspaces.addMessage(id, learnerMessage(reply));
+    // Same as the checkpoint path: text and speech plan in one write, then the
+    // sentences are voiced one at a time.
+    const speech = planSpeech(reply);
+    const message = await workspaces.addMessage(id, learnerMessage(reply, speech));
     await bump(id);
 
-    // Same as the checkpoint path: the text does not wait on the voice.
-    const learnerAudioUrl = await speakLearnerReply(id, reply);
-    if (learnerAudioUrl && (await stillExists(id))) {
-      await workspaces.updateMessage(id, message.id, { learnerAudioUrl });
-      await bump(id);
-    }
+    if (!speech) return;
+    await speakSegments(id, speech, (next) =>
+      workspaces.updateMessage(id, message.id, { speech: next }),
+    );
   });
 
   return userMsg;
@@ -758,39 +770,79 @@ async function requireSession(ws: Workspace): Promise<Session> {
   return session;
 }
 
-function learnerMessage(content: string, learnerAudioUrl?: string): ChatMessage {
+function learnerMessage(content: string, speech?: LearnerSpeech): ChatMessage {
   return {
     id: newId("msg"),
     sender: "learner",
     content,
-    learnerAudioUrl,
+    speech,
     createdAt: utcNowIso(),
   };
 }
 
 /**
- * Render a learner reply to speech and store it, returning the URL the UI can
- * play — or undefined when speech is off or the voice service is unavailable.
+ * The plan for speaking a reply: its sentences, none voiced yet.
  *
- * The voice is the character the user picked, so it matches the face on screen.
- * That pick is read here rather than passed in: this runs from a background job
- * that can outlive the request which started it, and reading late means a
- * character switched mid-turn is still heard correctly.
+ * Undefined when speech is switched off, which is the signal the UI uses to show
+ * the text immediately instead of waiting for audio that is not coming.
  */
-async function speakLearnerReply(
-  workspaceId: string,
-  text: string,
-): Promise<string | undefined> {
-  const ws = await workspaces.get(workspaceId);
-  const speech = await synthesizeSpeech(text, voiceForWorkspace(ws?.learnerId, workspaceId));
-  if (!speech) return undefined;
+function planSpeech(text: string): LearnerSpeech | undefined {
+  if (!config.TTS_ENABLED) return undefined;
+  const segments = speechSegments(text);
+  if (segments.length === 0) return undefined;
+  return {
+    id: newId("sp"),
+    status: "pending",
+    segments: segments.map((segment) => ({ text: segment })),
+  };
+}
 
-  const audioId = newId("aud");
-  await workspaces.saveAudioClip(workspaceId, audioId, {
-    data: speech.audio,
-    mime: speech.mime,
-  });
-  return `/api/workspaces/${workspaceId}/audio/${audioId}`;
+/**
+ * Voice a reply one sentence at a time, publishing each clip the moment it lands.
+ *
+ * The UI starts playing the first sentence while the rest are still rendering,
+ * so every clip is persisted as soon as it exists rather than all at the end.
+ *
+ * A failed sentence ends the reply as "unavailable" instead of skipping ahead: a
+ * gap in the middle of a spoken line sounds broken, and the UI reveals whatever
+ * is left as text. The voice is read once, when the reply starts speaking, so one
+ * line is never split across two characters if the pick changes mid-reply.
+ */
+async function speakSegments(
+  workspaceId: string,
+  speech: LearnerSpeech,
+  persist: (speech: LearnerSpeech) => Promise<unknown>,
+): Promise<void> {
+  const ws = await workspaces.get(workspaceId);
+  const voice = voiceForWorkspace(ws?.learnerId, workspaceId);
+
+  let current = speech;
+  for (let index = 0; index < current.segments.length; index++) {
+    const clip = await synthesizeSpeech(current.segments[index].text, voice);
+    // Re-checked after every render: the workspace can be deleted mid-reply.
+    if (!(await stillExists(workspaceId))) return;
+
+    if (!clip) {
+      current = { ...current, status: "unavailable" };
+      await persist(current);
+      await bump(workspaceId);
+      return;
+    }
+
+    const audioId = newId("aud");
+    await workspaces.saveAudioClip(workspaceId, audioId, { data: clip.audio, mime: clip.mime });
+    const audioUrl = `/api/workspaces/${workspaceId}/audio/${audioId}`;
+    const segments = current.segments.map((segment, i) =>
+      i === index ? { ...segment, audioUrl } : segment,
+    );
+    current = {
+      ...current,
+      segments,
+      status: index === segments.length - 1 ? "ready" : "pending",
+    };
+    await persist(current);
+    await bump(workspaceId);
+  }
 }
 
 function emptyEvaluation(sessionId: string) {

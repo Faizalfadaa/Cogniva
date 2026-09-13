@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChatToast } from '../hooks/useWorkspaceChat'
+import { spokenText, useUtteranceProgress } from '../hooks/useLearnerVoice'
+import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/TeachingSession.module.css'
 
+/** How long a toast stays once its line has been fully said. */
 const TOAST_DURATION_MS = 5000
 
 interface ChatToastsProps {
@@ -19,12 +22,22 @@ interface ToastItemProps {
 function ToastItem({ toast, onDismiss, onOpenChat }: ToastItemProps) {
   const [visible, setVisible] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const t = useT()
+  const progress = useUtteranceProgress(toast.speech)
+  const waiting = progress?.phase === 'waiting'
+  const shown = waiting ? '...' : spokenText(toast.content, toast.speech, progress)
+  const lineDone = !toast.speech || progress?.phase === 'done'
 
   useEffect(() => {
     // Fade in
     const raf = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
-    // Auto dismiss after duration
+  // Auto dismiss, counted from when the line has been fully said rather than
+  // from when the toast appeared — otherwise it could leave mid-sentence.
+  useEffect(() => {
+    if (!lineDone) return
     timerRef.current = setTimeout(() => {
       setVisible(false)
       // Wait for fade-out transition before removing
@@ -32,10 +45,9 @@ function ToastItem({ toast, onDismiss, onOpenChat }: ToastItemProps) {
     }, TOAST_DURATION_MS)
 
     return () => {
-      cancelAnimationFrame(raf)
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [toast.id, onDismiss])
+  }, [toast.id, onDismiss, lineDone])
 
   return (
     <div
@@ -47,12 +59,12 @@ function ToastItem({ toast, onDismiss, onOpenChat }: ToastItemProps) {
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onOpenChat()}
-      aria-label={`Message from ${toast.senderName}: ${toast.content}. Click to open chat.`}
+      aria-label={t('stage.messageFrom', { name: toast.senderName, text: shown })}
     >
       <img src={toast.avatarUrl} alt={toast.senderName} className={styles.chatToastAvatar} />
       <div className={styles.chatToastBody}>
         <span className={styles.chatToastName}>{toast.senderName}</span>
-        <p className={styles.chatToastText}>{toast.content}</p>
+        <p className={styles.chatToastText}>{shown}</p>
       </div>
     </div>
   )
