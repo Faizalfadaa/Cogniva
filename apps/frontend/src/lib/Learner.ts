@@ -7,6 +7,10 @@ import type { Locale } from '../i18n/messages';
 export interface LearnerCharacter extends Omit<LearnerDTO, 'firstMessage' | 'introVideoUrl'> {
   firstMessages: string[];
   introImageUrl: string;
+  /** Transparent full-body chibi, for surfaces that sit the character beside
+   *  text rather than in a circle: the debrief letter, where a 26px avatar was
+   *  too small to read as anyone in particular. */
+  chibiUrl: string;
   /** Short temperament label, e.g. "Anxious, thorough". Rendered uppercase by
    *  CSS rather than stored that way, so it stays readable in code. */
   traits: string;
@@ -22,6 +26,7 @@ export const LEARNERS: readonly LearnerCharacter[] = [
     name: 'Yuzuki Akatsuki',
     avatarUrl: '/assets/avatars/yuzuki.png',
     introImageUrl: '/intro/yuzuki_full.png',
+    chibiUrl: '/assets/chibi/yuzuki.png',
     firstMessages: [
       'E-Etto...',
       '...{userName}-sensei?',
@@ -38,6 +43,7 @@ export const LEARNERS: readonly LearnerCharacter[] = [
     name: 'Reina Kisaragi',
     avatarUrl: '/assets/avatars/reina.png',
     introImageUrl: '/intro/reina_full.png',
+    chibiUrl: '/assets/chibi/reina.png',
     firstMessages: [
       'Eh?',
       'A-Are you really...',
@@ -57,6 +63,7 @@ export const LEARNERS: readonly LearnerCharacter[] = [
     name: 'Akira Kagetsu',
     avatarUrl: '/assets/avatars/akira.png',
     introImageUrl: '/intro/akira_full.png',
+    chibiUrl: '/assets/chibi/akira.png',
     firstMessages: [
       "...You're late.",
       '...Hm?',

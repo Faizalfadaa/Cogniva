@@ -247,8 +247,6 @@ export const messages = {
   // --- evaluation -----------------------------------------------------------
   'evaluation.complete': { en: 'Session complete', id: 'Sesi selesai' },
   'evaluation.letterTitle': { en: 'Letter from Your Learner', id: 'Surat dari Muridmu' },
-  'evaluation.letterOpen': { en: 'Open the letter from your learner', id: 'Buka surat dari muridmu' },
-  'evaluation.clickToOpen': { en: 'Click to open', id: 'Klik untuk membuka' },
   'evaluation.toTheirTeacher': { en: 'to their teacher', id: 'untuk gurunya' },
   'evaluation.notes': { en: 'My Notes', id: 'Catatanku' },
   'evaluation.learned': { en: 'Learned', id: 'Yang dipahami' },
@@ -409,8 +407,6 @@ export const messages = {
   'evaluation.notesTitle': { en: 'How This Session Went', id: 'Penilaian Sesi Ini' },
   'evaluation.nothingToAssess': { en: 'Nothing to assess yet.', id: 'Belum ada yang bisa dinilai.' },
   'evaluation.followUpLabel': { en: 'Suggested fix', id: 'Saran perbaikan' },
-  'evaluation.prevFinding': { en: 'Previous finding', id: 'Temuan sebelumnya' },
-  'evaluation.nextFinding': { en: 'Next finding', id: 'Temuan berikutnya' },
   'evaluation.transcriptTitle': { en: 'What You Taught', id: 'Yang Kamu Ajarkan' },
   'evaluation.closeNote': { en: 'Close note', id: 'Tutup catatan' },
   'evaluation.close': { en: 'Close', id: 'Tutup' },
@@ -420,8 +416,8 @@ export const messages = {
     id: 'Penilaian dibuat per konsep dari materi rujukan. Sesi yang sangat singkat, atau workspace tanpa materi rujukan, belum menghasilkan apa pun di sini. Lanjutkan sesi dan ajarkan satu konsep lagi untuk mengisinya.',
   },
   'evaluation.notesIntro': {
-    en: 'Assessed automatically against the reference material, not your student\'s private notes. Swipe to read them one at a time.',
-    id: 'Dinilai otomatis dari materi rujukan, bukan catatan pribadi muridmu. Geser untuk membaca satu per satu.',
+    en: 'Assessed automatically against the reference material, not your student\'s private notes. Filter by category, then open a finding to read its suggested fix.',
+    id: 'Dinilai otomatis dari materi rujukan, bukan catatan pribadi muridmu. Saring per kategori, lalu buka satu temuan untuk membaca saran perbaikannya.',
   },
   'evaluation.transcriptIntro': {
     en: 'Marked passages carry an assessment note. Click one to open it in place.',
@@ -445,6 +441,22 @@ export const messages = {
     id: 'Catatan untuk giliran ini, tanpa kutipan presisi',
   },
   'evaluation.seeFollowUp': { en: 'See the suggested fix', id: 'Lihat saran perbaikan' },
+
+  // --- findings board, radar, coverage --------------------------------------
+  'evaluation.radarAria': { en: 'Score shape per axis', id: 'Bentuk skor per aksis' },
+  'evaluation.filterAria': { en: 'Filter findings by category', id: 'Saring temuan per kategori' },
+  'evaluation.filterAll': { en: 'All', id: 'Semua' },
+  'evaluation.filterEmpty': {
+    en: 'No findings in this category.',
+    id: 'Tidak ada temuan di kategori ini.',
+  },
+  'evaluation.statsTitle': { en: 'Session at a Glance', id: 'Sekilas Sesi Ini' },
+  'evaluation.statTurns': { en: 'teaching turns', id: 'giliran mengajar' },
+  'evaluation.statAssessed': { en: 'concepts assessed', id: 'konsep dinilai' },
+  'evaluation.statCovered': { en: 'of them you covered', id: 'di antaranya kamu bahas' },
+  'evaluation.statWords': { en: 'words taught', id: 'kata diajarkan' },
+  'evaluation.turnLabel': { en: 'Turn {index}', id: 'Giliran {index}' },
+  'evaluation.spokenLabel': { en: 'Spoken', id: 'Lisan' },
   'evaluation.processing2b': {
     en: 'Checking each concept against the reference...',
     id: 'Mencocokkan tiap konsep dengan materi rujukan...',

@@ -10,6 +10,7 @@ import { ContinueLearning } from '../../features/evaluation/components/ContinueL
 import { ScoreBreakdown } from '../../features/evaluation/components/ScoreBreakdown'
 import { EvaluatorNotes } from '../../features/evaluation/components/EvaluatorNotes'
 import { TranscriptReview } from '../../features/evaluation/components/TranscriptReview'
+import { SessionSnapshot } from '../../features/evaluation/components/SessionSnapshot'
 import { useLocale, usePinnedLocale, useT } from '../../i18n/LanguageProvider'
 import { LanguageToggle } from '../../i18n/LanguageToggle'
 import styles from '../../styles/Evaluation.module.css'
@@ -202,6 +203,11 @@ export default function EvaluationPage() {
             aria-labelledby="report-tab-detail"
             className={styles.tabPanel}
           >
+            {/* The shape of the session, then the session itself. */}
+            <SessionSnapshot
+              transcript={report!.transcript ?? []}
+              findings={report!.findings}
+            />
             <TranscriptReview
               transcript={report!.transcript ?? []}
               findings={report!.findings}

@@ -48,6 +48,14 @@
   --green-accent: #7fa03a;    /* small "live"/section markers */
   --green-deep: #3a4d12;      /* link colour on light surfaces */
 
+  /* A second accent, apart from the brand lime, for the one thing on a screen
+     asking to be acted on — the debrief's "fix this first", a character's
+     temperament chip. Kept separate from the four finding-category badges
+     below so an accent and a status can never be mistaken for each other. */
+  --gold: #e8b33d;
+  --gold-tint: #fbe8be;
+  --gold-text: #4a3510;
+
   /* Borders */
   --border: rgba(30, 25, 10, 0.1);
   --border-strong: rgba(30, 25, 10, 0.18);

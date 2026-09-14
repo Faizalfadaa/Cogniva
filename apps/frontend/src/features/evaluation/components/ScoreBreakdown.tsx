@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { EvaluationFindingDTO } from '../../../dto/EvaluationReportDTO'
 import type { LearnerCharacter } from '../../../lib/Learner'
 import { buildScoreAxes } from '../lib/scoreAxes'
@@ -22,11 +23,16 @@ interface ScoreBreakdownProps {
  * measurements. The radar sits beside the axis cards rather than instead of
  * them, because a shape answers "is this lopsided" and a card answers "by how
  * much, and counted from what".
+ *
+ * Which axis is being pointed at lives here rather than in either child, so the
+ * link works both ways: hovering a vertex lights its card, hovering a card lights
+ * its vertex.
  */
 export function ScoreBreakdown({ score, depthScore, findings, learner }: ScoreBreakdownProps) {
   const t = useT()
   const axes = buildScoreAxes(findings, depthScore, t)
   const highlights = buildSessionHighlights(findings, axes, t)
+  const [activeAxis, setActiveAxis] = useState<string | null>(null)
 
   return (
     <section className={styles.section}>
@@ -44,13 +50,19 @@ export function ScoreBreakdown({ score, depthScore, findings, learner }: ScoreBr
         <SessionHighlights highlights={highlights} learner={learner} />
 
         <div className={styles.axisLayout}>
-          <AxisRadar axes={axes} />
+          <AxisRadar axes={axes} activeKey={activeAxis} onActiveChange={setActiveAxis} />
 
           <div className={styles.axisGrid}>
             {axes.map((axis) => {
               const Icon = AXIS_ICON[axis.key]
+              const active = activeAxis === axis.key
               return (
-                <div key={axis.key} className={styles.axisCard}>
+                <div
+                  key={axis.key}
+                  className={`${styles.axisCard} ${active ? styles.axisCardActive : ''}`}
+                  onMouseEnter={() => setActiveAxis(axis.key)}
+                  onMouseLeave={() => setActiveAxis(null)}
+                >
                   <p className={styles.axisLabel}>
                     {Icon && (
                       <span className={styles.axisIcon}>
@@ -60,14 +72,14 @@ export function ScoreBreakdown({ score, depthScore, findings, learner }: ScoreBr
                     <span>{axis.label}</span>
                   </p>
                   {axis.value === null ? (
-                    <p className={styles.axisValueEmpty}>belum terukur</p>
+                    <p className={styles.axisValueEmpty}>{t('evaluation.notMeasured')}</p>
                   ) : (
                     <>
                       <p className={styles.axisValue}>{axis.value}</p>
                       <div
                         className={styles.axisBar}
                         role="img"
-                        aria-label={`${axis.label}: ${axis.value} dari 100`}
+                        aria-label={`${axis.label}: ${axis.value} / 100`}
                       >
                         <div className={styles.axisBarFill} style={{ width: `${axis.value}%` }} />
                       </div>

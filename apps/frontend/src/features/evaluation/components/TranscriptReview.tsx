@@ -86,9 +86,12 @@ export function TranscriptReview({ transcript, findings }: TranscriptReviewProps
             return (
               <li
                 key={turn.turnIndex}
+                id={`transcript-turn-${turn.turnIndex}`}
                 className={`${styles.turnCard} ${wholeTurn.length ? styles.turnCardFlagged : ''}`}
               >
-                <p className={styles.turnIndex}>Giliran {turn.turnIndex}</p>
+                <p className={styles.turnIndex}>
+                  {t('evaluation.turnLabel', { index: turn.turnIndex })}
+                </p>
 
                 <p className={styles.turnBody}>
                   {renderChannel(turn.boardText, quoted, 'boardText', indexOf, openIndex, toggle, openAndScroll, t)}
@@ -96,7 +99,7 @@ export function TranscriptReview({ transcript, findings }: TranscriptReviewProps
 
                 {turn.speech && (
                   <p className={styles.turnSpeech}>
-                    <span className={styles.turnSpeechLabel}>Lisan</span>
+                    <span className={styles.turnSpeechLabel}>{t('evaluation.spokenLabel')}</span>
                     {renderChannel(turn.speech, quoted, 'speech', indexOf, openIndex, toggle, openAndScroll, t)}
                   </p>
                 )}
