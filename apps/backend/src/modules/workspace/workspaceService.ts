@@ -552,11 +552,19 @@ export async function resumeSession(id: string): Promise<Workspace | undefined> 
 
 // --- Internals -------------------------------------------------------------
 
-/** Shown in the chat when the session runs out of token budget (§7.3). The
- * workspace UI has no separate banner, so this speaks in the student's voice. */
-const BUDGET_EXCEEDED_REPLY =
-  "Ah, this session has hit its token limit for this round. " +
-  "Let's wrap it up here so I can give you my evaluation!";
+/** End-of-session copy in the selected character's voice and session language. */
+const BUDGET_EXCEEDED_REPLIES = {
+  id: {
+    yuzuki: "E-Etto… Sensei, maaf, cukup dulu untuk kali ini, ya? Aku perlu menata lagi yang tadi kupelajari… Setelah itu, aku ceritakan bagian yang sudah kupahami dan yang masih bikin bingung.",
+    reina: "Waaah, Sensei! Kepalaku udah penuh sampai campur aduk! Kita cukupkan dulu, ya! Aku mau cerita hasil belajarku sebelum semuanya ketuker!",
+    akira: "…Cukup dulu, Sensei. Aku perlu mencerna penjelasan tadi. Mari kita tutup sesi ini. Akan kuberi tahu mana yang kupahami dan mana yang masih belum jelas.",
+  },
+  en: {
+    yuzuki: "E-Etto… Sensei, sorry, could we stop here for now? I need a little time to sort through what I've learned… Then I'll tell you what I understood and what still confuses me.",
+    reina: "Waaah, Sensei! My head's so full, everything's getting mixed up! Let's stop here for now! I want to tell you what I've learned before I get it all scrambled!",
+    akira: "…That's enough for now, Sensei. I need to digest that explanation. Let's wrap up this session. I'll tell you what I understood and what's still unclear.",
+  },
+} satisfies Record<Locale, Record<ReturnType<typeof voiceForWorkspace>, string>>;
 
 /**
  * What one teaching turn produced. `text` is always readable prose so a client
@@ -591,7 +599,11 @@ async function runTeachingTurn(
   // budget check is enough -- the old second check guarded a retry that no
   // longer exists.
   if (result.kind === "budget_exceeded") {
-    return { text: BUDGET_EXCEEDED_REPLY, errorKind: "budget_exceeded" };
+    const character = voiceForWorkspace(ws.learnerId, ws.id);
+    return {
+      text: BUDGET_EXCEEDED_REPLIES[ws.locale][character],
+      errorKind: "budget_exceeded",
+    };
   }
 
   return { text: result.response?.text ?? "Okay... go on, I'm following." };
