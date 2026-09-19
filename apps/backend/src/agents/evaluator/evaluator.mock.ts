@@ -9,6 +9,7 @@
  */
 
 import { utcNowIso } from "../../contracts/common.js";
+import { scoreFindings } from "./scoring.js";
 import type { EvaluationResult, Finding, EvaluatorInput, TranscriptTurn } from "./types.js";
 
 const STOPWORDS = new Set([
@@ -44,9 +45,6 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
     }
   }
 
-  const total = input.keyConcepts.length || 1;
-  const score = input.turns.length === 0 ? 0 : Math.round((covered.length / total) * 100);
-
   // Keyword coverage can say whether a concept was mentioned, never how deeply
   // it was explained, so there is no honest offline measure of depth. What the
   // transcript does support is a volume proxy, capped at 50: non-zero once the
@@ -72,6 +70,12 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
     }
   }
 
+  // Same arithmetic the real path uses (scoring.ts), over findings this path
+  // reached by keyword matching rather than by judgement. The number then means
+  // the same thing in both modes even though the evidence behind it is weaker,
+  // which is what makes an offline score comparable to an online one at all.
+  const score = input.turns.length === 0 ? 0 : scoreFindings(findings).score;
+
   return {
     evaluationId,
     sessionId: input.sessionId,
@@ -81,7 +85,7 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
     summary:
       input.turns.length === 0
         ? "No teaching turns were recorded yet, so there's nothing to assess."
-        : `You conveyed ${covered.length} of ${total} key concepts. ` +
+        : `You conveyed ${covered.length} of ${input.keyConcepts.length} key concepts. ` +
           (missed.length
             ? "A few important parts were still missed."
             : "Concept coverage is complete, nice work!"),

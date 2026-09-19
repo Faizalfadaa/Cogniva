@@ -88,6 +88,17 @@ export interface LLMClientOptions {
   timeout: number;
   /** Thinking-token budget; 0 disables thinking (default). */
   thinkingBudget?: number;
+  /**
+   * Sampling temperature. Omitted by default, which leaves the model on its
+   * own default — so every agent that does not ask for one behaves exactly as
+   * it did before this option existed.
+   *
+   * Opt-in per agent rather than set globally, because the agents want
+   * opposite things: the Evaluator wants the same transcript to classify the
+   * same way twice, while the Learner would sound mechanical if its replies
+   * stopped varying.
+   */
+  temperature?: number;
 }
 
 /** Wraps a Gemini client and returns parsed JSON objects. */
@@ -103,8 +114,10 @@ export class LLMClient implements LLM {
   readonly model: string;
   readonly maxTokens: number;
   readonly thinkingBudget: number;
+  /** Undefined means "do not send one", not "send zero". */
+  readonly temperature: number | undefined;
 
-  constructor({ model, maxTokens, timeout, thinkingBudget }: LLMClientOptions) {
+  constructor({ model, maxTokens, timeout, thinkingBudget, temperature }: LLMClientOptions) {
     const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
     // httpOptions.timeout is in milliseconds.
     this.client = new GoogleGenAI({
@@ -114,6 +127,7 @@ export class LLMClient implements LLM {
     this.model = model;
     this.maxTokens = maxTokens;
     this.thinkingBudget = thinkingBudget ?? 0;
+    this.temperature = temperature;
   }
 
   /**
@@ -145,6 +159,9 @@ export class LLMClient implements LLM {
           responseMimeType: "application/json",
           responseJsonSchema: schema,
           thinkingConfig: { thinkingBudget: this.thinkingBudget },
+          // Spread, so a client that asked for no temperature sends no
+          // temperature and keeps the model's own default.
+          ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
         },
       });
     } catch (err) {
