@@ -1381,6 +1381,106 @@
   color: var(--text-on-forest-muted);
 }
 
+/* Faint, because a gridline is a reading aid and must never compete with the
+   line whose height it exists to explain. */
+.trendGrid {
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+}
+
+.trendAxisTick {
+  fill: var(--text-on-forest-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  dominant-baseline: middle;
+}
+
+.trendAxisName {
+  fill: var(--text-on-forest-faint);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* The value sits on its own point, so the exact number never has to be
+   estimated against the axis. */
+.trendValue {
+  fill: var(--text-on-forest-muted);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+}
+
+.trendValueCurrent {
+  fill: var(--lime);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.trendLegend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+}
+
+.trendLegendItem {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-on-forest-muted);
+  min-width: 0;
+}
+
+.trendLegendCurrent {
+  color: var(--text-on-forest);
+  font-weight: 600;
+}
+
+.trendLegendIndex {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  flex: none;
+}
+
+.trendLegendName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 24ch;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   The recording behind a turn
+═══════════════════════════════════════════════════════════ */
+.turnAudio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.turnAudioLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex: none;
+}
+
+.turnAudioPlayer {
+  flex: 1;
+  min-width: 200px;
+  max-width: 420px;
+  height: 32px;
+}
+
 /* ═══════════════════════════════════════════════════════════
    Follow-up suggestion
 ═══════════════════════════════════════════════════════════ */

@@ -474,6 +474,9 @@ export const messages = {
   },
   'evaluation.trendVsPrevious': { en: 'vs last session', id: 'dari sesi sebelumnya' },
   'evaluation.trendSame': { en: 'same as last session', id: 'sama seperti sesi lalu' },
+  'evaluation.trendAxisY': { en: 'Score', id: 'Skor' },
+  'evaluation.trendAxisX': { en: 'Session, oldest first', id: 'Sesi, dari yang terlama' },
+  'evaluation.recordingLabel': { en: 'Your recording', id: 'Rekamanmu' },
   'evaluation.trendCaption': {
     en: 'Each dot is a finished session, scored the same way. Yours is the filled one.',
     id: 'Tiap titik adalah satu sesi selesai, dinilai dengan cara yang sama. Sesi ini yang terisi penuh.',

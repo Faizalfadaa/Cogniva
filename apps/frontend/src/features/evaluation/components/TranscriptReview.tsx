@@ -32,10 +32,12 @@ interface TranscriptReviewProps {
  * Identity is the finding's index in `findings`, so the mark in the text and the
  * panel that opens under it always agree on which note is showing.
  *
- * Each turn can also show the board it was taught from. The app is built around
- * a whiteboard, and until now the debrief only ever showed Vision's reading of
- * it — the drawing the user actually made never came back. Boards are matched by
- * position and only when the counts line up exactly (see `boardsByTurn`).
+ * Each turn can also show what it was taught from: the board that was drawn,
+ * and the recording that was spoken over it. The app is built around a
+ * whiteboard and a microphone, and until now the debrief only ever showed what
+ * the agents read out of them — never the drawing or the voice itself. Both are
+ * matched by position and only when the counts line up exactly (see
+ * `capturesByTurn`).
  */
 export function TranscriptReview({ transcript, findings, checkpoints }: TranscriptReviewProps) {
   const t = useT()
@@ -49,15 +51,19 @@ export function TranscriptReview({ transcript, findings, checkpoints }: Transcri
    * transcript entry, and the positions drift. Showing the wrong board under
    * the wrong words is worse than showing none, so an uneven count shows none.
    */
-  const boardsByTurn = useMemo(() => {
+  const capturesByTurn = useMemo(() => {
     if (!checkpoints || checkpoints.length !== transcript.length) return null
     const ordered = [...checkpoints].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     )
-    const map = new Map<number, string>()
+    const map = new Map<number, { image?: string; audio?: string }>()
     transcript.forEach((turn, i) => {
-      const image = ordered[i]?.snapshotImageUrl
-      if (image) map.set(turn.turnIndex, image)
+      const checkpoint = ordered[i]
+      if (!checkpoint) return
+      map.set(turn.turnIndex, {
+        image: checkpoint.snapshotImageUrl || undefined,
+        audio: checkpoint.audioUrl,
+      })
     })
     return map
   }, [checkpoints, transcript])
@@ -122,10 +128,10 @@ export function TranscriptReview({ transcript, findings, checkpoints }: Transcri
                   {t('evaluation.turnLabel', { index: turn.turnIndex })}
                 </p>
 
-                {boardsByTurn?.get(turn.turnIndex) && (
+                {capturesByTurn?.get(turn.turnIndex)?.image && (
                   <figure className={styles.turnBoard}>
                     <img
-                      src={boardsByTurn.get(turn.turnIndex)}
+                      src={capturesByTurn.get(turn.turnIndex)!.image}
                       alt={t('evaluation.boardAlt', { index: turn.turnIndex })}
                       className={styles.turnBoardImage}
                       loading="lazy"
@@ -145,6 +151,25 @@ export function TranscriptReview({ transcript, findings, checkpoints }: Transcri
                     <span className={styles.turnSpeechLabel}>{t('evaluation.spokenLabel')}</span>
                     {renderChannel(turn.speech, quoted, 'speech', indexOf, openIndex, toggle, openAndScroll, t)}
                   </p>
+                )}
+
+                {/* The recording itself, under the words ASR made of it. A
+                    transcript can be read for what was said; only the audio
+                    carries how it was said, which is the half a user wanting to
+                    teach better actually has to hear. Native controls: this is
+                    a short clip played once, not a player worth building. */}
+                {capturesByTurn?.get(turn.turnIndex)?.audio && (
+                  <div className={styles.turnAudio}>
+                    <span className={styles.turnAudioLabel}>
+                      {t('evaluation.recordingLabel')}
+                    </span>
+                    <audio
+                      className={styles.turnAudioPlayer}
+                      src={capturesByTurn.get(turn.turnIndex)!.audio}
+                      controls
+                      preload="none"
+                    />
+                  </div>
                 )}
 
                 {quoted.length === 0 && wholeTurn.length === 0 && (
