@@ -1349,8 +1349,12 @@
    category colours already spoken for. */
 .trendDown { color: var(--text-on-forest-muted); }
 
+/* Capped, not stretched. At 100% of a 1080px column the aspect ratio dragged
+   the height to 400px, which made a supporting strip the tallest thing in the
+   score card. The cap keeps it the size of the glance it is meant to be. */
 .trendChart {
   width: 100%;
+  max-width: 380px;
   height: auto;
   display: block;
 }

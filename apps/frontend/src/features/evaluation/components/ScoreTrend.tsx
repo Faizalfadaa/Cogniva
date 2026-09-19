@@ -3,15 +3,18 @@ import type { ScoreHistoryPointDTO } from '../../../dto/EvaluationReportDTO'
 import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/Evaluation.module.css'
 
-/* Room on the left for the y-axis numbers, above for the y-axis name, and
-   underneath for the x-axis labels and name — so no two of them can land on
-   each other or on the line itself. */
-const WIDTH = 300
-const HEIGHT = 140
+/* Wide and short, because this is a strip that answers "which way" — not a
+   chart to be studied. The ratio matters as much as the numbers: the SVG scales
+   to its container, so a squarer viewBox is what made this render 400px tall
+   and take up more of the score card than the score. Room is still reserved on
+   the left for the y-axis numbers, above for the y-axis name, and underneath
+   for the x-axis labels and name, so none of them can land on the line. */
+const WIDTH = 340
+const HEIGHT = 120
 const PAD_LEFT = 32
 const PAD_RIGHT = 14
-const PAD_TOP = 26
-const PLOT_BOTTOM = 104
+const PAD_TOP = 22
+const PLOT_BOTTOM = 88
 
 /** The score scale, fixed at 0..100 and labelled at these marks. */
 const Y_TICKS = [0, 50, 100]
@@ -131,7 +134,7 @@ export function ScoreTrend({ history, currentWorkspaceId, currentRound }: ScoreT
 
         <polyline className={styles.trendLine} points={line} />
 
-        {points.map((p) => {
+        {points.map((p, i) => {
           const isCurrent = keyOf(p) === keyOf(current)
           return (
             <g key={keyOf(p)}>
@@ -142,12 +145,16 @@ export function ScoreTrend({ history, currentWorkspaceId, currentRound }: ScoreT
                 r={isCurrent ? 4.5 : 3}
               />
               {/* The value on the point, so the exact number never has to be
-                  read off the axis by eye. */}
+                  read off the axis by eye. The end points lean inward: centred
+                  on the first dot, the label sat on top of the y-axis numbers,
+                  and on the last it ran past the right edge. */}
               <text
                 className={isCurrent ? styles.trendValueCurrent : styles.trendValue}
-                x={p.x}
+                x={p.x + (i === 0 ? 4 : i === points.length - 1 ? -4 : 0)}
                 y={p.y - 9}
-                textAnchor="middle"
+                textAnchor={
+                  i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle'
+                }
               >
                 {p.score}
               </text>
@@ -160,7 +167,7 @@ export function ScoreTrend({ history, currentWorkspaceId, currentRound }: ScoreT
                 y={PLOT_BOTTOM + 14}
                 textAnchor="middle"
               >
-                {points.indexOf(p) + 1}
+                {i + 1}
               </text>
             </g>
           )
