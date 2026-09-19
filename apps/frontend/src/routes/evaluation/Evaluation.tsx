@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import type { WorkspaceDTO } from '../../dto/WorkspaceDTO'
-import type { EvaluationReportDTO, ScoreHistoryPointDTO } from '../../dto/EvaluationReportDTO'
+import type {
+  EvaluationReportDTO,
+  EvaluationRoundSummaryDTO,
+  ScoreHistoryPointDTO,
+} from '../../dto/EvaluationReportDTO'
 import type { TeachingCheckpointDTO } from '../../dto/TeachingCheckpointDTO'
 import { resolveLearner } from '../../lib/Learner'
 import { EvaluationProcessing } from '../../features/evaluation/components/EvaluationProcessing'
@@ -12,6 +16,7 @@ import { ScoreBreakdown } from '../../features/evaluation/components/ScoreBreakd
 import { EvaluatorNotes } from '../../features/evaluation/components/EvaluatorNotes'
 import { TranscriptReview } from '../../features/evaluation/components/TranscriptReview'
 import { SessionSnapshot } from '../../features/evaluation/components/SessionSnapshot'
+import { RoundPicker } from '../../features/evaluation/components/RoundPicker'
 import { useLocale, usePinnedLocale, useT } from '../../i18n/LanguageProvider'
 import { LanguageToggle } from '../../i18n/LanguageToggle'
 import styles from '../../styles/Evaluation.module.css'
@@ -32,6 +37,7 @@ export default function EvaluationPage() {
   const [resuming, setResuming] = useState(false)
   const [tab, setTab] = useState<ReportTab>('summary')
   const [history, setHistory] = useState<ScoreHistoryPointDTO[]>([])
+  const [rounds, setRounds] = useState<EvaluationRoundSummaryDTO[]>([])
   const [checkpoints, setCheckpoints] = useState<TeachingCheckpointDTO[] | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -97,6 +103,32 @@ export default function EvaluationPage() {
     if (!report) return
     bridge.getScoreHistory().then(setHistory).catch(() => {})
   }, [bridge, report])
+
+  // Which rounds this workspace has. Fetched once a report exists, because
+  // before that there is nothing to have rounds of.
+  useEffect(() => {
+    if (!id || !report) return
+    bridge.getEvaluationRounds(id).then(setRounds).catch(() => {})
+  }, [bridge, id, report])
+
+  /**
+   * Switch to another finished round.
+   *
+   * The report is replaced rather than merged: every section on this screen
+   * reads from one round, and showing a mix of two would be worse than showing
+   * either. Checkpoints are dropped for the same reason — the board images
+   * belong to whichever round is on screen.
+   */
+  async function handleSelectRound(round: number) {
+    if (!id || round === report?.round) return
+    try {
+      const next = await bridge.getEvaluationReport(id, round)
+      setReport(next)
+      setCheckpoints(null)
+    } catch (err) {
+      console.error('[Evaluation] could not load round', round, err)
+    }
+  }
 
   // Checkpoints carry the board images and the timestamps, and they are heavy
   // (a data URL per turn). Fetched only when the Detail tab is actually opened,
@@ -182,6 +214,13 @@ export default function EvaluationPage() {
 
       {/* Sections */}
       <div className={styles.reportContent}>
+        {/* Above the score, because it decides which score is being read. */}
+        <RoundPicker
+          rounds={rounds}
+          selected={report!.round}
+          onSelect={handleSelectRound}
+        />
+
         <ScoreBreakdown
           score={report!.score}
           depthScore={report!.depthScore}
@@ -189,6 +228,7 @@ export default function EvaluationPage() {
           learner={learner}
           history={history}
           workspaceId={id!}
+          round={report!.round}
         />
 
         <div className={styles.tabBar} role="tablist" aria-label={t('evaluation.reportView')}>

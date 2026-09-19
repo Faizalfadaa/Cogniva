@@ -3,7 +3,11 @@ import type { WorkspaceDTO } from '../dto/WorkspaceDTO';
 import type { Locale } from '../i18n/messages';
 import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
-import type { EvaluationReportDTO, ScoreHistoryPointDTO } from '../dto/EvaluationReportDTO';
+import type {
+  EvaluationReportDTO,
+  EvaluationRoundSummaryDTO,
+  ScoreHistoryPointDTO,
+} from '../dto/EvaluationReportDTO';
 import type { TimelineDTO } from '../dto/TimelineDTO';
 import type {
   ReferenceSuggestionsDTO,
@@ -35,7 +39,8 @@ interface MockStore {
   workspaces: Map<string, WorkspaceDTO>;
   checkpoints: Map<string, TeachingCheckpointDTO[]>;
   messages: Map<string, ChatMessageDTO[]>;
-  reports: Map<string, EvaluationReportDTO>;
+  /** Rounds per workspace, oldest first — mirrors the real per-round store. */
+  reports: Map<string, EvaluationReportDTO[]>;
   evaluationTimers: Map<string, ReturnType<typeof setTimeout>>;
 }
 
@@ -70,7 +75,10 @@ function randomReaction(): string {
 // Evaluation report generator
 // ---------------------------------------------------------------------------
 
-function generateMockReport(workspaceId: string): EvaluationReportDTO {
+/** Everything but the round's place in the history, which the caller assigns. */
+function generateMockReport(
+  workspaceId: string,
+): Omit<EvaluationReportDTO, 'round' | 'createdAt'> {
   const checkpoints = store.checkpoints.get(workspaceId) ?? [];
   const ws = store.workspaces.get(workspaceId);
   const topic = ws?.title || 'this topic';
@@ -474,33 +482,63 @@ export class MockCognivaBridge implements CognivaBridge {
       const current = store.workspaces.get(workspaceId);
       if (!current || current.state !== 'Evaluating') return;
       store.workspaces.set(workspaceId, { ...current, state: 'Completed', updatedAt: now() });
-      store.reports.set(workspaceId, generateMockReport(workspaceId));
+      // Appended, like the real store: finishing a resumed session adds a round
+      // rather than replacing the debrief the previous one produced.
+      const rounds = store.reports.get(workspaceId) ?? [];
+      rounds.push({
+        ...generateMockReport(workspaceId),
+        round: rounds.length + 1,
+        createdAt: now(),
+      });
+      store.reports.set(workspaceId, rounds);
       store.evaluationTimers.delete(workspaceId);
     }, 5000);
 
     store.evaluationTimers.set(workspaceId, timer);
   }
 
-  async getEvaluationReport(workspaceId: string): Promise<EvaluationReportDTO> {
+  async getEvaluationReport(
+    workspaceId: string,
+    round?: number,
+  ): Promise<EvaluationReportDTO> {
     await delay(200);
-    const report = store.reports.get(workspaceId);
-    if (!report) throw new Error(`[Mock] Report not ready for workspace: ${workspaceId}`);
+    const rounds = store.reports.get(workspaceId);
+    if (!rounds?.length) {
+      throw new Error(`[Mock] Report not ready for workspace: ${workspaceId}`);
+    }
+    const report =
+      round === undefined ? rounds[rounds.length - 1] : rounds.find((r) => r.round === round);
+    if (!report) throw new Error(`[Mock] No round ${round} for workspace: ${workspaceId}`);
     return { ...report };
   }
 
-  /** Every report the mock has produced this session, oldest workspace first. */
+  async getEvaluationRounds(workspaceId: string): Promise<EvaluationRoundSummaryDTO[]> {
+    await delay(120);
+    return (store.reports.get(workspaceId) ?? []).map((report) => ({
+      round: report.round,
+      score: report.score,
+      depthScore: report.depthScore,
+      findingCount: report.findings.length,
+      createdAt: report.createdAt,
+    }));
+  }
+
+  /** Every round the mock has produced this session, oldest first. */
   async getScoreHistory(): Promise<ScoreHistoryPointDTO[]> {
     await delay(120);
     const points: ScoreHistoryPointDTO[] = [];
-    for (const [workspaceId, report] of store.reports) {
+    for (const [workspaceId, rounds] of store.reports) {
       const ws = store.workspaces.get(workspaceId);
       if (!ws) continue;
-      points.push({
-        workspaceId,
-        title: ws.title ?? null,
-        score: report.score,
-        completedAt: ws.updatedAt,
-      });
+      for (const report of rounds) {
+        points.push({
+          workspaceId,
+          round: report.round,
+          title: ws.title ?? null,
+          score: report.score,
+          completedAt: report.createdAt,
+        });
+      }
     }
     return points.sort(
       (a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime(),

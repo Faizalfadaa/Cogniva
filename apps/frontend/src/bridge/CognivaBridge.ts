@@ -1,7 +1,11 @@
 import type { WorkspaceDTO } from '../dto/WorkspaceDTO';
 import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
-import type { EvaluationReportDTO, ScoreHistoryPointDTO } from '../dto/EvaluationReportDTO';
+import type {
+  EvaluationReportDTO,
+  EvaluationRoundSummaryDTO,
+  ScoreHistoryPointDTO,
+} from '../dto/EvaluationReportDTO';
 import type { TimelineDTO } from '../dto/TimelineDTO';
 import type {
   ReferenceSuggestionsDTO,
@@ -72,8 +76,11 @@ export interface CognivaBridge {
   // The workspace state moves straight to 'Evaluating'; the caller polls getWorkspace()
   // to learn when it becomes 'Completed' - there's no separate status endpoint.
   finishSession(workspaceId: string): Promise<void>;
-  getEvaluationReport(workspaceId: string): Promise<EvaluationReportDTO>;
-  /** Scores of every session this device has finished, oldest first. */
+  /** The latest finished round, or an earlier one when `round` is given. */
+  getEvaluationReport(workspaceId: string, round?: number): Promise<EvaluationReportDTO>;
+  /** Which rounds this workspace has finished, oldest first. */
+  getEvaluationRounds(workspaceId: string): Promise<EvaluationRoundSummaryDTO[]>;
+  /** Scores of every round this device has finished, oldest first. */
   getScoreHistory(): Promise<ScoreHistoryPointDTO[]>;
 
   // Resume a session from Completed back to Teaching

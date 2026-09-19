@@ -18,9 +18,11 @@ interface ScoreBreakdownProps {
   depthScore: number
   findings: EvaluationFindingDTO[]
   learner: LearnerCharacter
-  /** Every scored session this device has finished, for the trend strip. */
+  /** Every scored round this device has finished, for the trend strip. */
   history: ScoreHistoryPointDTO[]
   workspaceId: string
+  /** Which round is on screen, so the trend can mark the right point. */
+  round: number
 }
 
 /**
@@ -42,6 +44,7 @@ export function ScoreBreakdown({
   learner,
   history,
   workspaceId,
+  round,
 }: ScoreBreakdownProps) {
   const t = useT()
   const axes = buildScoreAxes(findings, depthScore, t)
@@ -59,9 +62,14 @@ export function ScoreBreakdown({
           <span className={styles.scoreValue}>{score}</span>
           <span className={styles.scoreOutOf}>/ 100</span>
           <p className={styles.scoreCaption}>{t('evaluation.scoreCaption')}</p>
+          <p className={styles.scoreFormula}>{t('evaluation.scoreFormula')}</p>
         </div>
 
-        <ScoreTrend history={history} currentWorkspaceId={workspaceId} />
+        <ScoreTrend
+          history={history}
+          currentWorkspaceId={workspaceId}
+          currentRound={round}
+        />
 
         <SessionHighlights highlights={highlights} learner={learner} />
 

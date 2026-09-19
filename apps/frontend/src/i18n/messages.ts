@@ -404,9 +404,18 @@ export const messages = {
     en: 'How accurate and complete your explanation was against the reference material.',
     id: 'Ketepatan dan kelengkapan penjelasanmu dibanding materi rujukan.',
   },
+  /* Spelled out on the screen rather than buried in the code: a score nobody
+     can reproduce is a score nobody can argue with, and the whole point of
+     computing it from the findings was to make it checkable. */
+  'evaluation.scoreFormula': {
+    en: 'Counted from the findings below: 50% accuracy, 30% completeness, 20% clarity. Depth is judged separately and is not part of this number.',
+    id: 'Dihitung dari temuan di bawah: 50% ketepatan, 30% kelengkapan, 20% kejelasan. Kedalaman dinilai terpisah dan tidak masuk ke angka ini.',
+  },
   'evaluation.notesTitle': { en: 'How This Session Went', id: 'Penilaian Sesi Ini' },
   'evaluation.nothingToAssess': { en: 'Nothing to assess yet.', id: 'Belum ada yang bisa dinilai.' },
   'evaluation.followUpLabel': { en: 'Suggested fix', id: 'Saran perbaikan' },
+  'evaluation.prevFinding': { en: 'Previous finding', id: 'Temuan sebelumnya' },
+  'evaluation.nextFinding': { en: 'Next finding', id: 'Temuan berikutnya' },
   'evaluation.transcriptTitle': { en: 'What You Taught', id: 'Yang Kamu Ajarkan' },
   'evaluation.closeNote': { en: 'Close note', id: 'Tutup catatan' },
   'evaluation.close': { en: 'Close', id: 'Tutup' },
@@ -486,6 +495,12 @@ export const messages = {
   'evaluation.practiceConcept': {
     en: 'Practise this concept →',
     id: 'Latih konsep ini →',
+  },
+  'evaluation.roundPickerLabel': { en: 'Which round', id: 'Ronde ke berapa' },
+  'evaluation.roundLabel': { en: 'Round {round}', id: 'Ronde {round}' },
+  'evaluation.viewingOlderRound': {
+    en: 'You are reading an earlier round. Your newest debrief is the last tab.',
+    id: 'Kamu sedang membaca ronde yang lebih lama. Debrief terbarumu ada di tab paling kanan.',
   },
   'evaluation.processing2b': {
     en: 'Checking each concept against the reference...',

@@ -12,8 +12,19 @@ const PAD_Y = 8
 
 interface ScoreTrendProps {
   history: ScoreHistoryPointDTO[]
-  /** The session being read, so its own point can be marked in the run. */
+  /** The workspace being read. */
   currentWorkspaceId: string
+  /**
+   * The round being read, which the workspace id alone no longer identifies:
+   * a workspace taught twice contributes two points, and only one of them is
+   * the one on screen.
+   */
+  currentRound: number
+}
+
+/** Unique per point now that a workspace can contribute several. */
+function keyOf(point: { workspaceId: string; round: number }): string {
+  return `${point.workspaceId}#${point.round}`
 }
 
 /**
@@ -28,7 +39,7 @@ interface ScoreTrendProps {
  * turns three scores a point apart into a dramatic climb; the whole value of
  * this strip is that a small gain looks small.
  */
-export function ScoreTrend({ history, currentWorkspaceId }: ScoreTrendProps) {
+export function ScoreTrend({ history, currentWorkspaceId, currentRound }: ScoreTrendProps) {
   const t = useT()
 
   const points = useMemo(
@@ -46,7 +57,9 @@ export function ScoreTrend({ history, currentWorkspaceId }: ScoreTrendProps) {
 
   if (points.length < 2) return null
 
-  const currentIndex = points.findIndex((p) => p.workspaceId === currentWorkspaceId)
+  const currentIndex = points.findIndex(
+    (p) => p.workspaceId === currentWorkspaceId && p.round === currentRound,
+  )
   const current = currentIndex === -1 ? points[points.length - 1] : points[currentIndex]
   const previous = currentIndex > 0 ? points[currentIndex - 1] : null
   const delta = previous ? current.score - previous.score : null
@@ -79,17 +92,18 @@ export function ScoreTrend({ history, currentWorkspaceId }: ScoreTrendProps) {
         aria-label={points.map((p) => `${p.title ?? ''} ${p.score}`).join(', ')}
       >
         <polyline className={styles.trendLine} points={line} />
-        {points.map((p) => (
-          <circle
-            key={p.workspaceId}
-            className={
-              p.workspaceId === current.workspaceId ? styles.trendDotCurrent : styles.trendDot
-            }
-            cx={p.x}
-            cy={p.y}
-            r={p.workspaceId === current.workspaceId ? 4.5 : 3}
-          />
-        ))}
+        {points.map((p) => {
+          const isCurrent = keyOf(p) === keyOf(current)
+          return (
+            <circle
+              key={keyOf(p)}
+              className={isCurrent ? styles.trendDotCurrent : styles.trendDot}
+              cx={p.x}
+              cy={p.y}
+              r={isCurrent ? 4.5 : 3}
+            />
+          )
+        })}
       </svg>
 
       <p className={styles.trendCaption}>{t('evaluation.trendCaption')}</p>
