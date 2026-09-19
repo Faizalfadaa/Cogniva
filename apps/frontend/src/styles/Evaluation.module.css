@@ -1349,13 +1349,20 @@
    category colours already spoken for. */
 .trendDown { color: var(--text-on-forest-muted); }
 
-/* Capped, not stretched. At 100% of a 1080px column the aspect ratio dragged
-   the height to 400px, which made a supporting strip the tallest thing in the
-   score card. The cap keeps it the size of the glance it is meant to be. */
-.trendChart {
+/* The wrapper is what gets measured; the svg is drawn at that exact pixel size
+   rather than scaled into it, so the strip spans the card at a height this
+   component chooses instead of one the aspect ratio imposes. */
+.trendChartWrap {
   width: 100%;
-  max-width: 380px;
-  height: auto;
+  min-width: 0;
+  /* Without this the svg's own width inflates the wrapper, the wrapper reports
+     that inflated width back, and the measurement can never come down again.
+     Clipping breaks the loop: the wrapper is sized by the card, and an
+     oversized first paint is hidden rather than load-bearing. */
+  overflow: hidden;
+}
+
+.trendChart {
   display: block;
 }
 
@@ -1392,18 +1399,20 @@
   stroke-width: 1;
 }
 
+/* Sizes are true pixels now that the svg is drawn at its measured width, so
+   they are set where they read rather than where they scale to. */
 .trendAxisTick {
   fill: var(--text-on-forest-muted);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   dominant-baseline: middle;
 }
 
 .trendAxisName {
   fill: var(--text-on-forest-faint);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -1412,13 +1421,13 @@
 .trendValue {
   fill: var(--text-on-forest-muted);
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 11px;
 }
 
 .trendValueCurrent {
   fill: var(--lime);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
 }
 

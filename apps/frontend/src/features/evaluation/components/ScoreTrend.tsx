@@ -1,20 +1,26 @@
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ScoreHistoryPointDTO } from '../../../dto/EvaluationReportDTO'
 import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/Evaluation.module.css'
 
-/* Wide and short, because this is a strip that answers "which way" — not a
-   chart to be studied. The ratio matters as much as the numbers: the SVG scales
-   to its container, so a squarer viewBox is what made this render 400px tall
-   and take up more of the score card than the score. Room is still reserved on
-   the left for the y-axis numbers, above for the y-axis name, and underneath
-   for the x-axis labels and name, so none of them can land on the line. */
-const WIDTH = 340
-const HEIGHT = 120
-const PAD_LEFT = 32
-const PAD_RIGHT = 14
-const PAD_TOP = 22
-const PLOT_BOTTOM = 88
+/**
+ * Fixed height in real pixels, with the width measured from the container.
+ *
+ * Not a fixed viewBox scaled to fit. That couples the two dimensions through
+ * the aspect ratio, and every way of breaking the coupling is worse: letting it
+ * stretch made the chart 400px tall in a wide column, and capping the width
+ * left a small plot marooned in the left third of the card. Measuring means the
+ * strip spans whatever it is given and stays exactly this tall, with text at a
+ * true size rather than a scaled one.
+ */
+const HEIGHT = 150
+const PAD_LEFT = 44
+const PAD_RIGHT = 16
+const PAD_TOP = 30
+const PLOT_BOTTOM = HEIGHT - 42
+
+/** Until the container has been measured once. */
+const FALLBACK_WIDTH = 600
 
 /** The score scale, fixed at 0..100 and labelled at these marks. */
 const Y_TICKS = [0, 50, 100]
@@ -52,8 +58,7 @@ function yFor(score: number): number {
  * Both axes are drawn and labelled. Without them this was a line that went up
  * or down by an amount nobody could name: the y scale was invisible, so a climb
  * from 40 to 45 looked identical to one from 40 to 90, and nothing said what a
- * dot was. Now the y axis carries the score scale and the x axis names each
- * session, so the shape can be read off it rather than guessed at.
+ * dot was.
  *
  * The y scale is fixed at 0..100 rather than fitted to the data, for the same
  * reason. A fitted scale turns three scores a point apart into a dramatic
@@ -61,6 +66,26 @@ function yFor(score: number): number {
  */
 export function ScoreTrend({ history, currentWorkspaceId, currentRound }: ScoreTrendProps) {
   const t = useT()
+  const [width, setWidth] = useState(FALLBACK_WIDTH)
+  const observerRef = useRef<ResizeObserver>()
+
+  /**
+   * A callback ref rather than an effect over a `useRef`, because the chart is
+   * not on screen for the first render: history arrives from the server, so the
+   * early return below fires first and there is no element for an effect with
+   * empty deps to ever measure. This runs when the element actually appears.
+   */
+  const attachWrap = useCallback((wrap: HTMLDivElement | null) => {
+    observerRef.current?.disconnect()
+    if (!wrap) return
+    const measure = () => setWidth(Math.max(240, Math.round(wrap.clientWidth)))
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(wrap)
+    observerRef.current = observer
+  }, [])
+
+  useEffect(() => () => observerRef.current?.disconnect(), [])
 
   const points = useMemo(
     () =>
@@ -68,11 +93,11 @@ export function ScoreTrend({ history, currentWorkspaceId, currentRound }: ScoreT
         ...point,
         x:
           history.length === 1
-            ? (PAD_LEFT + WIDTH - PAD_RIGHT) / 2
-            : PAD_LEFT + (i * (WIDTH - PAD_LEFT - PAD_RIGHT)) / (history.length - 1),
+            ? width / 2
+            : PAD_LEFT + (i * (width - PAD_LEFT - PAD_RIGHT)) / (history.length - 1),
         y: yFor(point.score),
       })),
-    [history],
+    [history, width],
   )
 
   if (points.length < 2) return null
@@ -105,89 +130,89 @@ export function ScoreTrend({ history, currentWorkspaceId, currentRound }: ScoreT
         )}
       </div>
 
-      <svg
-        className={styles.trendChart}
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        role="img"
-        aria-label={points
-          .map((p) => `${p.title ?? t('home.untitledWorkspace')} ${p.score}`)
-          .join(', ')}
-      >
-        {/* Y axis: the score scale, with a gridline at each labelled mark. */}
-        {Y_TICKS.map((tick) => {
-          const y = yFor(tick)
-          return (
-            <g key={tick}>
-              <line
-                className={styles.trendGrid}
-                x1={PAD_LEFT}
-                y1={y}
-                x2={WIDTH - PAD_RIGHT}
-                y2={y}
-              />
-              <text className={styles.trendAxisTick} x={PAD_LEFT - 6} y={y} textAnchor="end">
-                {tick}
-              </text>
-            </g>
-          )
-        })}
-
-        <polyline className={styles.trendLine} points={line} />
-
-        {points.map((p, i) => {
-          const isCurrent = keyOf(p) === keyOf(current)
-          return (
-            <g key={keyOf(p)}>
-              <circle
-                className={isCurrent ? styles.trendDotCurrent : styles.trendDot}
-                cx={p.x}
-                cy={p.y}
-                r={isCurrent ? 4.5 : 3}
-              />
-              {/* The value on the point, so the exact number never has to be
-                  read off the axis by eye. The end points lean inward: centred
-                  on the first dot, the label sat on top of the y-axis numbers,
-                  and on the last it ran past the right edge. */}
-              <text
-                className={isCurrent ? styles.trendValueCurrent : styles.trendValue}
-                x={p.x + (i === 0 ? 4 : i === points.length - 1 ? -4 : 0)}
-                y={p.y - 9}
-                textAnchor={
-                  i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle'
-                }
-              >
-                {p.score}
-              </text>
-              {/* X axis: which session this dot is. Numbered rather than
-                  titled, because titles are user-written and would collide at
-                  this width; the legend under the chart maps the numbers. */}
-              <text
-                className={styles.trendAxisTick}
-                x={p.x}
-                y={PLOT_BOTTOM + 14}
-                textAnchor="middle"
-              >
-                {i + 1}
-              </text>
-            </g>
-          )
-        })}
-
-        {/* Axis titles, so neither scale has to be inferred. The y name sits on
-            its own row above the plot rather than beside the topmost tick,
-            which is where it collided with the "100". */}
-        <text className={styles.trendAxisName} x={0} y={10} textAnchor="start">
-          {t('evaluation.trendAxisY')}
-        </text>
-        <text
-          className={styles.trendAxisName}
-          x={(PAD_LEFT + WIDTH - PAD_RIGHT) / 2}
-          y={HEIGHT - 4}
-          textAnchor="middle"
+      <div ref={attachWrap} className={styles.trendChartWrap}>
+        <svg
+          className={styles.trendChart}
+          width={width}
+          height={HEIGHT}
+          viewBox={`0 0 ${width} ${HEIGHT}`}
+          role="img"
+          aria-label={points
+            .map((p) => `${p.title ?? t('home.untitledWorkspace')} ${p.score}`)
+            .join(', ')}
         >
-          {t('evaluation.trendAxisX')}
-        </text>
-      </svg>
+          {/* Y axis: the score scale, with a gridline at each labelled mark. */}
+          {Y_TICKS.map((tick) => {
+            const y = yFor(tick)
+            return (
+              <g key={tick}>
+                <line
+                  className={styles.trendGrid}
+                  x1={PAD_LEFT}
+                  y1={y}
+                  x2={width - PAD_RIGHT}
+                  y2={y}
+                />
+                <text className={styles.trendAxisTick} x={PAD_LEFT - 10} y={y} textAnchor="end">
+                  {tick}
+                </text>
+              </g>
+            )
+          })}
+
+          <polyline className={styles.trendLine} points={line} />
+
+          {points.map((p, i) => {
+            const isCurrent = keyOf(p) === keyOf(current)
+            return (
+              <g key={keyOf(p)}>
+                <circle
+                  className={isCurrent ? styles.trendDotCurrent : styles.trendDot}
+                  cx={p.x}
+                  cy={p.y}
+                  r={isCurrent ? 5 : 3.5}
+                />
+                {/* The value on the point, so the exact number never has to be
+                    read off the axis by eye. The end points lean inward: the
+                    first one would otherwise sit over the y-axis numbers and
+                    the last would run past the right edge. */}
+                <text
+                  className={isCurrent ? styles.trendValueCurrent : styles.trendValue}
+                  x={p.x + (i === 0 ? 8 : i === points.length - 1 ? -8 : 0)}
+                  y={p.y - 12}
+                  textAnchor={i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle'}
+                >
+                  {p.score}
+                </text>
+                {/* X axis: which session this dot is. Numbered rather than
+                    titled, because titles are user-written and would collide;
+                    the legend under the chart maps the numbers. */}
+                <text
+                  className={styles.trendAxisTick}
+                  x={p.x}
+                  y={PLOT_BOTTOM + 16}
+                  textAnchor="middle"
+                >
+                  {i + 1}
+                </text>
+              </g>
+            )
+          })}
+
+          {/* Axis names, so neither scale has to be inferred. */}
+          <text className={styles.trendAxisName} x={0} y={12} textAnchor="start">
+            {t('evaluation.trendAxisY')}
+          </text>
+          <text
+            className={styles.trendAxisName}
+            x={width / 2}
+            y={HEIGHT - 6}
+            textAnchor="middle"
+          >
+            {t('evaluation.trendAxisX')}
+          </text>
+        </svg>
+      </div>
 
       {/* Which numbered session is which, including the round when a workspace
           was taught more than once. */}
