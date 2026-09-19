@@ -18,8 +18,8 @@
 import type { EvaluationResult } from "../../contracts/evaluation.js";
 import type { LearnerState } from "../../contracts/learner.js";
 import type {
-  EvaluationReport,
   EvaluationTranscriptTurn,
+  NewEvaluationReport,
 } from "../../contracts/workspace.js";
 
 interface ReportContext {
@@ -42,7 +42,7 @@ interface ReportContext {
 export function buildEvaluationReport(
   result: EvaluationResult,
   ctx: ReportContext,
-): EvaluationReport {
+): NewEvaluationReport {
   const topic = ctx.title?.trim() || "this topic";
   const meaningful = ctx.meaningfulScore !== false;
   const tone = meaningful ? toneFromScore(result.score) : toneFromTurns(ctx.turnCount);

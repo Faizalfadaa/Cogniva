@@ -1,6 +1,6 @@
-import { useState } from 'react'
 import type { LearnerCharacter } from '../../../lib/Learner'
-import { useT } from '../../../i18n/LanguageProvider'
+import { learnerCopy } from '../../../lib/Learner'
+import { useLocale, useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/Evaluation.module.css'
 
 interface LetterFromLearnerProps {
@@ -8,9 +8,19 @@ interface LetterFromLearnerProps {
   letter: string
 }
 
+/**
+ * The student's own words about the session, with the student beside them.
+ *
+ * No longer behind a sealed envelope. The letter is the warmest thing on this
+ * screen and the part that makes the score feel like it came from someone, so
+ * hiding it behind a click meant the page's best moment was the one a reader was
+ * least likely to reach. The character now sits next to it at a size you can
+ * actually read a face at — the header's 26px circle never carried that.
+ */
 export function LetterFromLearner({ learner, letter }: LetterFromLearnerProps) {
-  const [sealed, setSealed] = useState(true)
   const t = useT()
+  const { locale } = useLocale()
+  const copy = learnerCopy(learner, locale)
 
   return (
     <section className={styles.section}>
@@ -18,25 +28,16 @@ export function LetterFromLearner({ learner, letter }: LetterFromLearnerProps) {
         <span>{t('evaluation.letterTitle')}</span>
       </div>
 
-      {sealed ? (
-        // Sealed envelope state — user clicks to open
-        <div className={styles.letterSealed} onClick={() => setSealed(false)} role="button" tabIndex={0}
-          onKeyDown={e => e.key === 'Enter' && setSealed(false)}
-          aria-label={t('evaluation.letterOpen')}
-        >
-          <img src={learner.avatarUrl} alt={learner.name} className={styles.letterSealAvatar} />
-          <div className={styles.letterSealText}>
-            <p className={styles.letterSealFrom}>
-              {t('evaluation.letterFrom', { name: learner.name })}
-            </p>
-            <p className={styles.letterSealHint}>{t('evaluation.clickToOpen')}</p>
-          </div>
+      <div className={styles.letterLayout}>
+        <div className={styles.letterPortrait}>
+          <img src={learner.chibiUrl} alt={learner.name} className={styles.letterChibi} />
+          <p className={styles.letterPortraitName}>{learner.name}</p>
+          <p className={styles.letterPortraitTrait}>{copy.traits}</p>
         </div>
-      ) : (
-        // Opened letter
+
         <div className={styles.letterOpen}>
           <div className={styles.letterHeader}>
-            <img src={learner.avatarUrl} alt={learner.name} className={styles.letterAvatar} />
+            <img src={learner.avatarUrl} alt="" aria-hidden="true" className={styles.letterAvatar} />
             <div>
               <p className={styles.letterFrom}>{learner.name}</p>
               <p className={styles.letterSub}>{t('evaluation.toTheirTeacher')}</p>
@@ -52,7 +53,7 @@ export function LetterFromLearner({ learner, letter }: LetterFromLearnerProps) {
             )}
           </div>
         </div>
-      )}
+      </div>
     </section>
   )
 }

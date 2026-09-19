@@ -195,6 +195,15 @@ export interface ChatMessage {
  * axis and highlight the sentence behind each judgement.
  */
 export interface EvaluationReport {
+  /**
+   * Which finished round this debrief belongs to, counting from 1.
+   *
+   * A workspace keeps one report per round rather than one report, so a user
+   * who resumed teaching can still read what the earlier round said.
+   */
+  round: number;
+  /** When this round's debrief was written. */
+  createdAt: string;
   /** A warm letter from the Learner to the user. */
   letter: string;
   notebook: {
@@ -224,6 +233,49 @@ export interface EvaluationTranscriptTurn {
   turnIndex: number;
   boardText: string;
   speech?: string;
+}
+
+/**
+ * A debrief on its way into the store, before it has a place in the history.
+ *
+ * `round` and `createdAt` are the store's to assign: the builder that maps an
+ * EvaluationResult into a report has no way to know how many rounds came
+ * before it, and letting it guess is how two rounds end up claiming the same
+ * number.
+ */
+export type NewEvaluationReport = Omit<EvaluationReport, "round" | "createdAt">;
+
+/**
+ * One round in a workspace's history, as the round picker lists them.
+ *
+ * Deliberately not the whole report: the picker needs enough to label a round
+ * and show how it went, and a list of full debriefs would carry every
+ * transcript and finding for rounds the user may never open.
+ */
+export interface EvaluationRoundSummary {
+  round: number;
+  score: number;
+  depthScore: number;
+  /** How many findings that round produced, for a one-glance sense of size. */
+  findingCount: number;
+  createdAt: string;
+}
+
+/**
+ * One finished session's score, for the trend across sessions.
+ *
+ * Deliberately not part of EvaluationReport: a report describes one session, and
+ * a session cannot know what came after it. This is read per owner at the moment
+ * the debrief is opened, so a session's trend stays accurate as later ones land.
+ */
+export interface ScoreHistoryPoint {
+  workspaceId: string;
+  /** Which round of that workspace this score came from. */
+  round: number;
+  title: string | null;
+  score: number;
+  /** When the report was written, oldest first. */
+  completedAt: string;
 }
 
 // --- Request bodies (validated at the REST boundary) ----------------------

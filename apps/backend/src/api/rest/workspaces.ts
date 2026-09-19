@@ -237,12 +237,27 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(204).send();
   });
 
+  // The latest round, or `?round=N` for an earlier one. A workspace that was
+  // resumed and finished again keeps both, so the user can read what the
+  // previous round said instead of losing it to the newer one.
   app.get("/workspaces/:id/report", async (req, reply) => {
     if (!(await service.getWorkspace(idOf(req.params)))) return notFound(reply);
-    const report = await service.getReport(idOf(req.params));
+    const round = roundOf(req.query);
+    if (round === "invalid") return badRequest(reply, "round must be a positive integer");
+    const report = await service.getReport(idOf(req.params), round);
     if (!report) return reply.code(404).send({ detail: "Report not ready yet" });
     return report;
   });
+
+  app.get("/workspaces/:id/report/rounds", async (req, reply) => {
+    if (!(await service.getWorkspace(idOf(req.params)))) return notFound(reply);
+    return service.getReportRounds(idOf(req.params));
+  });
+
+  // Scores across this owner's finished sessions, for the trend a single report
+  // cannot see. Owner-scoped like /workspaces, never by workspace id: the point
+  // of the list is the sessions either side of the one being read.
+  app.get("/reports/history", async (req) => service.getScoreHistory(await ownerOf(req)));
 
   // Resume a finished workspace back into teaching (§4.2, §5.4).
   app.post("/workspaces/:id/resume", async (req, reply) => {
@@ -255,6 +270,20 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
 
 function idOf(params: unknown): string {
   return (params as { id: string }).id;
+}
+
+/**
+ * `?round=N`, or undefined for "the latest".
+ *
+ * A malformed round is rejected rather than silently read as the latest: a
+ * client asking for round "abc" has a bug, and quietly handing it the newest
+ * debrief would hide that behind plausible-looking data.
+ */
+function roundOf(query: unknown): number | undefined | "invalid" {
+  const raw = (query as { round?: string } | undefined)?.round;
+  if (raw === undefined || raw === "") return undefined;
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : "invalid";
 }
 
 function notFound(reply: FastifyReply): FastifyReply {

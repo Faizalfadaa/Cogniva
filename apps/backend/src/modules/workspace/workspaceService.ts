@@ -477,11 +477,15 @@ export async function getChatMessages(id: string): Promise<ChatMessage[] | undef
 export async function finishSession(id: string): Promise<boolean> {
   const ws = await workspaces.get(id);
   if (!ws) return false;
-  // Idempotent: only a teaching workspace can be finished.
-  if (ws.state !== "Teaching" && ws.state !== "Draft") return true;
 
+  // Idempotent, and safe against two requests arriving together. Reading the
+  // state and then writing it left a gap in which both callers saw "Teaching",
+  // so both started an evaluation; the two runs disagreed and the user saw
+  // whichever landed last. Claiming it in one operation means only one caller
+  // can win, and the rest return the same "already handled" as a second click
+  // on a finished session.
+  if (!(await workspaces.claimForEvaluation(id))) return true;
   ws.state = "Evaluating";
-  await touch(ws);
 
   inBackground("evaluation", async () => {
     try {
@@ -509,8 +513,29 @@ export async function finishSession(id: string): Promise<boolean> {
   return true;
 }
 
-export async function getReport(id: string) {
-  return workspaces.getReport(id);
+/**
+ * A finished round's debrief. The latest one unless a round is named.
+ *
+ * Read straight out of storage — the Evaluator ran once, when the round was
+ * finished, and opening this screen never re-runs it.
+ */
+export async function getReport(id: string, round?: number) {
+  return workspaces.getReport(id, round);
+}
+
+/** Which rounds this workspace has finished, for the debrief's round picker. */
+export async function getReportRounds(id: string) {
+  return workspaces.listReportRounds(id);
+}
+
+/**
+ * Every scored session this owner has finished, oldest first.
+ *
+ * Read at the moment a debrief is opened rather than frozen into the report, so
+ * an older session's trend keeps up as newer ones land behind it.
+ */
+export async function getScoreHistory(ownerId: string) {
+  return workspaces.listScoreHistory(ownerId);
 }
 
 /**

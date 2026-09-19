@@ -3,7 +3,8 @@ import { describe, it, expect } from "vitest";
 import type { LLM, StructuredArgs } from "../../../llm/index.js";
 import { runEvaluator } from "../evaluator.js";
 import { normalizeEvaluation } from "../evaluator.guard.js";
-import type { EvaluatorInput, TranscriptTurn } from "../types.js";
+import { scoreFindings } from "../scoring.js";
+import type { EvaluatorInput, Finding, TranscriptTurn } from "../types.js";
 
 const baseInput: EvaluatorInput = {
   sessionId: "sess-1",
@@ -89,22 +90,84 @@ describe("runEvaluator (real path via injected LLM)", () => {
 });
 
 describe("normalizeEvaluation: depthScore", () => {
-  it("clamps depthScore into 0..100 independently of score", () => {
+  it("clamps depthScore into 0..100 independently of the computed score", () => {
     const result = normalizeEvaluation(
-      { score: 90, depthScore: 140, findings: [] },
+      { depthScore: 140, findings: [] },
       "sess-1",
       "ev_depth",
     );
 
-    expect(result.score).toBe(90);
     expect(result.depthScore).toBe(100);
+    // Nothing to measure: depth being high cannot lift a score no finding earned.
+    expect(result.score).toBe(0);
   });
 
   it("defaults depthScore to 0 when the model omits it or sends junk", () => {
-    expect(normalizeEvaluation({ score: 70 }, "s", "e").depthScore).toBe(0);
-    expect(
-      normalizeEvaluation({ score: 70, depthScore: "deep" }, "s", "e").depthScore,
-    ).toBe(0);
+    expect(normalizeEvaluation({}, "s", "e").depthScore).toBe(0);
+    expect(normalizeEvaluation({ depthScore: "deep" }, "s", "e").depthScore).toBe(0);
+  });
+
+  it("ignores a score the model sends anyway", () => {
+    // The schema no longer asks for one, but a model is free to emit extra
+    // keys. The findings decide the number, not the model's opinion of it.
+    const result = normalizeEvaluation(
+      {
+        score: 99,
+        findings: [
+          { category: "WRONG", concept: "a", detail: "d", evidenceTurnIndex: 0 },
+        ],
+      },
+      "s",
+      "e",
+    );
+
+    // One WRONG and nothing else: accuracy 0, completeness 1, clarity 1.
+    // (0 * 0.5) + (1 * 0.3) + (1 * 0.2) = 0.5 -> 50.
+    expect(result.score).toBe(50);
+  });
+});
+
+describe("scoreFindings", () => {
+  const finding = (category: Finding["category"], concept: string): Finding => ({
+    category,
+    concept,
+    detail: "",
+    evidenceTurnIndex: 0,
+  });
+
+  it("scores a flawless set at 100", () => {
+    expect(scoreFindings([finding("CORRECT", "a"), finding("CORRECT", "b")]).score).toBe(100);
+  });
+
+  it("weights accuracy above completeness above clarity", () => {
+    // Same set size, one flaw each, so only the weight differs.
+    const wrong = scoreFindings([finding("CORRECT", "a"), finding("WRONG", "b")]).score;
+    const missed = scoreFindings([finding("CORRECT", "a"), finding("MISSED", "b")]).score;
+    const confusing = scoreFindings([
+      finding("CORRECT", "a"),
+      finding("CONFUSING", "b"),
+    ]).score;
+
+    expect(wrong).toBeLessThan(missed);
+    expect(missed).toBeLessThan(confusing);
+  });
+
+  it("renormalises over the axes a session can actually measure", () => {
+    // No CORRECT and no WRONG, so accuracy is unmeasurable and its 0.5 weight
+    // is redistributed rather than counted as a zero.
+    const result = scoreFindings([finding("MISSED", "a"), finding("MISSED", "b")]);
+
+    expect(result.accuracy).toBeNull();
+    // completeness 0, clarity 1, over the 0.5 weight that remains -> 40.
+    expect(result.score).toBe(40);
+  });
+
+  it("scores an empty set at zero rather than dividing by nothing", () => {
+    const result = scoreFindings([]);
+
+    expect(result.score).toBe(0);
+    expect(result.accuracy).toBeNull();
+    expect(result.completeness).toBeNull();
   });
 });
 

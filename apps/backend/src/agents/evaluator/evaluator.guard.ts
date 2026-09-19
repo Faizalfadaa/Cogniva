@@ -12,6 +12,7 @@
 
 import { utcNowIso } from "../../contracts/common.js";
 import type { FindingCategory } from "../../contracts/enums.js";
+import { scoreFindings } from "./scoring.js";
 import type { EvaluationResult, Finding, TranscriptTurn } from "./types.js";
 
 const ALLOWED_CATEGORIES: readonly FindingCategory[] = [
@@ -27,12 +28,19 @@ export function normalizeEvaluation(
   evaluationId: string,
   turns: TranscriptTurn[] = [],
 ): EvaluationResult {
+  // Findings first: the score is computed from them, so it has to be the
+  // normalized set. A finding this guard drops (unknown category, empty
+  // concept and detail) must not be able to move the number either.
+  const findings = normalizeFindings(raw.findings, turns);
+
   return {
     evaluationId,
     sessionId,
-    score: clampScore(raw.score),
+    // Not read from the model. See scoring.ts for why the arithmetic lives in
+    // code while the judgements behind it stay the model's.
+    score: scoreFindings(findings).score,
     depthScore: clampScore(raw.depthScore),
-    findings: normalizeFindings(raw.findings, turns),
+    findings,
     summary: typeof raw.summary === "string" ? raw.summary.trim() : "",
     strengths: normalizeStringArray(raw.strengths),
     improvements: normalizeStringArray(raw.improvements),

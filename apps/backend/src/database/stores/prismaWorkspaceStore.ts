@@ -19,6 +19,9 @@ import type {
   EvaluationTranscriptTurn,
   LearnerSpeech,
   ReferenceSource,
+  EvaluationRoundSummary,
+  NewEvaluationReport,
+  ScoreHistoryPoint,
   TeachingCheckpoint,
   Workspace,
   WorkspaceState,
@@ -241,19 +244,47 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
     }));
   }
 
+  /**
+   * One conditional UPDATE, so the database decides the winner.
+   *
+   * `count` is 1 for the request that moved the row and 0 for every other,
+   * including one that arrived after the workspace was already Evaluating or
+   * Completed. That is the whole guard: no lock table, no in-process set that
+   * a second server instance would not share.
+   */
+  async claimForEvaluation(workspaceId: string): Promise<boolean> {
+    const { count } = await prisma.workspace.updateMany({
+      where: { id_workspace: workspaceId, state: { in: ["Teaching", "Draft"] } },
+      data: { state: "Evaluating", updated_at: new Date() },
+    });
+    return count === 1;
+  }
+
   // --- Evaluation report ------------------------------------------------
 
-  async saveReport(workspaceId: string, report: EvaluationReport): Promise<EvaluationReport> {
+  async saveReport(
+    workspaceId: string,
+    report: NewEvaluationReport,
+  ): Promise<EvaluationReport> {
     const idReport = `rep_${randomUUID().replace(/-/g, "").slice(0, 8)}`;
-    // One report per workspace: finishing a later round replaces the previous
-    // debrief, which is what the store this replaced did. Delete + create in one
-    // transaction so a reader never sees a report with no notebook rows.
-    await prisma.$transaction([
-      prisma.report.deleteMany({ where: { id_workspace: workspaceId } }),
-      prisma.report.create({
+    // Appended, never replaced: a resumed session that finishes again adds a
+    // round, and the earlier debrief stays readable. The round number is read
+    // and written in one transaction so two finishes racing each other cannot
+    // both claim the same one — the unique index would reject the loser, which
+    // is the outcome we want over silently overwriting a round.
+    const created = await prisma.$transaction(async (tx) => {
+      const previous = await tx.report.findFirst({
+        where: { id_workspace: workspaceId },
+        orderBy: { round: "desc" },
+        select: { round: true },
+      });
+      const round = (previous?.round ?? 0) + 1;
+
+      return tx.report.create({
         data: {
           id_report: idReport,
           id_workspace: workspaceId,
+          round,
           letter: report.letter,
           reflection: report.notebook.reflection,
           continue_learning: report.continueLearning,
@@ -279,14 +310,21 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
             })),
           },
         },
-      }),
-    ]);
-    return report;
+      });
+    });
+
+    return { ...report, round: created.round, createdAt: created.created_at.toISOString() };
   }
 
-  async getReport(workspaceId: string): Promise<EvaluationReport | undefined> {
-    const row = await prisma.report.findUnique({
-      where: { id_workspace: workspaceId },
+  async getReport(
+    workspaceId: string,
+    round?: number,
+  ): Promise<EvaluationReport | undefined> {
+    const row = await prisma.report.findFirst({
+      where: { id_workspace: workspaceId, ...(round === undefined ? {} : { round }) },
+      // Latest round when none was asked for, which is what the debrief screen
+      // opens on.
+      orderBy: { round: "desc" },
       include: {
         learned: { orderBy: { seq: "asc" } },
         confused: { orderBy: { seq: "asc" } },
@@ -294,6 +332,8 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
     });
     if (!row) return undefined;
     return {
+      round: row.round,
+      createdAt: row.created_at.toISOString(),
       letter: row.letter,
       notebook: {
         learned: row.learned.map((item) => item.content),
@@ -309,6 +349,53 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
       findings: (row.findings as Finding[] | null) ?? [],
       transcript: (row.transcript as EvaluationTranscriptTurn[] | null) ?? [],
     };
+  }
+
+  async listReportRounds(workspaceId: string): Promise<EvaluationRoundSummary[]> {
+    const rows = await prisma.report.findMany({
+      where: { id_workspace: workspaceId },
+      orderBy: { round: "asc" },
+      select: {
+        round: true,
+        score: true,
+        depth_score: true,
+        findings: true,
+        created_at: true,
+      },
+    });
+    return rows.map((row) => ({
+      round: row.round,
+      score: row.score ?? 0,
+      depthScore: row.depth_score ?? 0,
+      findingCount: ((row.findings as Finding[] | null) ?? []).length,
+      createdAt: row.created_at.toISOString(),
+    }));
+  }
+
+  /**
+   * Scored reports only, one point per round. A report written before the
+   * breakdown columns existed has a null score, and plotting it as a zero
+   * would invent a failed session the user never had.
+   */
+  async listScoreHistory(ownerId: string): Promise<ScoreHistoryPoint[]> {
+    const rows = await prisma.report.findMany({
+      where: { workspace: { id_user: ownerId }, score: { not: null } },
+      orderBy: { created_at: "asc" },
+      select: {
+        id_workspace: true,
+        round: true,
+        score: true,
+        created_at: true,
+        workspace: { select: { title: true } },
+      },
+    });
+    return rows.map((row) => ({
+      workspaceId: row.id_workspace,
+      round: row.round,
+      title: row.workspace.title,
+      score: row.score as number,
+      completedAt: row.created_at.toISOString(),
+    }));
   }
 
   // --- PDF blob ---------------------------------------------------------

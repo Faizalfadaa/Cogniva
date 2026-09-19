@@ -1,11 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { EvaluationFindingDTO } from '../../../dto/EvaluationReportDTO'
 import { CATEGORY_BADGE_CLASS, CATEGORY_LABEL } from '../lib/findingLabels'
 import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/Evaluation.module.css'
 
+type Category = EvaluationFindingDTO['category']
+
+/** The order the chips appear in, and the order findings are read in. */
+const CATEGORY_ORDER: Category[] = ['WRONG', 'MISSED', 'CONFUSING', 'CORRECT']
+
 interface EvaluatorNotesProps {
   findings: EvaluationFindingDTO[]
+  /** Open a new session pointed at one concept. */
+  onPractice: (concept: string) => void
 }
 
 /**
@@ -22,12 +29,40 @@ interface EvaluatorNotesProps {
  * infinite loop is not reused. Findings are a finite, ordered assessment, so
  * wrapping past the last one would hide how much is left to read; the arrows
  * stop at the ends instead.
+ *
+ * The chips above it are the one thing a slider cannot do on its own. Reading
+ * one card at a time is fine for taking in a judgement, but it cannot answer
+ * "how many did I get wrong" without walking the whole set, so the counts sit
+ * above the track and filtering narrows what the track holds.
  */
-export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
+export function EvaluatorNotes({ findings, onPractice }: EvaluatorNotesProps) {
   const t = useT()
   const trackRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
   const [active, setActive] = useState(0)
+  const [filter, setFilter] = useState<Category | 'ALL'>('ALL')
+  const [starting, setStarting] = useState<string | null>(null)
+
+  const counts = useMemo(() => {
+    const byCategory = new Map<Category, number>()
+    findings.forEach((f) => byCategory.set(f.category, (byCategory.get(f.category) ?? 0) + 1))
+    return byCategory
+  }, [findings])
+
+  // Only the categories this session actually produced get a chip. A row of
+  // zeroes would read as four things to check rather than one thing to fix.
+  const chips = useMemo(
+    () => CATEGORY_ORDER.filter((c) => (counts.get(c) ?? 0) > 0),
+    [counts],
+  )
+
+  /** Worst first, so the cards that need action are the ones you reach first. */
+  const visible = useMemo(() => {
+    const ordered = [...findings].sort(
+      (a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category),
+    )
+    return filter === 'ALL' ? ordered : ordered.filter((f) => f.category === filter)
+  }, [findings, filter])
 
   /**
    * Pad the track by half the leftover width at each end.
@@ -75,7 +110,7 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
       cancelAnimationFrame(settle)
       ro.disconnect()
     }
-  }, [findings.length])
+  }, [visible.length])
 
   /**
    * Active card = the one whose centre sits closest to the track's centre.
@@ -85,7 +120,7 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
    * reports nothing and the previous winner stays highlighted: that is how the
    * last card stayed dim at the end of the scroll. Here the observer is only a
    * cheap "something moved" signal, and the answer always comes from measuring
-   * all four cards.
+   * all the cards.
    */
   const measure = useCallback(() => {
     const track = trackRef.current
@@ -135,7 +170,7 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
       track.removeEventListener('scrollend', schedule)
       if (frame) cancelAnimationFrame(frame)
     }
-  }, [findings.length, measure])
+  }, [visible.length, measure])
 
   /**
    * Scroll a card to the centre. `active` is set here rather than waiting for
@@ -154,7 +189,19 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
   }
 
   function nudge(direction: 1 | -1) {
-    goTo(Math.min(findings.length - 1, Math.max(0, active + direction)))
+    goTo(Math.min(visible.length - 1, Math.max(0, active + direction)))
+  }
+
+  /**
+   * Narrowing the set leaves the track scrolled where the old set was, which
+   * reads as a slider that jumped somewhere arbitrary. Snap back to the first
+   * card of whatever is now showing.
+   */
+  function applyFilter(next: Category | 'ALL') {
+    setFilter(next)
+    setActive(0)
+    cardRefs.current = []
+    trackRef.current?.scrollTo({ left: 0 })
   }
 
   if (findings.length === 0) {
@@ -178,6 +225,32 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
       </div>
       <p className={styles.notesIntro}>{t('evaluation.notesIntro')}</p>
 
+      <div className={styles.filterRow} role="group" aria-label={t('evaluation.filterAria')}>
+        <button
+          type="button"
+          className={styles.filterChip}
+          aria-pressed={filter === 'ALL'}
+          onClick={() => applyFilter('ALL')}
+        >
+          {t('evaluation.filterAll')}
+          <span className={styles.filterCount}>{findings.length}</span>
+        </button>
+
+        {chips.map((category) => (
+          <button
+            key={category}
+            type="button"
+            className={styles.filterChip}
+            aria-pressed={filter === category}
+            onClick={() => applyFilter(category)}
+          >
+            <span className={`${styles.filterDot} ${CATEGORY_BADGE_CLASS[category]}`} />
+            {t(CATEGORY_LABEL[category])}
+            <span className={styles.filterCount}>{counts.get(category)}</span>
+          </button>
+        ))}
+      </div>
+
       <div className={styles.notesSlider}>
         <button
           type="button"
@@ -190,9 +263,9 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
         </button>
 
         <div ref={trackRef} className={styles.notesTrack}>
-          {findings.map((finding, i) => (
+          {visible.map((finding, i) => (
             <div
-              key={i}
+              key={`${filter}-${i}`}
               ref={(el) => {
                 cardRefs.current[i] = el
               }}
@@ -207,7 +280,7 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
                   {t(CATEGORY_LABEL[finding.category])}
                 </span>
                 <span className={styles.noteCardCount}>
-                  {i + 1} / {findings.length}
+                  {i + 1} / {visible.length}
                 </span>
               </div>
 
@@ -220,6 +293,25 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
                   <p className={styles.followUpText}>{finding.followUp}</p>
                 </div>
               )}
+
+              {/* Only where something is actually owed. A CORRECT finding has
+                  nothing to practise, and offering it anyway would make the
+                  button mean "another session" rather than "fix this". */}
+              {finding.category !== 'CORRECT' && (
+                <button
+                  type="button"
+                  className={styles.practiceButton}
+                  disabled={starting !== null}
+                  onClick={() => {
+                    setStarting(finding.concept)
+                    onPractice(finding.concept)
+                  }}
+                >
+                  {starting === finding.concept
+                    ? t('evaluation.opening')
+                    : t('evaluation.practiceConcept')}
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -228,7 +320,7 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
           type="button"
           className={`${styles.notesArrow} ${styles.notesArrowRight}`}
           onClick={() => nudge(1)}
-          disabled={active === findings.length - 1}
+          disabled={active === visible.length - 1}
           aria-label={t('evaluation.nextFinding')}
         >
           {'›'}

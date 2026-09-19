@@ -21,6 +21,9 @@ import type {
   ChatMessage,
   EvaluationReport,
   ReferenceSource,
+  EvaluationRoundSummary,
+  NewEvaluationReport,
+  ScoreHistoryPoint,
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
@@ -125,9 +128,34 @@ export interface WorkspaceStore {
   ): Promise<ChatMessage | undefined>;
   listMessages(workspaceId: string): Promise<ChatMessage[]>;
 
+  /**
+   * Atomically move a workspace from Teaching/Draft into Evaluating, returning
+   * true only for the caller that actually made the move.
+   *
+   * finishSession used to read the state and then write it, which is two
+   * operations with a gap in the middle: two requests arriving together both
+   * read "Teaching", both wrote "Evaluating", and both ran an evaluation. The
+   * two runs disagreed, and whichever finished last was the one the user saw.
+   * The claim has to be one operation for the loser to be able to tell.
+   */
+  claimForEvaluation(workspaceId: string): Promise<boolean>;
+
   // --- Evaluation report ------------------------------------------------
-  saveReport(workspaceId: string, report: EvaluationReport): Promise<EvaluationReport>;
-  getReport(workspaceId: string): Promise<EvaluationReport | undefined>;
+  /**
+   * Append this round's debrief. The store assigns the round number, so a
+   * caller can never overwrite an earlier one by getting it wrong.
+   */
+  saveReport(workspaceId: string, report: NewEvaluationReport): Promise<EvaluationReport>;
+  /** The latest round, or a specific one when `round` is given. */
+  getReport(workspaceId: string, round?: number): Promise<EvaluationReport | undefined>;
+  /** Every round this workspace has finished, oldest first. */
+  listReportRounds(workspaceId: string): Promise<EvaluationRoundSummary[]>;
+  /**
+   * Every scored report this owner has, oldest first, so a debrief can show
+   * where its score sits in the run of them. Scoped by owner for the same
+   * reason `list` is: one device must never read another's sessions.
+   */
+  listScoreHistory(ownerId: string): Promise<ScoreHistoryPoint[]>;
 
   // --- PDF blob ---------------------------------------------------------
   savePdf(workspaceId: string, blob: StoredBlob): Promise<void>;
