@@ -12,6 +12,8 @@ import type {
   ChatMessage,
   EvaluationReport,
   ReferenceSource,
+  EvaluationRoundSummary,
+  NewEvaluationReport,
   ScoreHistoryPoint,
   TeachingCheckpoint,
   Workspace,
@@ -35,7 +37,8 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
   private sessionIdByWorkspace = new Map<string, string>();
   private checkpoints = new Map<string, TeachingCheckpoint[]>();
   private messages = new Map<string, ChatMessage[]>();
-  private reports = new Map<string, EvaluationReport>();
+  /** Rounds in finishing order, so the last entry is the current debrief. */
+  private reports = new Map<string, EvaluationReport[]>();
   private pdfs = new Map<string, StoredBlob>();
   private references = new Map<string, string>();
   private referenceSources = new Map<string, ReferenceSource>();
@@ -147,33 +150,58 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
 
   // --- Evaluation report ------------------------------------------------
 
-  async saveReport(workspaceId: string, report: EvaluationReport): Promise<EvaluationReport> {
-    this.reports.set(workspaceId, report);
-    return report;
+  async saveReport(
+    workspaceId: string,
+    report: NewEvaluationReport,
+  ): Promise<EvaluationReport> {
+    const rounds = this.reports.get(workspaceId) ?? [];
+    const stored: EvaluationReport = {
+      ...report,
+      round: rounds.length + 1,
+      createdAt: new Date().toISOString(),
+    };
+    rounds.push(stored);
+    this.reports.set(workspaceId, rounds);
+    return stored;
   }
 
-  async getReport(workspaceId: string): Promise<EvaluationReport | undefined> {
-    return this.reports.get(workspaceId);
+  async getReport(workspaceId: string, round?: number): Promise<EvaluationReport | undefined> {
+    const rounds = this.reports.get(workspaceId);
+    if (!rounds?.length) return undefined;
+    if (round === undefined) return rounds[rounds.length - 1];
+    return rounds.find((r) => r.round === round);
+  }
+
+  async listReportRounds(workspaceId: string): Promise<EvaluationRoundSummary[]> {
+    return (this.reports.get(workspaceId) ?? []).map((report) => ({
+      round: report.round,
+      score: report.score,
+      depthScore: report.depthScore,
+      findingCount: report.findings.length,
+      createdAt: report.createdAt,
+    }));
   }
 
   /**
-   * Reports have no timestamp of their own here, so the workspace's own
-   * updatedAt stands in for when the session finished. It is written on the
-   * same state change, and this store only ever backs a guest session or a
-   * test — neither of which outlives the approximation.
+   * One point per round, not per workspace: a workspace taught twice produced
+   * two scores, and collapsing them would hide the improvement the second
+   * round was for.
    */
   async listScoreHistory(ownerId: string): Promise<ScoreHistoryPoint[]> {
     const points: ScoreHistoryPoint[] = [];
-    for (const [workspaceId, report] of this.reports) {
+    for (const [workspaceId, rounds] of this.reports) {
       if (this.owners.get(workspaceId) !== ownerId) continue;
       const workspace = this.workspaces.get(workspaceId);
       if (!workspace) continue;
-      points.push({
-        workspaceId,
-        title: workspace.title ?? null,
-        score: report.score,
-        completedAt: workspace.updatedAt,
-      });
+      for (const report of rounds) {
+        points.push({
+          workspaceId,
+          round: report.round,
+          title: workspace.title ?? null,
+          score: report.score,
+          completedAt: report.createdAt,
+        });
+      }
     }
     return points.sort(
       (a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime(),

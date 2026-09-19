@@ -509,8 +509,19 @@ export async function finishSession(id: string): Promise<boolean> {
   return true;
 }
 
-export async function getReport(id: string) {
-  return workspaces.getReport(id);
+/**
+ * A finished round's debrief. The latest one unless a round is named.
+ *
+ * Read straight out of storage — the Evaluator ran once, when the round was
+ * finished, and opening this screen never re-runs it.
+ */
+export async function getReport(id: string, round?: number) {
+  return workspaces.getReport(id, round);
+}
+
+/** Which rounds this workspace has finished, for the debrief's round picker. */
+export async function getReportRounds(id: string) {
+  return workspaces.listReportRounds(id);
 }
 
 /**

@@ -265,11 +265,17 @@ model voice_clip {
   @@map("voice_clip")
 }
 
-/// The debrief the Evaluation screen renders. One per workspace: finishing a
-/// later round replaces it, matching what the old store did.
+/// The debrief the Evaluation screen renders. One row per finished round.
+///
+/// It used to be one per workspace, deleted and rewritten every time a resumed
+/// session was finished again. That threw away the only record of how an
+/// earlier round went, which is exactly what a user who chose "continue
+/// teaching" wants to compare against. Rounds are numbered from 1 and kept.
 model report {
   id_report         String   @id
-  id_workspace      String   @unique
+  id_workspace      String
+  /// 1 for the first debrief in this workspace, incrementing per finished round.
+  round             Int      @default(1)
   letter            String
   reflection        String
   continue_learning String[]
@@ -290,6 +296,9 @@ model report {
   learned   learned[]
   confused  confused[]
 
+  /// One row per round per workspace, and the index the round picker reads.
+  @@unique([id_workspace, round])
+  @@index([id_workspace, created_at])
   @@map("report")
 }
 
