@@ -60,7 +60,15 @@ export interface ReferenceSuggestions {
    * search that came back thin. Empty when there is nothing to disclose.
    */
   notice: string;
+  /**
+   * The same notices as stable codes, in the order `notice` lists them, so the
+   * interface can show them in the reader's language. Absent from older clients'
+   * point of view, hence optional.
+   */
+  noticeCodes?: ReferenceNoticeCode[];
 }
+
+export type ReferenceNoticeCode = "thin" | "unverified" | "rejected" | "offline";
 
 export type ReferenceSuggestionSource = "search" | "offline";
 

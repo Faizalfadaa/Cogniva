@@ -51,11 +51,14 @@ export default function WorkspacePage() {
     return () => { active = false }
   }, [bridge, id])
 
-  // A session is shown in its own language, and the switch in the header turns
-  // into a label saying which. Undefined until the workspace loads, which pins
-  // nothing and leaves the reader's own preference in place for that moment.
+  // The board is shown entirely in the session's own language, fixed when the
+  // workspace was created, so the interface never mixes with what the student
+  // says. The header switch becomes a label naming it. Undefined until the
+  // workspace loads, which leaves the reader's preference in place for a moment.
   usePinnedLocale(workspace?.locale)
-  const { locale } = useLocale()
+  const { locale: uiLocale } = useLocale()
+  /** The language the student speaks in this workspace. */
+  const locale = workspace?.locale ?? uiLocale
 
   const handleAutosave = useCallback(
     (payload: { snapshot: unknown; thumbnail?: Blob }) => {
@@ -137,7 +140,9 @@ export default function WorkspacePage() {
         content,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [learner, id] // userName intentionally excluded — only seed once on mount
+    [learner, id, workspace?.locale] // userName intentionally excluded — only seed once on mount; the
+    // workspace's language is included so the student's opening lines are not
+    // fixed in the reader's language before the workspace has loaded.
   )
 
   const chat = useWorkspaceChat(id ?? '', bridge, learner.name, learner.avatarUrl, {

@@ -21,9 +21,11 @@ export function LearnerIntro({ learner, userName, onDone }: LearnerIntroProps) {
   const [visibleMessages, setVisibleMessages] = useState<number[]>([])
   const [messageIndex, setMessageIndex] = useState(0)
   const t = useT()
-  const { locale } = useLocale()
+  // The student's own lines are session content, so they use the session's
+  // language; the surrounding labels ("Connecting…", Skip) use the reader's.
+  const { sessionLocale } = useLocale()
 
-  const messages = resolveFirstMessages(learner, userName || t('intro.you'), locale)
+  const messages = resolveFirstMessages(learner, userName || t('intro.you'), sessionLocale)
 
   useEffect(() => {
     if (phase !== 'connecting') return

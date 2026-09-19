@@ -60,14 +60,14 @@ export function ScoreBreakdown({ score, depthScore, findings, learner }: ScoreBr
                     <span>{axis.label}</span>
                   </p>
                   {axis.value === null ? (
-                    <p className={styles.axisValueEmpty}>belum terukur</p>
+                    <p className={styles.axisValueEmpty}>{t('evaluation.axisUnmeasured')}</p>
                   ) : (
                     <>
                       <p className={styles.axisValue}>{axis.value}</p>
                       <div
                         className={styles.axisBar}
                         role="img"
-                        aria-label={`${axis.label}: ${axis.value} dari 100`}
+                        aria-label={t('evaluation.axisOutOf100', { label: axis.label, value: axis.value })}
                       >
                         <div className={styles.axisBarFill} style={{ width: `${axis.value}%` }} />
                       </div>

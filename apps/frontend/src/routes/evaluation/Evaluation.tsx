@@ -31,8 +31,9 @@ export default function EvaluationPage() {
   const [tab, setTab] = useState<ReportTab>('summary')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // The report is written in the language the session ran in, so the page
-  // around it is too — and the header's switch becomes a label.
+  // The report is written in the language the session ran in, so the whole page
+  // around it is too, and the header's switch becomes a label naming it. A new
+  // session started from here is created in that same language.
   usePinnedLocale(workspace?.locale)
   const { locale } = useLocale()
 

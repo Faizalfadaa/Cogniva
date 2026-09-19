@@ -208,6 +208,22 @@ export const messages = {
   'reference.searchFailed': { en: 'The search failed. Try again in a moment.', id: 'Pencarian gagal. Coba lagi sebentar.' },
   'reference.useFailed': { en: 'Could not save the reference. Try again.', id: 'Gagal menyimpan referensi. Coba lagi.' },
   'reference.unusable': { en: 'That source cannot be used.', id: 'Sumber itu tidak bisa dipakai.' },
+  'reference.noticeThin': {
+    en: 'The search found only a few usable sources. If none of them fit, you can still upload a PDF of your own.',
+    id: 'Pencarian hanya menemukan sedikit sumber yang bisa dipakai. Kalau tidak ada yang cocok, kamu tetap bisa mengunggah PDF sendiri.',
+  },
+  'reference.noticeUnverified': {
+    en: 'Some of the links below were not confirmed to appear in the search results. Open them and check before using one.',
+    id: 'Beberapa tautan di bawah belum terkonfirmasi muncul di hasil pencarian. Buka dan periksa dulu sebelum memakainya.',
+  },
+  'reference.noticeRejected': {
+    en: 'Some results were skipped because nobody is answerable for what they say, such as open-edit wikis, Q&A sites and personal uploads. This material becomes the marking key for your explanation, so its source has to be accountable.',
+    id: 'Beberapa hasil dilewati karena tidak ada yang bertanggung jawab atas isinya, seperti wiki yang bisa diedit siapa saja, situs tanya jawab, dan unggahan pribadi. Materi ini menjadi kunci penilaian penjelasanmu, jadi sumbernya harus bisa dipertanggungjawabkan.',
+  },
+  'reference.noticeOffline': {
+    en: 'Online search is unavailable right now, so these are entry points into open libraries, pre-filtered for your topic, not specific document titles. Open one, then upload the PDF if you find something that fits.',
+    id: 'Pencarian online sedang tidak tersedia, jadi ini pintu masuk ke perpustakaan terbuka yang sudah disaring untuk topikmu, bukan judul dokumen tertentu. Buka salah satunya, lalu unggah PDF-nya kalau kamu menemukan yang cocok.',
+  },
 
   // --- home -----------------------------------------------------------------
   'home.newWorkspace': { en: 'New workspace', id: 'Ruang kerja baru' },
@@ -471,6 +487,8 @@ export const messages = {
   'evaluation.axisClarityShort': { en: 'Clear', id: 'Jelas' },
   'evaluation.axisDepth': { en: 'Depth of Understanding', id: 'Kedalaman Pemahaman' },
   'evaluation.axisDepthShort': { en: 'Deep', id: 'Dalam' },
+  'evaluation.axisUnmeasured': { en: 'not measured yet', id: 'belum terukur' },
+  'evaluation.axisOutOf100': { en: '{label}: {value} out of 100', id: '{label}: {value} dari 100' },
   'evaluation.accuracyNone': {
     en: 'Nothing was judged right or wrong yet',
     id: 'Belum ada poin yang dinilai benar atau salah',
