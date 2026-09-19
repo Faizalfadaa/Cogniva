@@ -33,7 +33,7 @@ interface TranscriptReviewProps {
  * panel that opens under it always agree on which note is showing.
  *
  * Each turn can also show what it was taught from: the board that was drawn,
- * and the recording that was spoken over it. The app is built around a
+ * the recording that was spoken over it, and the chat that followed. The app is built around a
  * whiteboard and a microphone, and until now the debrief only ever showed what
  * the agents read out of them — never the drawing or the voice itself. Both are
  * matched by position and only when the counts line up exactly (see
@@ -169,6 +169,52 @@ export function TranscriptReview({ transcript, findings, checkpoints }: Transcri
                       controls
                       preload="none"
                     />
+                  </div>
+                )}
+
+                {/* The chat that followed this board. It is teaching too: the
+                    student asks what it did not follow and the user answers,
+                    often more directly than anything they drew. Both sides are
+                    shown because the answer is unreadable without the question,
+                    and only the user's half can carry a mark. */}
+                {turn.chat && turn.chat.length > 0 && (
+                  <div className={styles.turnChat}>
+                    <span className={styles.turnChatLabel}>{t('evaluation.chatLabel')}</span>
+                    <ol className={styles.turnChatList}>
+                      {turn.chat.map((message, i) => (
+                        <li
+                          key={i}
+                          className={`${styles.turnChatRow} ${
+                            message.sender === 'user'
+                              ? styles.turnChatFromUser
+                              : styles.turnChatFromLearner
+                          }`}
+                        >
+                          <span className={styles.turnChatWho}>
+                            {t(
+                              message.sender === 'user'
+                                ? 'evaluation.chatYou'
+                                : 'evaluation.chatLearner',
+                            )}
+                          </span>
+                          <span className={styles.turnChatText}>
+                            {message.sender === 'user'
+                              ? renderChannel(
+                                  message.text,
+                                  quoted,
+                                  'chat',
+                                  indexOf,
+                                  openIndex,
+                                  toggle,
+                                  openAndScroll,
+                                  t,
+                                  i,
+                                )
+                              : message.text}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
                   </div>
                 )}
 
@@ -332,9 +378,11 @@ function renderChannel(
   toggle: (i: number) => void,
   openAndScroll: (i: number) => void,
   t: Translate,
+  /** Which chat bubble this is, when `field` is 'chat'. */
+  chatIndex?: number,
 ) {
   const matches = quoted
-    .filter((q) => q.match.field === field)
+    .filter((q) => q.match.field === field && q.match.chatIndex === chatIndex)
     .map((q) => ({ finding: q.finding, index: q.match.index, length: q.match.text.length }))
 
   if (matches.length === 0) return text

@@ -21,6 +21,7 @@ import {
   getEvaluator,
   seedLearnerState,
   seedLearnerStateFromEvaluation,
+  type ChatExchange,
   type ReferenceSuggestions,
   type TranscriptTurn,
 } from "../../agents/index.js";
@@ -659,13 +660,19 @@ async function runEvaluation(ws: Workspace): Promise<void> {
   session.endedAt = utcNowIso();
   await sessions.saveSession(session);
 
-  // Same transcript projection the session REST layer feeds the Evaluator (§5.2).
+  // Same transcript projection the session REST layer feeds the Evaluator (§5.2),
+  // with the chat panel folded in: see attachChat.
   const rows = await sessions.listTurnsWithResponses(session.sessionId);
+  const chatByTurn = groupChatByTurn(
+    rows.map(({ turn }) => ({ turnIndex: turn.turnIndex, createdAt: turn.createdAt })),
+    await workspaces.listMessages(ws.id),
+  );
   const transcript: TranscriptTurn[] = rows.map(({ turn, response }) => ({
     turnIndex: turn.turnIndex,
     boardText: turn.interpretation.transcribedText,
     speech: turn.speechTranscript?.transcript || undefined,
     learnerUtterance: response?.text,
+    chat: chatByTurn.get(turn.turnIndex),
   }));
 
   const topic = await synthTopic(ws);
@@ -709,13 +716,62 @@ async function runEvaluation(ws: Workspace): Promise<void> {
       meaningfulScore: !usedMock,
       // The same turns the Evaluator read, minus the student's own replies:
       // the debrief highlights what the user taught, not what it answered.
+      // The chat survives that cut whole, both sides, because a reply with the
+      // question stripped off it cannot be read (see EvaluationTranscriptTurn).
       transcript: transcript.map((turn) => ({
         turnIndex: turn.turnIndex,
         boardText: turn.boardText,
         speech: turn.speech,
+        chat: turn.chat,
       })),
     }),
   );
+}
+
+/**
+ * Fold the chat panel into the turn timeline.
+ *
+ * Chat and teaching turns are two separate streams in storage, and the
+ * Evaluator reads one of them. Merging is by timestamp rather than by
+ * position: a message belongs to the last turn that had already happened when
+ * it was sent, which is the turn whose board the student was looking at while
+ * they asked. Position would be a guess, and a wrong guess hangs the teacher's
+ * words off someone else's drawing.
+ *
+ * Messages sent before the first turn attach to that first turn. They were
+ * still part of the lesson, and the alternative is dropping them.
+ *
+ * A session with no turns at all keeps no chat: there is nothing to attach it
+ * to. That session has no transcript to evaluate either, so the debrief
+ * already falls back to the empty report.
+ */
+function groupChatByTurn(
+  turns: { turnIndex: number; createdAt: string }[],
+  messages: ChatMessage[],
+): Map<number, ChatExchange[]> {
+  const byTurn = new Map<number, ChatExchange[]>();
+  if (turns.length === 0) return byTurn;
+
+  const ordered = [...turns].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+  const startedAt = ordered.map((turn) => new Date(turn.createdAt).getTime());
+
+  for (const message of messages) {
+    const text = message.content?.trim();
+    if (!text) continue;
+
+    const sentAt = new Date(message.createdAt).getTime();
+    let at = 0;
+    while (at + 1 < startedAt.length && startedAt[at + 1] <= sentAt) at++;
+
+    const turnIndex = ordered[at].turnIndex;
+    const list = byTurn.get(turnIndex) ?? [];
+    list.push({ sender: message.sender, text });
+    byTurn.set(turnIndex, list);
+  }
+
+  return byTurn;
 }
 
 /**

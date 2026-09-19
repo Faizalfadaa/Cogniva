@@ -4,8 +4,9 @@
  * Used when no Gemini credential is configured (or USE_MOCK_AI=true), and as the
  * graceful fallback when a real evaluation call fails — so the debrief always
  * renders rather than dead-ending the flow. It scores by naive keyword coverage
- * of the topic's keyConcepts across the transcript: covered -> CORRECT, absent
- * -> MISSED. No model call, fully reproducible.
+ * of the topic's keyConcepts across the transcript -- board, speech, and what
+ * the user typed in chat -- covered -> CORRECT, absent -> MISSED. No model
+ * call, fully reproducible.
  */
 
 import { utcNowIso } from "../../contracts/common.js";
@@ -51,7 +52,7 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
   // user actually wrote something, never high enough to pass for a judgement
   // the offline path did not make.
   const explained = input.turns
-    .map((turn) => `${turn.boardText ?? ""} ${turn.speech ?? ""}`.trim())
+    .map((turn) => `${turn.boardText ?? ""} ${turn.speech ?? ""} ${taughtInChat(turn)}`.trim())
     .join(" ");
   const depthScore =
     input.turns.length === 0 ? 0 : Math.min(50, Math.round(explained.length / 20));
@@ -95,12 +96,26 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
   };
 }
 
+/**
+ * This turn's chat, teacher's side only.
+ *
+ * The student's lines are excluded on purpose. They name the concept constantly
+ * — asking about it is what a student does — so counting them would mark every
+ * concept the student was curious about as one the user taught.
+ */
+function taughtInChat(turn: TranscriptTurn): string {
+  return (turn.chat ?? [])
+    .filter((message) => message.sender === "user")
+    .map((message) => message.text)
+    .join(" ");
+}
+
 /** First turn whose text shares a distinctive content word with the concept. */
 function findEvidenceTurn(turns: TranscriptTurn[], concept: string): number | null {
   const words = contentWords(concept);
   if (words.length === 0) return null;
   for (const turn of turns) {
-    const text = [turn.boardText, turn.speech, turn.learnerUtterance]
+    const text = [turn.boardText, turn.speech, turn.learnerUtterance, taughtInChat(turn)]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
