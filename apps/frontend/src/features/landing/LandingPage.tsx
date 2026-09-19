@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import styles from '../../styles/LandingPage.module.css'
 import { LEARNERS, learnerCopy } from '../../lib/Learner'
-import { LoginScreen } from '../auth/LoginScreen'
-import { useUserStore } from '../../state/UserStore'
 import { TeamSlider } from './TeamSlider'
-import { BackToTop } from './BackToTop'
 import { useLocale, useT, type Translate } from '../../i18n/LanguageProvider'
-import { LanguageToggle } from '../../i18n/LanguageToggle'
 import type { MessageKey } from '../../i18n/messages'
+import { useOpenSignIn } from '../marketing/SignInContext'
 
 /**
  * Fade-and-lift sections in as they scroll into view.
@@ -108,7 +105,7 @@ const TEAM = [
  * The ids are anchors, not copy: the footer and the Sekolah card both link to a
  * single row by id and open it, so they stay in English however the page reads.
  */
-const FAQS: Array<{ id: string; q: MessageKey; a: MessageKey }> = [
+export const FAQS: Array<{ id: string; q: MessageKey; a: MessageKey }> = [
   { id: 'what-is-cogniva', q: 'landing.faqWhatQ', a: 'landing.faqWhatA' },
   { id: 'who-is-it-for', q: 'landing.faqWhoQ', a: 'landing.faqWhoA' },
   { id: 'getting-started', q: 'landing.faqStartQ', a: 'landing.faqStartA' },
@@ -128,65 +125,23 @@ const FAQ_VALUES: Partial<Record<MessageKey, Record<string, string>>> = {
   'landing.faqStudentA': { names: LEARNERS.map((student) => student.name).join(', ') },
 }
 
-const FOOTER_GROUPS: Array<{
-  title: MessageKey
-  links: Array<{ label: MessageKey; target: string }>
-}> = [
-  {
-    title: 'landing.footerExplore',
-    links: [
-      { label: 'landing.navHow', target: 'how' },
-      { label: 'landing.footerMeetStudents', target: 'students' },
-      { label: 'landing.footerFeedback', target: 'feedback' },
-      { label: 'landing.footerAccess', target: 'pricing' },
-      { label: 'landing.footerAllQuestions', target: 'faq' },
-    ],
-  },
-  {
-    title: 'landing.footerFirstSession',
-    links: [
-      { label: 'landing.footerGettingStarted', target: 'faq-getting-started' },
-      { label: 'landing.footerChooseStudent', target: 'faq-choose-student' },
-      { label: 'landing.footerPrepareRefs', target: 'faq-reference-material' },
-      { label: 'landing.footerBoardVoice', target: 'faq-voice-and-board' },
-      { label: 'landing.footerTeachButton', target: 'faq-teach-button' },
-    ],
-  },
-  {
-    title: 'landing.footerKeepLearning',
-    links: [
-      { label: 'landing.footerGuestOrAccount', target: 'faq-guest-and-account' },
-      { label: 'landing.footerReadReport', target: 'faq-session-report' },
-      { label: 'landing.footerAnotherRound', target: 'faq-continue-learning' },
-      { label: 'landing.footerAiFeedback', target: 'faq-ai-feedback' },
-      { label: 'landing.footerPlanAvailability', target: 'faq-plans-and-access' },
-    ],
-  },
-  {
-    title: 'landing.footerAboutCogniva',
-    links: [
-      { label: 'landing.footerApproach', target: 'about' },
-      { label: 'landing.footerLbt', target: 'faq-what-is-cogniva' },
-      { label: 'landing.footerWhoFor', target: 'faq-who-is-it-for' },
-      { label: 'landing.footerTeam', target: 'team' },
-      { label: 'landing.backToTop', target: 'top' },
-    ],
-  },
-]
-
 /** Feature bullet marker. `on={false}` renders the muted "not included" dash. */
 function Tick({ on = true, dark = false }: { on?: boolean; dark?: boolean }) {
   if (dark) return <span className={styles.tickDark}>✓</span>
   return <span className={on ? styles.tick : styles.tickOff}>{on ? '✓' : '–'}</span>
 }
 
+/**
+ * The front page. Nav, closing call to action and footer live in
+ * MarketingLayout, shared with the inner pages; this renders the sections in
+ * between.
+ */
 export default function LandingPage() {
   const t = useT()
   const { locale } = useLocale()
+  const location = useLocation()
+  const openSignIn = useOpenSignIn()
   const [annual, setAnnual] = useState(false)
-  const [signInOpen, setSignInOpen] = useState(false)
-  const navigate = useNavigate()
-  const { login, register, continueAsGuest } = useUserStore()
   /** Index of the open FAQ row, or null when all are collapsed. */
   const [openFaq, setOpenFaq] = useState<number | null>(0)
 
@@ -195,41 +150,19 @@ export default function LandingPage() {
   const faqReveal = useReveal<HTMLDivElement>()
   const teamReveal = useReveal<HTMLDivElement>()
 
+  // Footer links on other pages point at a single question (/#faq-teach-button):
+  // open that row when the page arrives with its hash.
+  useEffect(() => {
+    const index = FAQS.findIndex((faq) => `#faq-${faq.id}` === location.hash)
+    if (index >= 0) setOpenFaq(index)
+  }, [location.hash, location.key])
+
   const senseiPrice = annual ? '39.000' : '49.000'
   const senseiNote = annual ? t('landing.proposedAnnual') : t('landing.proposedMonthly')
   const schoolPrice = annual ? '19.000' : '24.000'
 
   return (
-    <div className={styles.page}>
-      {/* ============ NAV ============ */}
-      <header className={styles.nav}>
-        <div className={styles.navInner}>
-          <a href="#top" className={styles.brand}>
-            <img src="/cogniva_logo.png" alt="" aria-hidden="true" className={styles.brandMarkImg} />
-            <span className={styles.brandName}>Cogniva</span>
-          </a>
-          <nav className={styles.navLinks}>
-            <a href="#how">{t('landing.navHow')}</a>
-            <a href="#students">{t('landing.navStudents')}</a>
-            <a href="#pricing">{t('landing.navPricing')}</a>
-            <a href="#faq">{t('landing.navFaq')}</a>
-            <a href="#about">{t('landing.navAbout')}</a>
-          </nav>
-          <div className={styles.navActions}>
-            {/* First thing on the page, so someone who reads Indonesian can
-                switch before reading anything else. */}
-            <LanguageToggle />
-            <button
-              type="button"
-              className={styles.btnLime}
-              onClick={() => setSignInOpen(true)}
-            >
-              {t('auth.signIn')}
-            </button>
-          </div>
-        </div>
-      </header>
-
+    <>
       {/* ============ HERO ============ */}
       <section id="top" className={styles.hero}>
         <div className={styles.heroInner}>
@@ -440,7 +373,7 @@ export default function LandingPage() {
               <button
                 type="button"
                 className={styles.planCtaGhost}
-                onClick={() => setSignInOpen(true)}
+                onClick={openSignIn}
               >
                 {t('landing.startNow')}
               </button>
@@ -482,7 +415,7 @@ export default function LandingPage() {
               <button
                 type="button"
                 className={styles.planCtaLime}
-                onClick={() => setSignInOpen(true)}
+                onClick={openSignIn}
               >
                 {t('landing.takeSensei')}
               </button>
@@ -622,90 +555,6 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
-      {/* ============ CTA + FOOTER ============ */}
-      <section className={styles.closing}>
-        <div className={styles.container}>
-          <div className={styles.closingCta}>
-            <h2 className={styles.closingTitle}>{t('landing.closingTitle')}</h2>
-            <p className={styles.closingLead}>{t('landing.closingLead')}</p>
-            <button
-              type="button"
-              className={styles.btnLimeLarge}
-              onClick={() => setSignInOpen(true)}
-            >
-              {t('landing.startFree')}
-            </button>
-          </div>
-
-          <div className={styles.footerRule} />
-
-          <footer className={styles.footer} aria-label={t('landing.footerLabel')}>
-            <div className={styles.footerBrand}>
-              <a href="#top" className={styles.brand} aria-label={t('landing.footerHome')}>
-                <img src="/cogniva_logo.png" alt="" aria-hidden="true" className={styles.brandMarkImg} />
-                <span className={styles.brandNameOnDark}>Cogniva</span>
-              </a>
-              <span className={styles.footerTagline}>{t('landing.tagline')}</span>
-              <button type="button" className={styles.btnLime} onClick={() => setSignInOpen(true)}>
-                {t('landing.startSession')}
-              </button>
-              <Link to={APP_ENTRY} className={styles.footerDashboard}>
-                {t('landing.goToDashboard')} →
-              </Link>
-            </div>
-            <nav className={styles.footerCols} aria-label={t('landing.footerNavLabel')}>
-              {FOOTER_GROUPS.map((group) => (
-                <div key={group.title} className={styles.footerCol}>
-                  <h3 className={styles.footerColTitle}>{t(group.title)}</h3>
-                  {group.links.map((link) => (
-                    <a
-                      key={link.target}
-                      href={`#${link.target}`}
-                      onClick={() => {
-                        const index = FAQS.findIndex((faq) => `faq-${faq.id}` === link.target)
-                        if (index >= 0) setOpenFaq(index)
-                      }}
-                    >
-                      {t(link.label)}
-                    </a>
-                  ))}
-                </div>
-              ))}
-            </nav>
-          </footer>
-
-          <div className={styles.footerBottom}>
-            <span className={styles.copyright}>
-              {t('landing.copyright', { year: new Date().getFullYear() })}
-            </span>
-            <span className={styles.copyright}>{t('landing.motto')}</span>
-          </div>
-        </div>
-      </section>
-
-      <BackToTop />
-
-      {/* The same LoginScreen HomePage uses, opened here as an overlay. No
-          route change: the landing page stays mounted underneath, and closing
-          returns to it. Signing in lands on the dashboard. */}
-      {signInOpen && (
-        <LoginScreen
-          onLogin={async (u, p) => {
-            await login(u, p)
-            navigate('/home')
-          }}
-          onRegister={async (u, p) => {
-            await register(u, p)
-            navigate('/home')
-          }}
-          onGuest={() => {
-            continueAsGuest()
-            navigate('/home')
-          }}
-          onClose={() => setSignInOpen(false)}
-        />
-      )}
-    </div>
+    </>
   )
 }

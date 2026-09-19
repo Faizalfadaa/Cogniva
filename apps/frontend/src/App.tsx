@@ -1,6 +1,13 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import LandingPage from './features/landing/LandingPage'
+import MarketingLayout from './features/marketing/MarketingLayout'
+import ProductPage from './features/marketing/pages/ProductPage'
+import StudentsPage from './features/marketing/pages/StudentsPage'
+import DebriefPage from './features/marketing/pages/DebriefPage'
+import PricingPage from './features/marketing/pages/PricingPage'
+import TechnologyPage from './features/marketing/pages/TechnologyPage'
+import AboutPage from './features/marketing/pages/AboutPage'
 import HomePage from './features/home/HomePage'
 import WorkspacePage from './routes/workspace/Workspace'
 import EvaluationPage from './routes/evaluation/Evaluation'
@@ -19,9 +26,18 @@ export default function App() {
 
   return (
     <Routes>
-      {/* Public marketing page is the front door; the workspace dashboard that
-          used to live here moved to /home. */}
-      <Route path="/" element={<LandingPage />} />
+      {/* The public site is the front door: the landing page plus the pages
+          its menus link to, all sharing one nav and footer. The workspace
+          dashboard that used to live at / moved to /home. */}
+      <Route element={<MarketingLayout />}>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/product" element={<ProductPage />} />
+        <Route path="/students" element={<StudentsPage />} />
+        <Route path="/debrief" element={<DebriefPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/technology" element={<TechnologyPage />} />
+        <Route path="/about" element={<AboutPage />} />
+      </Route>
       <Route path="/home" element={<HomePage />} />
       <Route path="/workspace/:id" element={<WorkspacePage />} />
       <Route path="/evaluation/:id" element={<EvaluationPage />} />

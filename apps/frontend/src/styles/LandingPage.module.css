@@ -140,6 +140,83 @@
 
 .navLinks a:hover { color: var(--forest-dark); }
 
+/* The page the reader is on: darker text over a short lime underline. */
+.navLinks a.navLinkActive {
+  color: var(--text-primary);
+  box-shadow: inset 0 -2px 0 var(--lime);
+  padding-bottom: 4px;
+}
+
+/* Six page links do not fit beside the actions on a narrow screen, so below
+   960px they move behind a menu button into a panel under the bar. */
+.menuToggle {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  cursor: pointer;
+}
+
+.menuToggle span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--forest-dark);
+}
+
+.mobileMenu {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .navLinks { display: none; }
+  .navActions { margin-left: auto; }
+  .menuToggle { display: flex; }
+
+  .mobileMenu {
+    display: flex;
+    flex-direction: column;
+    padding: 4px var(--ln-gutter) 18px;
+    border-top: 1px solid var(--border-warm);
+  }
+
+  .mobileMenu a {
+    display: flex;
+    align-items: center;
+    min-height: 46px;
+    border-bottom: 1px solid var(--divider-warm);
+    font: 600 15px/1.2 var(--font-body);
+    color: var(--text-secondary);
+    text-decoration: none;
+  }
+
+  .mobileMenu a.navLinkActive { color: var(--text-primary); }
+}
+
+.mobileMenuCta {
+  align-self: flex-start;
+  margin-top: 14px;
+  border: none;
+  cursor: pointer;
+}
+
+@media (max-width: 520px) {
+  .navInner {
+    gap: 12px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .navSignInBtn { display: none; }
+}
+
 .navActions {
   display: flex;
   align-items: center;
