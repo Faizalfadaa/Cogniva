@@ -52,3 +52,17 @@ export interface EvaluationReportDTO {
   /** The turns `findings` cite. Empty when the report was built without one. */
   transcript?: EvaluationTranscriptTurnDTO[];
 }
+
+/**
+ * One finished session's score, for the trend across sessions.
+ *
+ * Fetched apart from the report because a report describes one session and
+ * cannot know what came after it.
+ */
+export interface ScoreHistoryPointDTO {
+  workspaceId: string;
+  title: string | null;
+  score: number;
+  /** When the report was written, oldest first. */
+  completedAt: string;
+}

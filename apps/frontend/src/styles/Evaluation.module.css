@@ -1118,6 +1118,143 @@
   color: var(--text-secondary);
 }
 
+/* The one action a finding can offer, so it carries the gold accent rather than
+   the lime every other button on the page uses. */
+.practiceButton {
+  align-self: flex-start;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--gold-text);
+  background: var(--gold-tint);
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-pill);
+  padding: 8px 16px;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.practiceButton:hover:not(:disabled) {
+  background: var(--gold);
+}
+.practiceButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.practiceButton:focus-visible {
+  outline: 2px solid var(--green-accent);
+  outline-offset: 2px;
+}
+
+/* Timing is context, never a grade, so it is set like a footnote rather than
+   like another number in the row above it. */
+.statCaveat {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: 68ch;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   The board behind a turn
+═══════════════════════════════════════════════════════════ */
+.turnBoard {
+  margin: 2px 0 10px;
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-md);
+  background: var(--parchment);
+  overflow: hidden;
+}
+
+.turnBoardImage {
+  display: block;
+  width: 100%;
+  /* Capped rather than free: a board is context for the words under it, and a
+     full-height screenshot would push the assessment itself off the screen. */
+  max-height: 280px;
+  object-fit: contain;
+  background: var(--card-bg);
+}
+
+.turnBoardCaption {
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-warm);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Score trend across sessions
+═══════════════════════════════════════════════════════════ */
+.trendCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trendTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.trendTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-on-forest-muted);
+}
+
+.trendDelta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-on-forest-muted);
+}
+.trendUp { color: var(--lime); }
+/* Not red. A dip is information, not a failure, and this screen has four
+   category colours already spoken for. */
+.trendDown { color: var(--text-on-forest-muted); }
+
+.trendChart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.trendLine {
+  fill: none;
+  stroke: var(--lime);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trendDot {
+  fill: var(--forest-dark);
+  stroke: var(--lime);
+  stroke-width: 2;
+}
+
+.trendDotCurrent {
+  fill: var(--lime);
+  stroke: var(--forest-dark);
+  stroke-width: 2;
+}
+
+.trendCaption {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-on-forest-muted);
+}
+
 /* ═══════════════════════════════════════════════════════════
    Follow-up suggestion
 ═══════════════════════════════════════════════════════════ */

@@ -3,6 +3,7 @@ import type {
   EvaluationFindingDTO,
   EvaluationTranscriptTurnDTO,
 } from '../../../dto/EvaluationReportDTO'
+import type { TeachingCheckpointDTO } from '../../../dto/TeachingCheckpointDTO'
 import { findingsForTurn, segmentTextForFindings, type QuoteField } from '../lib/highlightQuote'
 import { CATEGORY_BADGE_CLASS, CATEGORY_LABEL, CATEGORY_MARK_CLASS } from '../lib/findingLabels'
 import { useT, type Translate } from '../../../i18n/LanguageProvider'
@@ -11,6 +12,8 @@ import styles from '../../../styles/Evaluation.module.css'
 interface TranscriptReviewProps {
   transcript: EvaluationTranscriptTurnDTO[]
   findings: EvaluationFindingDTO[]
+  /** Null while the Detail tab's lazy fetch is still in flight. */
+  checkpoints: TeachingCheckpointDTO[] | null
 }
 
 /**
@@ -28,10 +31,36 @@ interface TranscriptReviewProps {
  *
  * Identity is the finding's index in `findings`, so the mark in the text and the
  * panel that opens under it always agree on which note is showing.
+ *
+ * Each turn can also show the board it was taught from. The app is built around
+ * a whiteboard, and until now the debrief only ever showed Vision's reading of
+ * it — the drawing the user actually made never came back. Boards are matched by
+ * position and only when the counts line up exactly (see `boardsByTurn`).
  */
-export function TranscriptReview({ transcript, findings }: TranscriptReviewProps) {
+export function TranscriptReview({ transcript, findings, checkpoints }: TranscriptReviewProps) {
   const t = useT()
   const [openIndex, setOpenIndex] = useState<number | null>(null)
+
+  /**
+   * Board image per turn, or null when they cannot be matched with certainty.
+   *
+   * Checkpoints and turns are written by the same loop, so position N is turn N
+   * — but a turn that ended in a handled failure leaves a checkpoint without a
+   * transcript entry, and the positions drift. Showing the wrong board under
+   * the wrong words is worse than showing none, so an uneven count shows none.
+   */
+  const boardsByTurn = useMemo(() => {
+    if (!checkpoints || checkpoints.length !== transcript.length) return null
+    const ordered = [...checkpoints].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    )
+    const map = new Map<number, string>()
+    transcript.forEach((turn, i) => {
+      const image = ordered[i]?.snapshotImageUrl
+      if (image) map.set(turn.turnIndex, image)
+    })
+    return map
+  }, [checkpoints, transcript])
 
   const indexOf = useMemo(() => {
     const map = new Map<EvaluationFindingDTO, number>()
@@ -92,6 +121,20 @@ export function TranscriptReview({ transcript, findings }: TranscriptReviewProps
                 <p className={styles.turnIndex}>
                   {t('evaluation.turnLabel', { index: turn.turnIndex })}
                 </p>
+
+                {boardsByTurn?.get(turn.turnIndex) && (
+                  <figure className={styles.turnBoard}>
+                    <img
+                      src={boardsByTurn.get(turn.turnIndex)}
+                      alt={t('evaluation.boardAlt', { index: turn.turnIndex })}
+                      className={styles.turnBoardImage}
+                      loading="lazy"
+                    />
+                    <figcaption className={styles.turnBoardCaption}>
+                      {t('evaluation.boardCaption')}
+                    </figcaption>
+                  </figure>
+                )}
 
                 <p className={styles.turnBody}>
                   {renderChannel(turn.boardText, quoted, 'boardText', indexOf, openIndex, toggle, openAndScroll, t)}

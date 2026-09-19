@@ -3,7 +3,7 @@ import type { WorkspaceDTO } from '../dto/WorkspaceDTO';
 import type { Locale } from '../i18n/messages';
 import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
-import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
+import type { EvaluationReportDTO, ScoreHistoryPointDTO } from '../dto/EvaluationReportDTO';
 import type { TimelineDTO } from '../dto/TimelineDTO';
 import type {
   ReferenceSuggestionsDTO,
@@ -486,6 +486,25 @@ export class MockCognivaBridge implements CognivaBridge {
     const report = store.reports.get(workspaceId);
     if (!report) throw new Error(`[Mock] Report not ready for workspace: ${workspaceId}`);
     return { ...report };
+  }
+
+  /** Every report the mock has produced this session, oldest workspace first. */
+  async getScoreHistory(): Promise<ScoreHistoryPointDTO[]> {
+    await delay(120);
+    const points: ScoreHistoryPointDTO[] = [];
+    for (const [workspaceId, report] of store.reports) {
+      const ws = store.workspaces.get(workspaceId);
+      if (!ws) continue;
+      points.push({
+        workspaceId,
+        title: ws.title ?? null,
+        score: report.score,
+        completedAt: ws.updatedAt,
+      });
+    }
+    return points.sort(
+      (a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime(),
+    );
   }
 
   async resumeSession(workspaceId: string): Promise<WorkspaceDTO> {

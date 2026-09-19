@@ -1,10 +1,14 @@
 import { useState } from 'react'
-import type { EvaluationFindingDTO } from '../../../dto/EvaluationReportDTO'
+import type {
+  EvaluationFindingDTO,
+  ScoreHistoryPointDTO,
+} from '../../../dto/EvaluationReportDTO'
 import type { LearnerCharacter } from '../../../lib/Learner'
 import { buildScoreAxes } from '../lib/scoreAxes'
 import { buildSessionHighlights } from '../lib/sessionHighlights'
 import { AXIS_ICON } from '../lib/axisIcons'
 import { AxisRadar } from './AxisRadar'
+import { ScoreTrend } from './ScoreTrend'
 import { SessionHighlights } from './SessionHighlights'
 import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/Evaluation.module.css'
@@ -14,6 +18,9 @@ interface ScoreBreakdownProps {
   depthScore: number
   findings: EvaluationFindingDTO[]
   learner: LearnerCharacter
+  /** Every scored session this device has finished, for the trend strip. */
+  history: ScoreHistoryPointDTO[]
+  workspaceId: string
 }
 
 /**
@@ -28,7 +35,14 @@ interface ScoreBreakdownProps {
  * link works both ways: hovering a vertex lights its card, hovering a card lights
  * its vertex.
  */
-export function ScoreBreakdown({ score, depthScore, findings, learner }: ScoreBreakdownProps) {
+export function ScoreBreakdown({
+  score,
+  depthScore,
+  findings,
+  learner,
+  history,
+  workspaceId,
+}: ScoreBreakdownProps) {
   const t = useT()
   const axes = buildScoreAxes(findings, depthScore, t)
   const highlights = buildSessionHighlights(findings, axes, t)
@@ -46,6 +60,8 @@ export function ScoreBreakdown({ score, depthScore, findings, learner }: ScoreBr
           <span className={styles.scoreOutOf}>/ 100</span>
           <p className={styles.scoreCaption}>{t('evaluation.scoreCaption')}</p>
         </div>
+
+        <ScoreTrend history={history} currentWorkspaceId={workspaceId} />
 
         <SessionHighlights highlights={highlights} learner={learner} />
 

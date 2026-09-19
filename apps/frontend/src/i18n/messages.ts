@@ -457,6 +457,36 @@ export const messages = {
   'evaluation.statWords': { en: 'words taught', id: 'kata diajarkan' },
   'evaluation.turnLabel': { en: 'Turn {index}', id: 'Giliran {index}' },
   'evaluation.spokenLabel': { en: 'Spoken', id: 'Lisan' },
+
+  // --- trend, timing, board replay, practice --------------------------------
+  'evaluation.trendTitle': {
+    en: 'Across your last {count} sessions',
+    id: '{count} sesi terakhirmu',
+  },
+  'evaluation.trendVsPrevious': { en: 'vs last session', id: 'dari sesi sebelumnya' },
+  'evaluation.trendSame': { en: 'same as last session', id: 'sama seperti sesi lalu' },
+  'evaluation.trendCaption': {
+    en: 'Each dot is a finished session, scored the same way. Yours is the filled one.',
+    id: 'Tiap titik adalah satu sesi selesai, dinilai dengan cara yang sama. Sesi ini yang terisi penuh.',
+  },
+  'evaluation.statSpan': { en: 'teaching span', id: 'rentang mengajar' },
+  'evaluation.statLongestGap': { en: 'longest pause', id: 'jeda terlama' },
+  'evaluation.timingCaveat': {
+    en: 'Times are measured between one "Teach" and the next, and are shown as context only. How long someone thinks before explaining is not part of the score.',
+    id: 'Waktu dihitung antara satu "Teach" dan berikutnya, dan ditampilkan sebagai konteks saja. Lama berpikir sebelum menjelaskan tidak ikut dinilai.',
+  },
+  'evaluation.boardAlt': {
+    en: 'The whiteboard you taught turn {index} from',
+    id: 'Papan tulis yang kamu pakai mengajar di giliran {index}',
+  },
+  'evaluation.boardCaption': {
+    en: 'What you drew for this turn',
+    id: 'Yang kamu tulis untuk giliran ini',
+  },
+  'evaluation.practiceConcept': {
+    en: 'Practise this concept →',
+    id: 'Latih konsep ini →',
+  },
   'evaluation.processing2b': {
     en: 'Checking each concept against the reference...',
     id: 'Mencocokkan tiap konsep dengan materi rujukan...',

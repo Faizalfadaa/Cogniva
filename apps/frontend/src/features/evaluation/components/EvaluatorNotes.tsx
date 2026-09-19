@@ -11,6 +11,8 @@ const CATEGORY_ORDER: Category[] = ['WRONG', 'MISSED', 'CONFUSING', 'CORRECT']
 
 interface EvaluatorNotesProps {
   findings: EvaluationFindingDTO[]
+  /** Open a new session pointed at one concept. */
+  onPractice: (concept: string) => void
 }
 
 /**
@@ -28,10 +30,11 @@ interface EvaluatorNotesProps {
  * a glance — that every gap this session left was about mechanism, not naming.
  * The filter chips are the part a slider cannot do at all.
  */
-export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
+export function EvaluatorNotes({ findings, onPractice }: EvaluatorNotesProps) {
   const t = useT()
   const [filter, setFilter] = useState<Category | 'ALL'>('ALL')
   const [openIndex, setOpenIndex] = useState<number | null>(null)
+  const [starting, setStarting] = useState<string | null>(null)
 
   const counts = useMemo(() => {
     const byCategory = new Map<Category, number>()
@@ -136,6 +139,24 @@ export function EvaluatorNotes({ findings }: EvaluatorNotesProps) {
                       <p className={styles.followUpLabel}>{t('evaluation.followUpLabel')}</p>
                       <p className={styles.followUpText}>{finding.followUp}</p>
                     </div>
+                  )}
+                  {/* Only where something is actually owed. A CORRECT finding has
+                      nothing to practise, and offering it anyway would make the
+                      button mean "another session" rather than "fix this". */}
+                  {finding.category !== 'CORRECT' && (
+                    <button
+                      type="button"
+                      className={styles.practiceButton}
+                      disabled={starting !== null}
+                      onClick={() => {
+                        setStarting(finding.concept)
+                        onPractice(finding.concept)
+                      }}
+                    >
+                      {starting === finding.concept
+                        ? t('evaluation.opening')
+                        : t('evaluation.practiceConcept')}
+                    </button>
                   )}
                 </div>
               )}

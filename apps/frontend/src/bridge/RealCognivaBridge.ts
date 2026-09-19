@@ -4,7 +4,7 @@ import type { WorkspaceDTO } from '../dto/WorkspaceDTO';
 import type { Locale } from '../i18n/messages';
 import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
-import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
+import type { EvaluationReportDTO, ScoreHistoryPointDTO } from '../dto/EvaluationReportDTO';
 import type { TimelineDTO } from '../dto/TimelineDTO';
 import type {
   ReferenceSuggestionsDTO,
@@ -225,6 +225,10 @@ export class RealCognivaBridge implements CognivaBridge {
     // 404 until the evaluation finishes — surfaced as a rejection, matching the
     // mock so the Evaluation screen keeps polling getWorkspace() until Completed.
     return getJson<EvaluationReportDTO>(`/api/workspaces/${workspaceId}/report`);
+  }
+
+  getScoreHistory(): Promise<ScoreHistoryPointDTO[]> {
+    return getJson<ScoreHistoryPointDTO[]>('/api/reports/history');
   }
 
   // Resume a finished session back into teaching — transcript and the Learner's
