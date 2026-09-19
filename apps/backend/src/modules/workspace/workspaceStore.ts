@@ -148,6 +148,19 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
     return [...(this.messages.get(workspaceId) ?? [])];
   }
 
+  /**
+   * Single-threaded, so the read and the write below cannot interleave with
+   * another caller's — the claim is atomic here for free.
+   */
+  async claimForEvaluation(workspaceId: string): Promise<boolean> {
+    const workspace = this.workspaces.get(workspaceId);
+    if (!workspace) return false;
+    if (workspace.state !== "Teaching" && workspace.state !== "Draft") return false;
+    workspace.state = "Evaluating";
+    workspace.updatedAt = new Date().toISOString();
+    return true;
+  }
+
   // --- Evaluation report ------------------------------------------------
 
   async saveReport(

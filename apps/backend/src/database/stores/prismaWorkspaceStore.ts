@@ -244,6 +244,22 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
     }));
   }
 
+  /**
+   * One conditional UPDATE, so the database decides the winner.
+   *
+   * `count` is 1 for the request that moved the row and 0 for every other,
+   * including one that arrived after the workspace was already Evaluating or
+   * Completed. That is the whole guard: no lock table, no in-process set that
+   * a second server instance would not share.
+   */
+  async claimForEvaluation(workspaceId: string): Promise<boolean> {
+    const { count } = await prisma.workspace.updateMany({
+      where: { id_workspace: workspaceId, state: { in: ["Teaching", "Draft"] } },
+      data: { state: "Evaluating", updated_at: new Date() },
+    });
+    return count === 1;
+  }
+
   // --- Evaluation report ------------------------------------------------
 
   async saveReport(

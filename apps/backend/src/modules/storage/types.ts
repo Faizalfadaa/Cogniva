@@ -128,6 +128,18 @@ export interface WorkspaceStore {
   ): Promise<ChatMessage | undefined>;
   listMessages(workspaceId: string): Promise<ChatMessage[]>;
 
+  /**
+   * Atomically move a workspace from Teaching/Draft into Evaluating, returning
+   * true only for the caller that actually made the move.
+   *
+   * finishSession used to read the state and then write it, which is two
+   * operations with a gap in the middle: two requests arriving together both
+   * read "Teaching", both wrote "Evaluating", and both ran an evaluation. The
+   * two runs disagreed, and whichever finished last was the one the user saw.
+   * The claim has to be one operation for the loser to be able to tell.
+   */
+  claimForEvaluation(workspaceId: string): Promise<boolean>;
+
   // --- Evaluation report ------------------------------------------------
   /**
    * Append this round's debrief. The store assigns the round number, so a

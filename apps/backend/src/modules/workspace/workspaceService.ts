@@ -477,11 +477,15 @@ export async function getChatMessages(id: string): Promise<ChatMessage[] | undef
 export async function finishSession(id: string): Promise<boolean> {
   const ws = await workspaces.get(id);
   if (!ws) return false;
-  // Idempotent: only a teaching workspace can be finished.
-  if (ws.state !== "Teaching" && ws.state !== "Draft") return true;
 
+  // Idempotent, and safe against two requests arriving together. Reading the
+  // state and then writing it left a gap in which both callers saw "Teaching",
+  // so both started an evaluation; the two runs disagreed and the user saw
+  // whichever landed last. Claiming it in one operation means only one caller
+  // can win, and the rest return the same "already handled" as a second click
+  // on a finished session.
+  if (!(await workspaces.claimForEvaluation(id))) return true;
   ws.state = "Evaluating";
-  await touch(ws);
 
   inBackground("evaluation", async () => {
     try {
