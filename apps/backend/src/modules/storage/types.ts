@@ -21,6 +21,7 @@ import type {
   ChatMessage,
   EvaluationReport,
   ReferenceSource,
+  ScoreHistoryPoint,
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
@@ -128,6 +129,12 @@ export interface WorkspaceStore {
   // --- Evaluation report ------------------------------------------------
   saveReport(workspaceId: string, report: EvaluationReport): Promise<EvaluationReport>;
   getReport(workspaceId: string): Promise<EvaluationReport | undefined>;
+  /**
+   * Every scored report this owner has, oldest first, so a debrief can show
+   * where its score sits in the run of them. Scoped by owner for the same
+   * reason `list` is: one device must never read another's sessions.
+   */
+  listScoreHistory(ownerId: string): Promise<ScoreHistoryPoint[]>;
 
   // --- PDF blob ---------------------------------------------------------
   savePdf(workspaceId: string, blob: StoredBlob): Promise<void>;

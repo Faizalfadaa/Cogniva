@@ -19,6 +19,7 @@ import type {
   EvaluationTranscriptTurn,
   LearnerSpeech,
   ReferenceSource,
+  ScoreHistoryPoint,
   TeachingCheckpoint,
   Workspace,
   WorkspaceState,
@@ -309,6 +310,30 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
       findings: (row.findings as Finding[] | null) ?? [],
       transcript: (row.transcript as EvaluationTranscriptTurn[] | null) ?? [],
     };
+  }
+
+  /**
+   * Scored reports only. A report written before the breakdown columns existed
+   * has a null score, and plotting it as a zero would invent a failed session
+   * the user never had.
+   */
+  async listScoreHistory(ownerId: string): Promise<ScoreHistoryPoint[]> {
+    const rows = await prisma.report.findMany({
+      where: { workspace: { id_user: ownerId }, score: { not: null } },
+      orderBy: { created_at: "asc" },
+      select: {
+        id_workspace: true,
+        score: true,
+        created_at: true,
+        workspace: { select: { title: true } },
+      },
+    });
+    return rows.map((row) => ({
+      workspaceId: row.id_workspace,
+      title: row.workspace.title,
+      score: row.score as number,
+      completedAt: row.created_at.toISOString(),
+    }));
   }
 
   // --- PDF blob ---------------------------------------------------------

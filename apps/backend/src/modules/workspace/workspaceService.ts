@@ -514,6 +514,16 @@ export async function getReport(id: string) {
 }
 
 /**
+ * Every scored session this owner has finished, oldest first.
+ *
+ * Read at the moment a debrief is opened rather than frozen into the report, so
+ * an older session's trend keeps up as newer ones land behind it.
+ */
+export async function getScoreHistory(ownerId: string) {
+  return workspaces.listScoreHistory(ownerId);
+}
+
+/**
  * Resume a finished workspace back into teaching (§4.2, §5.4). The transcript and
  * turn count carry over, and prior evaluations stay as history (the next finish
  * appends a fresh one). The Learner's mental model is re-seeded from the last

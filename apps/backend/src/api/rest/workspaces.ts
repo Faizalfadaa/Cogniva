@@ -244,6 +244,11 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     return report;
   });
 
+  // Scores across this owner's finished sessions, for the trend a single report
+  // cannot see. Owner-scoped like /workspaces, never by workspace id: the point
+  // of the list is the sessions either side of the one being read.
+  app.get("/reports/history", async (req) => service.getScoreHistory(await ownerOf(req)));
+
   // Resume a finished workspace back into teaching (§4.2, §5.4).
   app.post("/workspaces/:id/resume", async (req, reply) => {
     const ws = await service.resumeSession(idOf(req.params));

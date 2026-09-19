@@ -226,6 +226,21 @@ export interface EvaluationTranscriptTurn {
   speech?: string;
 }
 
+/**
+ * One finished session's score, for the trend across sessions.
+ *
+ * Deliberately not part of EvaluationReport: a report describes one session, and
+ * a session cannot know what came after it. This is read per owner at the moment
+ * the debrief is opened, so a session's trend stays accurate as later ones land.
+ */
+export interface ScoreHistoryPoint {
+  workspaceId: string;
+  title: string | null;
+  score: number;
+  /** When the report was written, oldest first. */
+  completedAt: string;
+}
+
 // --- Request bodies (validated at the REST boundary) ----------------------
 
 export const updateMetaSchema = z.object({
