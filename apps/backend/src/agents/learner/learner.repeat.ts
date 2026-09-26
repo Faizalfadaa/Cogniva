@@ -20,12 +20,24 @@
 
 import {
   AskedConcept,
+  AskedConceptKind,
   LearnerResponseType,
   LearnerState
 } from "./learner.types";
 
 /** Two questions on one concept is plenty; the third becomes "let's move on". */
 export const MAX_SAME_CONCEPT_QUESTIONS = 2;
+
+/**
+ * Questions that push a concept to a NEW case are counted apart, under their own
+ * budget of the same size.
+ *
+ * "And what about FFFFF?" after being taught F0 is not the user being asked the
+ * same thing a third time — it is a new question that happens to be about the
+ * same concept, and it is the kind that makes the teacher stretch. It still gets
+ * a limit, so the student cannot turn one concept into a quiz.
+ */
+const probeKinds: AskedConceptKind[] = ["probe", "extend"];
 
 /** Keep the tally bounded — a long session only needs its recent concepts. */
 const MAX_TRACKED_CONCEPTS = 40;
@@ -99,20 +111,33 @@ export function probeKey(
  */
 export function matchProbe(
   state: LearnerState,
-  key: string
+  key: string,
+  kind: AskedConceptKind = "probe"
 ): AskedConcept | undefined {
   if (!key) return undefined;
 
   const words = toWordSet(key);
 
-  return (state.askedConcepts ?? []).find((entry) =>
-    sameConcept(words, toWordSet(entry.key))
+  return (state.askedConcepts ?? []).find(
+    (entry) =>
+      entryKind(entry) === kind && sameConcept(words, toWordSet(entry.key))
   );
 }
 
-/** How many times the student has already probed this concept. */
-export function countProbes(state: LearnerState, key: string): number {
-  return matchProbe(state, key)?.count ?? 0;
+/** How many times the student has already asked this way about this concept. */
+export function countProbes(
+  state: LearnerState,
+  key: string,
+  kind: AskedConceptKind = "probe"
+): number {
+  return matchProbe(state, key, kind)?.count ?? 0;
+}
+
+/** Entries written before extensions existed are plain probes. */
+function entryKind(entry: AskedConcept): AskedConceptKind {
+  return probeKinds.includes(entry.kind as AskedConceptKind)
+    ? (entry.kind as AskedConceptKind)
+    : "probe";
 }
 
 function toWordSet(key: string): Set<string> {
@@ -131,16 +156,21 @@ function sameConcept(a: Set<string>, b: Set<string>): boolean {
   return contained && shared * 2 >= Math.max(a.size, b.size);
 }
 
-/** True once the student has spent its two questions on this concept. */
-export function isRepeatExhausted(state: LearnerState, key: string): boolean {
-  return countProbes(state, key) >= MAX_SAME_CONCEPT_QUESTIONS;
+/** True once the student has spent its two questions of this kind. */
+export function isRepeatExhausted(
+  state: LearnerState,
+  key: string,
+  kind: AskedConceptKind = "probe"
+): boolean {
+  return countProbes(state, key, kind) >= MAX_SAME_CONCEPT_QUESTIONS;
 }
 
 /** The tally for the next state, with this probe counted in. */
 export function recordProbe(
   state: LearnerState,
   key: string,
-  label: string
+  label: string,
+  kind: AskedConceptKind = "probe"
 ): AskedConcept[] {
   const carried = state.askedConcepts ?? [];
 
@@ -148,14 +178,14 @@ export function recordProbe(
 
   // Counted against the concept it already belongs to, keeping that entry's key
   // and label so the tally stays one concept rather than two spellings of it.
-  const existing = matchProbe(state, key);
+  const existing = matchProbe(state, key, kind);
   const updated: AskedConcept[] = existing
     ? carried.map((entry) =>
-        entry.key === existing.key
+        entry === existing
           ? { ...entry, label: entry.label || label, count: entry.count + 1 }
           : entry
       )
-    : [...carried, { key, label, count: 1 }];
+    : [...carried, { key, label, count: 1, kind }];
 
   // Oldest entries go first: a concept from twenty turns ago is not what the
   // student is stuck on now.
@@ -165,7 +195,11 @@ export function recordProbe(
 /** Concepts the student may no longer ask about, for the prompt to name. */
 export function conceptsAtLimit(state: LearnerState): string[] {
   return (state.askedConcepts ?? [])
-    .filter((entry) => entry.count >= MAX_SAME_CONCEPT_QUESTIONS)
+    .filter(
+      (entry) =>
+        entryKind(entry) === "probe" &&
+        entry.count >= MAX_SAME_CONCEPT_QUESTIONS
+    )
     .map((entry) => entry.label || entry.key)
     .filter(Boolean);
 }

@@ -3,6 +3,7 @@ import {
   conceptsAtLimit,
   MAX_SAME_CONCEPT_QUESTIONS
 } from "../../agents/learner/learner.repeat";
+import { shouldExtendThisTurn } from "../../agents/learner/learner.extend";
 
 export type AIMessage = {
   role: "system" | "user";
@@ -66,7 +67,8 @@ export const LEARNER_LLM_OUTPUT_SCHEMA: Record<string, unknown> = {
             "request_example",
             "challenge_claim",
             "paraphrase",
-            "attempt_problem"
+            "attempt_problem",
+            "extend_example"
           ]
         }
       },
@@ -153,6 +155,16 @@ Your misconceptions MUST come from the user's explanation, not prior knowledge. 
 • Misreading a term: user mentions a technical term → you take it literally/everyday
 • Over-simplifying: user explains a complex process → you drop an important detail
 
+═══ QUESTIONS THAT BUILD ═══
+The best question a student can ask is one that carries the idea further: the
+teacher explains one case, and you wonder out loud how a bigger or more awkward
+case would go. That shows the explanation landed AND gives the teacher something
+new to explain.
+
+But NOT every turn. Most turns you are simply a beginner surfacing what is
+unclear. Stretch the idea only when something has genuinely landed and the turn
+prompt invites it — a beginner who extends everything is not a beginner.
+
 ═══ WHEN TO LET A QUESTION GO ═══
 You may press on ONE concept at most ${MAX_SAME_CONCEPT_QUESTIONS} times.
 If the teacher has already answered you that many times about it and it is
@@ -190,6 +202,12 @@ Each turn you choose ONE "action" (the "action.kind" field):
       ("wait, if that's true, then why does X happen?") — NOT a correction, still a student
     - "paraphrase" → try to restate your understanding (may be slightly off)
     - "attempt_problem" → try applying it to a small case, then ask "is this right?"
+    - "extend_example" → take the teacher's OWN example and push it somewhere
+      harder, then ask whether the same method still holds. Taught that F0 in hex
+      is 240, you ask "so what about FFFFF, does the same way still work?";
+      taught an example with two items, you ask how it goes with a hundred.
+      Still a student's question — you are testing whether the idea you just got
+      stretches, not quizzing the teacher
 
 AGENT RULES:
 - Use a tool only when it genuinely helps; after at most a couple of uses,
@@ -232,6 +250,16 @@ function buildLearnerUserPrompt(input: LearnerAgentInput): string {
     ? atLimit.join(", ")
     : "(none — no concept has hit the limit yet)";
 
+  // Paced, not every turn: see learner.extend.ts for why.
+  const extendHint = shouldExtendThisTurn(input)
+    ? `This is a good turn to PUSH THE IDEA FURTHER. Pick something you now
+understand (${understoodHint}), take the teacher's own example, and ask how a
+bigger or more awkward case would go — e.g. taught F0 → 240, ask about FFFFF.
+Use action.strategy "extend_example" and response type "question". If nothing
+has landed solidly enough to stretch yet, ask your ordinary question instead.`
+    : `Ask your ordinary beginner question this turn — whatever is least clear to
+you about what was just taught. Don't force a "what if it were bigger" question.`;
+
   const toolsHint = input.availableTools && input.availableTools.length > 0
     ? input.availableTools.join(", ")
     : "(none — just choose action \"respond\")";
@@ -262,6 +290,9 @@ ${teachingText || "(the teacher hasn't explained anything yet)"}
 
 ═══ BEHAVIOR STYLE THIS TURN ═══
 ${behaviorStyle}
+
+═══ WHAT KIND OF QUESTION THIS TURN ═══
+${extendHint}
 
 ═══ RESPONSE LANGUAGE THIS TURN ═══
 Always answer in English.

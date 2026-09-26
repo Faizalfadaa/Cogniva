@@ -26,6 +26,11 @@ export const askedConceptSchema = z.object({
   key: z.string(),
   label: z.string(),
   count: z.number().int(),
+  /**
+   * "probe" (the default) counts plain questions about the concept; "extend"
+   * counts questions that apply it to a new case, which get their own budget.
+   */
+  kind: z.enum(["probe", "extend"]).optional(),
 });
 export type AskedConcept = z.infer<typeof askedConceptSchema>;
 
