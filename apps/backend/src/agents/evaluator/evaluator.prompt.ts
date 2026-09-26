@@ -173,7 +173,12 @@ ${input.commonMisconceptions.length ? input.commonMisconceptions.map((c) => `- $
 
 # Session Transcript (turn by turn)
 A turn can carry four channels: what was written on the board, what was said
-aloud over it, how the student reacted, and the chat that followed. A
+aloud over it, how the student reacted, and the chat that followed.
+"Board/text" is the WHOLE board as it stood at that turn, so anything written
+earlier is still in it. Where a turn has a "New on the board this turn" line,
+that line is what was actually written in that turn: cite evidenceTurnIndex for
+the turn where a concept first appears there, not a later turn where it merely
+remained on the board. A
 "Teacher (chat)" line is teaching just as much as the board is -- often the
 sharpest teaching in the session, because it answers a confusion the student
 had just named. Judge a concept as MISSED only when it appears in none of them.
@@ -223,6 +228,7 @@ ${excerpts.map((excerpt) => `\n[${excerpt.label}]\n${excerpt.text}`).join("\n")}
 
 function renderTurn(turn: EvaluatorInput["turns"][number]): string {
   const lines = [`Turn ${turn.turnIndex}:`];
+  if (turn.newBoardText?.trim()) lines.push(`  New on the board this turn: ${turn.newBoardText.trim()}`);
   if (turn.boardText?.trim()) lines.push(`  Board/text: ${turn.boardText.trim()}`);
   if (turn.speech?.trim()) lines.push(`  Speech: ${turn.speech.trim()}`);
   if (turn.learnerUtterance?.trim())

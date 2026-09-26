@@ -216,6 +216,7 @@
 /* ─── Main ─── */
 .main {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -230,6 +231,8 @@
 }
 
 .mainHeaderLeft {
+  min-width: 0;
+  overflow-wrap: anywhere;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -250,6 +253,7 @@
 
 /* ─── Search ─── */
 .searchBox {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -271,6 +275,7 @@
 }
 
 .searchInput {
+  min-width: 0;
   border: none;
   background: none;
   outline: none;
@@ -883,10 +888,10 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Mobile (≤768px) — sidebar collapses into a top bar.
+   Compact windows (≤1024px) — sidebar collapses into a top bar.
    Desktop layout above is untouched; this block only overrides.
 ═══════════════════════════════════════════════════════════ */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .layout {
     flex-direction: column;
     min-height: 100vh;

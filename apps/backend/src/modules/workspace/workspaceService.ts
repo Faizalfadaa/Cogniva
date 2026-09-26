@@ -344,12 +344,15 @@ async function extractPdfText(data: Buffer): Promise<string> {
 export async function submitCheckpoint(
   id: string,
   payload: {
-    snapshotImage: string;
+    /** Absent on a voice-only turn. */
+    snapshotImage?: string;
     snapshotMime: string;
     whiteboardSnapshot?: unknown;
     audio?: string;
     audioMime?: string;
     timeline?: Timeline;
+    /** Only what changed on the board since the last Teach. */
+    newContentImage?: string;
   },
 ): Promise<TeachingCheckpoint | undefined> {
   const ws = await workspaces.get(id);
@@ -360,14 +363,18 @@ export async function submitCheckpoint(
 
   const checkpoint: TeachingCheckpoint = {
     id: newId("chk"),
-    snapshotImageUrl: dataUrl(payload.snapshotMime, payload.snapshotImage),
+    // Empty rather than a data URL with no data in it, which would render as a
+    // broken image wherever the board is shown back.
+    snapshotImageUrl: payload.snapshotImage
+      ? dataUrl(payload.snapshotMime, payload.snapshotImage)
+      : "",
     whiteboardSnapshot: payload.whiteboardSnapshot,
     audioUrl: payload.audio
       ? dataUrl(payload.audioMime ?? "audio/webm", payload.audio)
       : undefined,
     learnerResponse: undefined,
-    // Phase 1: stored alongside whiteboardSnapshot and deliberately NOT passed
-    // to runTeachingTurn -- wiring it into Vision/Learner is Phase 2.
+    // Stored with the checkpoint, and also handed to the turn below so the
+    // student can match each drawing with what was being said as it was made.
     timeline: payload.timeline,
     createdAt: utcNowIso(),
   };
@@ -380,8 +387,12 @@ export async function submitCheckpoint(
     let reply: TurnReply;
     try {
       reply = await runTeachingTurn(ws, {
-        image: payload.snapshotImage,
+        // An empty image is how the orchestrator already spells "nothing on
+        // the board": Vision is skipped and the turn runs on the speech alone.
+        image: payload.snapshotImage ?? "",
         audio: payload.audio ?? null,
+        newImage: payload.newContentImage ?? null,
+        timeline: payload.timeline,
       });
     } catch (err) {
       // A thrown turn stays untagged: errorKind is for conditions we understand
@@ -616,7 +627,12 @@ interface TurnReply {
 /** Run one teaching turn through the orchestrator, never pausing for confirmation. */
 async function runTeachingTurn(
   ws: Workspace,
-  input: { image: string; audio: string | null },
+  input: {
+    image: string;
+    audio: string | null;
+    newImage: string | null;
+    timeline: Timeline | undefined;
+  },
 ): Promise<TurnReply> {
   const session = await requireSession(ws);
   const topic = await synthTopic(ws);
@@ -630,6 +646,8 @@ async function runTeachingTurn(
     audio: input.audio,
     typedText: null,
     allowConfirmation: false,
+    newImage: input.newImage,
+    timeline: input.timeline,
   });
 
   // Only one orchestrator call now (the planner absorbed the retry), so one
@@ -693,6 +711,7 @@ async function runEvaluation(ws: Workspace): Promise<void> {
   const transcript: TranscriptTurn[] = rows.map(({ turn, response }) => ({
     turnIndex: turn.turnIndex,
     boardText: turn.interpretation.transcribedText,
+    newBoardText: turn.interpretation.newText,
     speech: turn.speechTranscript?.transcript || undefined,
     learnerUtterance: response?.text,
     chat: chatByTurn.get(turn.turnIndex),
@@ -744,6 +763,7 @@ async function runEvaluation(ws: Workspace): Promise<void> {
       transcript: transcript.map((turn) => ({
         turnIndex: turn.turnIndex,
         boardText: turn.boardText,
+        newBoardText: turn.newBoardText,
         speech: turn.speech,
         chat: turn.chat,
       })),

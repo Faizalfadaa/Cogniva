@@ -13,6 +13,8 @@ export type AsrLLMOutput = {
   /** BCP-47 language code detected by the model, e.g. "en-US". */
   language: string;
   ambiguities: string[];
+  /** Times in seconds from the start of the clip, as the model reports them. */
+  segments: { start: number; end: number; text: string }[];
 };
 
 /**

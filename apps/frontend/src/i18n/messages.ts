@@ -260,8 +260,8 @@ export const messages = {
     id: 'Beberapa hasil dilewati karena tidak ada yang bertanggung jawab atas isinya, seperti wiki yang bisa diedit siapa saja, situs tanya jawab, dan unggahan pribadi. Materi ini menjadi kunci penilaian penjelasanmu, jadi sumbernya harus bisa dipertanggungjawabkan.',
   },
   'reference.noticeOffline': {
-    en: 'Online search is unavailable right now, so these are entry points into open libraries, pre-filtered for your topic, not specific document titles. Open one, then upload the PDF if you find something that fits.',
-    id: 'Pencarian online sedang tidak tersedia, jadi ini pintu masuk ke perpustakaan terbuka yang sudah disaring untuk topikmu, bukan judul dokumen tertentu. Buka salah satunya, lalu unggah PDF-nya kalau kamu menemukan yang cocok.',
+    en: 'Online search is unavailable right now. These links open library catalogs where you can search for your topic. Open one, then upload the PDF if you find something that fits.',
+    id: 'Pencarian online sedang tidak tersedia. Tautan ini membuka katalog perpustakaan untuk mencari topikmu. Buka salah satunya, lalu unggah PDF-nya kalau kamu menemukan yang cocok.',
   },
 
   // --- home -----------------------------------------------------------------
@@ -522,6 +522,12 @@ export const messages = {
   'evaluation.turnLabel': { en: 'Turn {index}', id: 'Giliran {index}' },
   'evaluation.spokenLabel': { en: 'Spoken', id: 'Lisan' },
   'evaluation.chatLabel': { en: 'In the chat', id: 'Di obrolan' },
+  'evaluation.newOnBoard': { en: 'Written this turn', id: 'Ditulis di giliran ini' },
+  'evaluation.nothingNewOnBoard': {
+    en: 'Nothing new was written on the board this turn.',
+    id: 'Tidak ada tulisan baru di papan pada giliran ini.',
+  },
+  'evaluation.wholeBoard': { en: 'The whole board at this point', id: 'Seluruh papan saat itu' },
   'evaluation.chatYou': { en: 'You', id: 'Kamu' },
   'evaluation.chatLearner': { en: 'Your student', id: 'Muridmu' },
 
@@ -1079,6 +1085,14 @@ export const messages = {
   'error.networkText': {
     en: 'The connection dropped. Your whiteboard is still saved on this device — the message will be sent again as soon as you are back online.',
     id: 'Koneksi terputus. Coretan di papan tetap tersimpan di perangkat ini — pesan akan terkirim lagi begitu koneksi kembali.',
+  },
+  'error.emptyTitle': {
+    en: 'Nothing to teach yet',
+    id: 'Belum ada yang diajarkan',
+  },
+  'error.emptyText': {
+    en: 'The board is empty and the mic did not pick up your voice. Write or draw something, or explain it out loud, then press Teach.',
+    id: 'Papan masih kosong dan mikrofon belum menangkap suaramu. Tulis atau gambar sesuatu, atau jelaskan dengan suara, lalu tekan Ajarkan.',
   },
   'error.aiTitle': { en: 'Could not reach Cogniva', id: 'Gagal menghubungi Cogniva' },
   'error.aiText': {

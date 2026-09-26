@@ -57,7 +57,11 @@ export interface CognivaBridge {
   submitCheckpoint(
     workspaceId: string,
     payload: {
-      snapshotImage: Blob;
+      // Null for a voice-only turn: nothing was drawn, but something was said.
+      snapshotImage: Blob | null;
+      // Only what changed on the board since the last Teach, cropped to it.
+      // Absent on the first Teach, when all of it is new.
+      newContentImage?: Blob;
       whiteboardSnapshot: unknown;
       // The user's explanation recorded during editing, uploaded whole with the snapshot.
       // Optional - the mic may be off or not permitted.

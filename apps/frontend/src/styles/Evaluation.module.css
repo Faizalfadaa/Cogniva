@@ -921,6 +921,54 @@
   white-space: pre-wrap;
 }
 
+/* What this turn added to the board, set ahead of the whole board. A lime
+   rule, the same accent that marks a finding worth attention, because this is
+   the part of the turn the teacher actually wrote. */
+.turnNewBoard {
+  padding-left: 12px;
+  border-left: 3px solid var(--lime-edge);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.turnNewBoardLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--forest-dark);
+}
+
+/* The rest of the board: earlier material, folded so it does not repeat in
+   full under every turn. */
+.turnWholeBoard {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.turnWholeBoard .turnBody {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.turnWholeBoardSummary {
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  width: fit-content;
+}
+
+.turnWholeBoardSummary:focus-visible {
+  outline: 2px solid var(--lime-edge);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .turnSpeech {
   font-size: 13px;
   line-height: 1.7;
