@@ -14,7 +14,7 @@
 import type { EvaluationFindingDTO, EvaluationTranscriptTurnDTO } from '../../../dto/EvaluationReportDTO'
 
 /** Which of a turn's text channels a quote was found in. */
-export type QuoteField = 'boardText' | 'speech' | 'chat'
+export type QuoteField = 'boardText' | 'newBoardText' | 'speech' | 'chat'
 
 export interface QuoteMatch {
   field: QuoteField
@@ -44,10 +44,16 @@ export interface QuoteMatch {
  * the user said something the student did.
  */
 export function highlightQuoteInText(
-  turn: Pick<EvaluationTranscriptTurnDTO, 'boardText' | 'speech' | 'chat'>,
+  turn: Pick<EvaluationTranscriptTurnDTO, 'boardText' | 'newBoardText' | 'speech' | 'chat'>,
   quote: string | null | undefined,
 ): QuoteMatch | null {
   if (!quote) return null
+
+  // The new part is what the screen puts first, so a quote found there is
+  // marked there rather than in the whole board further down.
+  const fresh = turn.newBoardText ?? ''
+  const inFresh = fresh.indexOf(quote)
+  if (inFresh >= 0) return { field: 'newBoardText', index: inFresh, text: quote }
 
   const board = turn.boardText ?? ''
   const inBoard = board.indexOf(quote)

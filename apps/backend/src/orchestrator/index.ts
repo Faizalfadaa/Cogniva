@@ -62,6 +62,7 @@ import type { LearnerResponse, LearnerState } from "../contracts/learner.js";
 import type { Session } from "../contracts/session.js";
 import type { SpeechTranscript } from "../contracts/speech.js";
 import type { TeachingTurn } from "../contracts/teaching.js";
+import type { Timeline } from "../contracts/timeline.js";
 import type { Topic } from "../contracts/topic.js";
 import { newId, sessions } from "../modules/storage/sessionStore.js";
 
@@ -128,6 +129,17 @@ export interface TeachingInput {
    * Vision's best guess instead of stalling.
    */
   allowConfirmation?: boolean;
+  /**
+   * Base64 PNG of only what changed on the board since the last Teach. Read on
+   * its own so the student can be told which part is new (see
+   * VisionInterpretation.newText). Absent on a first reading.
+   */
+  newImage?: string | null;
+  /**
+   * When each board change was made, timed on the audio clip. Handed to the
+   * student so it can tell which drawing went with which sentence.
+   */
+  timeline?: Timeline;
 }
 
 /** Stand-in board text when the reading is empty and we must proceed anyway. */
@@ -138,6 +150,12 @@ interface TurnContext {
   interpretation: VisionInterpretation | null;
   speech: SpeechTranscript | null;
   completed: PlanStepKind[];
+  /**
+   * What was added to the board this turn (VisionInterpretation.newText). Kept
+   * apart from `interpretation` because verify_board may replace that with a
+   * second reading of the whole board, which knows nothing about what is new.
+   */
+  newBoardText: string | undefined;
 }
 
 /** What every step execution needs; assembled once per turn. */
@@ -147,6 +165,10 @@ interface StepArgs {
   snapshot: BoardSnapshot;
   typedText: string | null | undefined;
   audio: string | null | undefined;
+  /** See TeachingInput.newImage. */
+  newImage: string | null | undefined;
+  /** See TeachingInput.timeline. */
+  timeline: Timeline | undefined;
   turnIndex: number;
   previousTurn: TeachingTurn | undefined;
   /**
@@ -191,7 +213,7 @@ export class Orchestrator {
   async runTeachingTurn(
     session: Session,
     topic: Topic,
-    { image, audio, typedText, allowConfirmation = true }: TeachingInput,
+    { image, audio, typedText, allowConfirmation = true, newImage, timeline }: TeachingInput,
   ): Promise<TurnResult> {
     // Budget gate (§7.3), before anything else: once a session is out of
     // tokens we refuse the turn without calling Vision, ASR or the Learner.
@@ -226,7 +248,12 @@ export class Orchestrator {
     const previousImage = previousTurn
       ? (await sessions.getSnapshot(previousTurn.snapshotId))?.image
       : undefined;
-    const ctx: TurnContext = { interpretation: null, speech: null, completed: [] };
+    const ctx: TurnContext = {
+      interpretation: null,
+      speech: null,
+      completed: [],
+      newBoardText: undefined,
+    };
     const trace: PlanTraceEntry[] = [];
     const args: StepArgs = {
       session,
@@ -234,6 +261,8 @@ export class Orchestrator {
       snapshot,
       typedText,
       audio,
+      newImage,
+      timeline,
       turnIndex,
       previousTurn,
       previousImage,
@@ -309,13 +338,18 @@ export class Orchestrator {
       case "read_board":
         // Continuity between turns (§3.4): the board is drawn incrementally, so
         // Vision is told what the previous completed turn read.
-        ctx.interpretation = await this.vision.interpret(
-          snapshot,
-          args.typedText,
-          topic.title,
-          args.previousTurn?.interpretation.elements,
-          args.onUsage,
-        );
+        // The two readings are independent, so they run side by side: one after
+        // the other doubled the wait before the student could answer.
+        [ctx.interpretation, ctx.newBoardText] = await Promise.all([
+          this.vision.interpret(
+            snapshot,
+            args.typedText,
+            topic.title,
+            args.previousTurn?.interpretation.elements,
+            args.onUsage,
+          ),
+          this.readNewPart(args),
+        ]);
         return null;
 
       case "reuse_board":
@@ -330,6 +364,10 @@ export class Orchestrator {
               undefined,
               args.onUsage,
             );
+        // Nothing was drawn since the last turn, so nothing on the board is new.
+        // Said explicitly rather than left absent: absent means "everything is
+        // new", and the carried-over reading must not read as this turn's.
+        ctx.newBoardText = args.previousTurn ? "" : undefined;
         return null;
 
       case "verify_board": {
@@ -406,6 +444,38 @@ export class Orchestrator {
     }
   }
 
+  /**
+   * Read only what changed on the board since the last Teach.
+   *
+   * A second, small Vision call on an image of just the new strokes, alongside
+   * the full reading rather than instead of it. Stitching the previous turn's
+   * reading together with this one would be cheaper, but it would silently lose
+   * whatever was drawn during a turn that failed, because the client and the
+   * transcript would no longer agree on what "previous" means. The full reading
+   * stays the source of truth for the board; this only says which part is new.
+   *
+   * No previous elements are passed: this image contains nothing but the new
+   * part, and telling Vision what used to be there invites it to report that.
+   */
+  private async readNewPart(args: StepArgs): Promise<string | undefined> {
+    if (!args.newImage?.trim()) return undefined;
+    try {
+      const fresh = await this.vision.interpret(
+        { ...args.snapshot, image: args.newImage },
+        null,
+        args.topic.title,
+        undefined,
+        args.onUsage,
+      );
+      return fresh.transcribedText.trim();
+    } catch (err) {
+      // The full reading already succeeded or failed on its own; without the
+      // new-part reading the turn simply falls back to the whole board.
+      console.error("[Orchestrator] reading the new part of the board failed:", err);
+      return undefined;
+    }
+  }
+
   /** The terminal step: the student reacts, and the whole turn is persisted. */
   private async askLearner({
     session,
@@ -417,12 +487,17 @@ export class Orchestrator {
     ctx,
     onUsage,
     recordUsage,
+    timeline,
   }: StepArgs): Promise<TurnResult> {
-    const interpretation = bestGuess(
-      ctx.interpretation ?? blankInterpretation(snapshot.snapshotId),
-      allowConfirmation,
-    );
     const speech = ctx.speech;
+    const interpretation: VisionInterpretation = {
+      ...bestGuess(
+        ctx.interpretation ?? blankInterpretation(snapshot.snapshotId),
+        allowConfirmation,
+        Boolean(snapshot.image.trim()),
+      ),
+      newText: ctx.newBoardText,
+    };
 
     const state =
       (await sessions.getLearnerState(session.sessionId)) ??
@@ -452,6 +527,7 @@ export class Orchestrator {
       turnIndex,
       tools,
       onUsage,
+      timeline,
     });
 
     // The response is written before the turn that references it, so the
@@ -579,15 +655,28 @@ function betterReading(
  * When the caller cannot act on a confirmation request, an unsure reading still
  * has to become something the student can react to: keep Vision's best guess, and
  * give it a neutral placeholder when it read nothing at all.
+ *
+ * The placeholder stands in for a board that was drawn on but could not be
+ * read, so it applies only when there was an image. With no image, as on a
+ * voice-only turn, the board is empty because nothing was drawn, and saying
+ * otherwise tells the student there is an explanation on it when there is none.
+ * The sentence would also be saved into the transcript as if the user had
+ * written it, where the Evaluator would grade it.
+ *
+ * That holds even when the speech came back empty too, which happens when the
+ * mic picked up noise rather than the user. The student is then handed nothing,
+ * and says so ("I haven't caught the explanation yet"), which is the truth.
  */
 function bestGuess(
   interpretation: VisionInterpretation,
   allowConfirmation: boolean,
+  hasImage = true,
 ): VisionInterpretation {
   if (allowConfirmation || !interpretation.needsConfirmation) return interpretation;
+  const read = interpretation.transcribedText.trim();
   return {
     ...interpretation,
-    transcribedText: interpretation.transcribedText.trim() || FALLBACK_BOARD_TEXT,
+    transcribedText: read || (hasImage ? FALLBACK_BOARD_TEXT : ""),
     needsConfirmation: false,
   };
 }

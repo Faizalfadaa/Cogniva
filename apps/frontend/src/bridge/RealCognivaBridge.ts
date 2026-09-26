@@ -173,24 +173,29 @@ export class RealCognivaBridge implements CognivaBridge {
   async submitCheckpoint(
     workspaceId: string,
     payload: {
-      snapshotImage: Blob;
+      snapshotImage: Blob | null;
       whiteboardSnapshot: unknown;
       audio?: Blob;
       timeline?: TimelineDTO;
+      newContentImage?: Blob;
     }
   ): Promise<TeachingCheckpointDTO> {
-    const image = await blobToBase64(payload.snapshotImage);
+    const image = payload.snapshotImage ? await blobToBase64(payload.snapshotImage) : undefined;
+    const fresh = payload.newContentImage ? await blobToBase64(payload.newContentImage) : undefined;
     const audio = payload.audio ? await blobToBase64(payload.audio) : undefined;
     return sendJson<TeachingCheckpointDTO>(
       `/api/workspaces/${workspaceId}/checkpoints`,
       'POST',
       {
-        snapshotImage: image.data,
-        snapshotMime: image.mime === 'application/octet-stream' ? 'image/png' : image.mime,
+        // Left out entirely for a voice-only turn, not sent as an empty string.
+        snapshotImage: image?.data,
+        snapshotMime:
+          image && image.mime !== 'application/octet-stream' ? image.mime : 'image/png',
         whiteboardSnapshot: payload.whiteboardSnapshot,
         audio: audio?.data,
         audioMime: audio?.mime,
         timeline: payload.timeline,
+        newContentImage: fresh?.data,
       }
     );
   }

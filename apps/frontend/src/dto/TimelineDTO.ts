@@ -7,6 +7,13 @@ export interface BoardEventDTO {
   at: number;
   shapeIds: string[];
   kind: BoardEventKind;
+  /** Milliseconds into the audio clip; null when drawn while the mic was off.
+   *  Differs from `at` after a pause, since the clip skips the paused stretch. */
+  audioAt?: number | null;
+  /** Excalidraw's element type ("text", "arrow", "freedraw"...). */
+  shape?: string;
+  /** The words, when the element is text. */
+  text?: string;
 }
 
 /** Board changes for one checkpoint, plus the clock they are measured from.

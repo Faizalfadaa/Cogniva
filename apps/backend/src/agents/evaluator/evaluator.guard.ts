@@ -131,6 +131,7 @@ function resolveSourceQuote(
 
   return (
     findVerbatim(turn.boardText, quote) ??
+    findVerbatim(turn.newBoardText, quote) ??
     findVerbatim(turn.speech, quote) ??
     firstVerbatim(taught, quote)
   );

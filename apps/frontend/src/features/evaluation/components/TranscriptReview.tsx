@@ -142,9 +142,42 @@ export function TranscriptReview({ transcript, findings, checkpoints }: Transcri
                   </figure>
                 )}
 
-                <p className={styles.turnBody}>
-                  {renderChannel(turn.boardText, quoted, 'boardText', indexOf, openIndex, toggle, openAndScroll, t)}
-                </p>
+                {turn.newBoardText === undefined ? (
+                  <p className={styles.turnBody}>
+                    {renderChannel(turn.boardText, quoted, 'boardText', indexOf, openIndex, toggle, openAndScroll, t)}
+                  </p>
+                ) : (
+                  <>
+                    {/* What this turn added, first. The board text is the whole
+                        board, so everything written earlier repeats in every
+                        turn after it; shown alone, a later turn looked like it
+                        re-taught all of it. */}
+                    <div className={styles.turnNewBoard}>
+                      <span className={styles.turnNewBoardLabel}>{t('evaluation.newOnBoard')}</span>
+                      {turn.newBoardText.trim() ? (
+                        <p className={styles.turnBody}>
+                          {renderChannel(turn.newBoardText, quoted, 'newBoardText', indexOf, openIndex, toggle, openAndScroll, t)}
+                        </p>
+                      ) : (
+                        <p className={styles.turnNoNotes}>{t('evaluation.nothingNewOnBoard')}</p>
+                      )}
+                    </div>
+
+                    {/* The rest of the board, folded away, but opened on its own
+                        when a finding is marked inside it so no mark is hidden. */}
+                    {turn.boardText.trim() && (
+                      <details
+                        className={styles.turnWholeBoard}
+                        open={quoted.some((q) => q.match.field === 'boardText')}
+                      >
+                        <summary className={styles.turnWholeBoardSummary}>{t('evaluation.wholeBoard')}</summary>
+                        <p className={styles.turnBody}>
+                          {renderChannel(turn.boardText, quoted, 'boardText', indexOf, openIndex, toggle, openAndScroll, t)}
+                        </p>
+                      </details>
+                    )}
+                  </>
+                )}
 
                 {turn.speech && (
                   <p className={styles.turnSpeech}>

@@ -19,6 +19,7 @@ import { LearnerSelect } from '../../features/teaching-session/components/Learne
 import { useTeachingSession } from '../../features/teaching-session/state/useTeachingSession'
 import { useWorkspaceTitleAutosave } from '../../features/teaching-session/hooks/useWorkspaceTitleAutosave'
 import { useIntroSeen } from '../../features/teaching-session/hooks/useIntroSeen'
+import { useFirstSession } from '../../features/teaching-session/hooks/useFirstSession'
 import { useSessionSetup } from '../../features/teaching-session/hooks/useSessionSetup'
 import { useWorkspaceChat } from '../../features/teaching-session/hooks/useWorkspaceChat'
 import { useUserStore } from '../../state/UserStore'
@@ -84,6 +85,16 @@ export default function WorkspacePage() {
   )
   const titleField = useWorkspaceTitleAutosave(id ?? '', workspace?.title, bridge)
   const intro = useIntroSeen(id ?? '')
+  const firstSession = useFirstSession(id ?? '', bridge, workspace)
+  /**
+   * Past the introduction, whether it played here or never needs to.
+   *
+   * The chat, its toasts, the learner stage and the tour all wait for the
+   * introduction to finish. From the second session on it no longer plays at
+   * all, so waiting on `intro.seen` alone would keep them hidden for good on any
+   * browser that had not watched it during the first session.
+   */
+  const introDone = intro.seen || firstSession === false
   const setup = useSessionSetup(id ?? '')
   const tour = useAppTour('workspace')
   const { userName } = useUserStore()
@@ -132,18 +143,30 @@ export default function WorkspacePage() {
     }
   }, [bridge, id])
 
-  // Resolve first messages with userName substitution — stable across renders
-  const seedMessages = useMemo(
-    () =>
-      resolveFirstMessages(learner, userName || t('intro.you'), locale).map((content, i) => ({
-        id: `seed-${id}-${i}`,
-        content,
-      })),
+  /**
+   * The student's greeting in the chat, on the first session only.
+   *
+   * Every later session is the same lesson carrying on, and a student who says
+   * hello again as if meeting the user for the first time breaks that. Held as
+   * `undefined` until useFirstSession knows, so no greeting flashes up and is
+   * then withdrawn.
+   *
+   * Dated from when the workspace was made, a millisecond apart, so the lines
+   * keep their order and always sort ahead of the real conversation.
+   */
+  const seedMessages = useMemo(() => {
+    if (firstSession === null || !workspace) return undefined
+    if (!firstSession) return []
+    const start = new Date(workspace.createdAt).getTime()
+    return resolveFirstMessages(learner, userName || t('intro.you'), locale).map((content, i) => ({
+      id: `seed-${id}-${i}`,
+      content,
+      createdAt: new Date(start + i).toISOString(),
+    }))
+    // userName is left out on purpose: the greeting names whoever the user was
+    // when it was first shown, and should not rewrite itself when they rename.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [learner, id, workspace?.locale] // userName intentionally excluded — only seed once on mount; the
-    // workspace's language is included so the student's opening lines are not
-    // fixed in the reader's language before the workspace has loaded.
-  )
+  }, [learner, id, workspace?.locale, workspace?.createdAt, firstSession])
 
   const chat = useWorkspaceChat(id ?? '', bridge, learner.name, learner.avatarUrl, {
     seedMessages,
@@ -199,7 +222,7 @@ export default function WorkspacePage() {
    * greeting is over and the setup panel is gone: those own the screen with
    * their own overlays, and two dimmed layers at once would be a mess.
    */
-  const showTour = tour.active && intro.seen && !needsLearnerPick && !needsSetup
+  const showTour = tour.active && introDone && !needsLearnerPick && !needsSetup
 
   // One banner, two sources. Teaching errors win: the user just pressed Teach
   // and is waiting on that, whereas a chat poll fails quietly in the background.
@@ -280,12 +303,12 @@ export default function WorkspacePage() {
             />
           )}
 
-          {!needsLearnerPick && !needsSetup && !intro.seen && (
+          {!needsLearnerPick && !needsSetup && !intro.seen && firstSession === true && (
             <LearnerIntro learner={learner} userName={userName ?? ''} onDone={intro.markSeen} />
           )}
 
           {/* Toast notifications — float over canvas, only when sidebar is closed */}
-          {intro.seen && !needsSetup && !chat.isOpen && (
+          {introDone && !needsSetup && !chat.isOpen && (
             <ChatToasts
               toasts={chat.toasts}
               onDismiss={chat.dismissToast}
@@ -303,10 +326,10 @@ export default function WorkspacePage() {
             />
           )}
 
-          {/* Chat entry point, bottom-right. Gated on intro.seen for the same
+          {/* Chat entry point, bottom-right. Gated on introDone for the same
               reason ChatSidebar is: before the intro is done the sidebar is not
               mounted, so a toggle would flip state with nothing to show. */}
-          {intro.seen && !needsSetup && (
+          {introDone && !needsSetup && (
             <ChatLauncher
               chatOpen={chat.isOpen}
               chatUnread={chat.unreadCount}
@@ -318,7 +341,7 @@ export default function WorkspacePage() {
         </div>
 
         {/* Learner stage — flex sibling so it pushes the canvas, not overlaps it */}
-        {intro.seen && (
+        {introDone && (
           <LearnerStage
             learner={learner}
             messages={chat.messages}

@@ -154,7 +154,11 @@ const mockTranscript = [
   },
   {
     turnIndex: 1,
-    boardText: 'The light reactions run in the thylakoid membrane and make ATP.',
+    // The whole board by now, with the line this turn added read on its own.
+    boardText:
+      'Photosynthesis converts light, water and CO2 into glucose and oxygen.\n' +
+      'The light reactions run in the thylakoid membrane and make ATP.',
+    newBoardText: 'The light reactions run in the thylakoid membrane and make ATP.',
     speech: 'The oxygen released comes from splitting water, not from the CO2.',
     // A concept the user only ever explained in the chat panel, which is
     // exactly the case the Detail tab used to show nothing for.
@@ -400,15 +404,19 @@ export class MockCognivaBridge implements CognivaBridge {
   async submitCheckpoint(
     workspaceId: string,
     payload: {
-      snapshotImage: Blob;
+      snapshotImage: Blob | null;
       whiteboardSnapshot: unknown;
       audio?: Blob;
       timeline?: TimelineDTO;
+      newContentImage?: Blob;
     }
   ): Promise<TeachingCheckpointDTO> {
     await delay(1200);
 
-    const snapshotImageUrl = URL.createObjectURL(payload.snapshotImage);
+    // Empty for a voice-only turn, matching what the real backend stores.
+    const snapshotImageUrl = payload.snapshotImage
+      ? URL.createObjectURL(payload.snapshotImage)
+      : '';
     const audioUrl = payload.audio ? URL.createObjectURL(payload.audio) : undefined;
 
     const checkpoint: TeachingCheckpointDTO = {
