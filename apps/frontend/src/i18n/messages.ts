@@ -483,6 +483,12 @@ export const messages = {
   'evaluation.turnLabel': { en: 'Turn {index}', id: 'Giliran {index}' },
   'evaluation.spokenLabel': { en: 'Spoken', id: 'Lisan' },
   'evaluation.chatLabel': { en: 'In the chat', id: 'Di obrolan' },
+  'evaluation.newOnBoard': { en: 'Written this turn', id: 'Ditulis di giliran ini' },
+  'evaluation.nothingNewOnBoard': {
+    en: 'Nothing new was written on the board this turn.',
+    id: 'Tidak ada tulisan baru di papan pada giliran ini.',
+  },
+  'evaluation.wholeBoard': { en: 'The whole board at this point', id: 'Seluruh papan saat itu' },
   'evaluation.chatYou': { en: 'You', id: 'Kamu' },
   'evaluation.chatLearner': { en: 'Your student', id: 'Muridmu' },
 
@@ -1040,6 +1046,14 @@ export const messages = {
   'error.networkText': {
     en: 'The connection dropped. Your whiteboard is still saved on this device — the message will be sent again as soon as you are back online.',
     id: 'Koneksi terputus. Coretan di papan tetap tersimpan di perangkat ini — pesan akan terkirim lagi begitu koneksi kembali.',
+  },
+  'error.emptyTitle': {
+    en: 'Nothing to teach yet',
+    id: 'Belum ada yang diajarkan',
+  },
+  'error.emptyText': {
+    en: 'The board is empty and the mic did not pick up your voice. Write or draw something, or explain it out loud, then press Teach.',
+    id: 'Papan masih kosong dan mikrofon belum menangkap suaramu. Tulis atau gambar sesuatu, atau jelaskan dengan suara, lalu tekan Ajarkan.',
   },
   'error.aiTitle': { en: 'Could not reach Cogniva', id: 'Gagal menghubungi Cogniva' },
   'error.aiText': {

@@ -619,6 +619,9 @@
 .errorBannerNetwork { border-left: 4px solid #d98324; }
 .errorBannerAi { border-left: 4px solid #c0392b; }
 .errorBannerBudget { border-left: 4px solid var(--forest-mid); }
+/* A nudge rather than a failure: nothing broke, the user just has not given the
+   student anything yet, so it takes the brand's accent instead of an alarm colour. */
+.errorBannerEmpty { border-left: 4px solid var(--lime-edge); }
 
 .errorBannerIcon {
   flex: none;

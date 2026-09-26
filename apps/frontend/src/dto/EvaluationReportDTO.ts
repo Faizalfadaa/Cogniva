@@ -32,6 +32,12 @@ export interface EvaluationFindingDTO {
 export interface EvaluationTranscriptTurnDTO {
   turnIndex: number;
   boardText: string;
+  /**
+   * What was added to the board this turn. `boardText` is the whole board, so
+   * everything written earlier repeats in every later turn; this is the part
+   * that was new. Absent when unknown, empty when nothing new was drawn.
+   */
+  newBoardText?: string;
   speech?: string;
   /**
    * The chat that followed this turn, both sides, in the order it was sent.

@@ -23,6 +23,13 @@ export interface TranscriptTurn {
   turnIndex: number;
   /** Vision's board reading (or the typed-text fallback) for this turn. */
   boardText: string;
+  /**
+   * What was added to the board this turn, read on its own. `boardText` is the
+   * whole board, so a concept written in turn 1 appears in every turn after it;
+   * this is how the Evaluator tells where it was actually introduced. Absent
+   * when unknown (a board's first reading), empty when nothing new was drawn.
+   */
+  newBoardText?: string;
   /** ASR transcript of the teacher's spoken explanation, if any (§6.5). */
   speech?: string;
   /** The student's (Learner's) utterance this turn — question/confusion/etc. */

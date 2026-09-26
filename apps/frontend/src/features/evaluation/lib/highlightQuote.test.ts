@@ -79,6 +79,20 @@ describe('highlightQuoteInText', () => {
     ).toBe('the battery that powers it')
   })
 
+  it('marks a quote in what this turn added, ahead of the whole board', () => {
+    const later = {
+      boardText: 'Water is split.\nRuBisCO fixes CO2.',
+      newBoardText: 'RuBisCO fixes CO2.',
+    }
+    expect(highlightQuoteInText(later, 'RuBisCO fixes CO2')).toEqual({
+      field: 'newBoardText',
+      index: 0,
+      text: 'RuBisCO fixes CO2',
+    })
+    // Earlier material is only in the whole board, and is still found there.
+    expect(highlightQuoteInText(later, 'Water is split')?.field).toBe('boardText')
+  })
+
   it('never anchors to the student, whose words are in the same list', () => {
     // The phrase only occurs in a learner bubble. Marking it would show the
     // user's own question back to them as evidence of what they taught.

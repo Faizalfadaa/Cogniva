@@ -13,14 +13,18 @@ export interface WhiteboardProps {
 
 /**
  * One board change as the editor observed it, stamped with the wall clock.
- * Excalidraw does not currently emit the granular shape diff stream that the
- * previous editor exposed, so this timeline hook is optional.
+ * Excalidraw has no change stream of its own, so ExcalidrawWhiteboard derives
+ * these by comparing element versions on each change (see boardDiff.ts).
  */
 export interface BoardChange {
   /** Epoch milliseconds. */
   at: number
   shapeIds: string[]
   kind: BoardEventKind
+  /** Excalidraw's element type. */
+  shape?: string
+  /** The words, when the element is text. */
+  text?: string
 }
 
 export interface WhiteboardHandle {
@@ -28,4 +32,6 @@ export interface WhiteboardHandle {
   exportSnapshot: () => Promise<{ document: unknown; image?: Blob }>
   /** Drain board changes recorded since the last call, if an editor implements it. */
   flushTimeline?: () => BoardChange[]
+  /** A PNG of only these elements, cropped to them: what changed since the last Teach. */
+  exportImageOf?: (ids: string[]) => Promise<Blob | undefined>
 }

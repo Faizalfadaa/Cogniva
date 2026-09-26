@@ -9,6 +9,8 @@ export type SessionErrorKind =
   | 'network'
   /** The request reached nobody, or the backend answered with a failure. */
   | 'ai_unavailable'
+  /** Teach was pressed with nothing on the board and nothing said aloud. */
+  | 'empty_board'
 
 export interface SessionError {
   kind: SessionErrorKind

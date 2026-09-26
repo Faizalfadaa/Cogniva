@@ -25,6 +25,17 @@ const allowedActionKinds: LearnerActionKind[] = [
   "recall_earlier"
 ];
 
+/**
+ * How many open gaps the student carries into the next turn.
+ *
+ * The student picks what to ask from its gaps, and nothing used to remove one
+ * except the model deciding to. So gaps from the first topic of a lesson were
+ * still there, and still winning, three topics later. Capping the list and
+ * keeping it in the order the gaps appeared lets the oldest fall off as newer
+ * ones arrive, the way a real student's attention moves with the lesson.
+ */
+export const MAX_OPEN_GAPS = 5;
+
 const allowedStrategies: LearnerResponseStrategy[] = [
   "ask_clarification",
   "request_example",
@@ -102,10 +113,10 @@ function normalizeState(
       state?.activeMisconceptions,
       input.currentState.activeMisconceptions
     ),
-    openGaps: normalizeStringArray(
-      state?.openGaps,
+    openGaps: byRecency(
+      normalizeStringArray(state?.openGaps, input.currentState.openGaps),
       input.currentState.openGaps
-    ),
+    ).slice(-MAX_OPEN_GAPS),
     questionsAsked: normalizeStringArray(
       state?.questionsAsked,
       input.currentState.questionsAsked
@@ -201,6 +212,18 @@ function getSafeDerivedFrom(value: unknown): LearnerResponseDerivedFrom {
   }
 
   return "gap";
+}
+
+/**
+ * Order `next` oldest first: gaps carried over keep the order they had, and
+ * gaps that are new this turn go after them. The model returns the list in
+ * whatever order it likes, so without this "the end of the list" would not
+ * mean "most recent" and the cap would cut arbitrarily.
+ */
+export function byRecency(next: string[], previous: string[]): string[] {
+  const carried = previous.filter((gap) => next.includes(gap));
+  const added = next.filter((gap) => !previous.includes(gap));
+  return [...carried, ...added];
 }
 
 function normalizeStringArray(value: unknown, fallback: string[]): string[] {
