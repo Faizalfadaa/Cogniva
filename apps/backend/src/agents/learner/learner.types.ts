@@ -34,6 +34,13 @@ export type LearnerState = {
    * the model never fills this in — the guard does.
    */
   askedConcepts?: AskedConcept[];
+  /**
+   * How many questions in a row have asked how the teacher's own previous
+   * answer works, rather than about the lesson (see learner.depth.ts). Optional
+   * for the same reason as `askedConcepts`, and kept by the guard, never by the
+   * model.
+   */
+  followUpDepth?: number;
   updatedAtTurn: number;
 };
 
@@ -137,6 +144,12 @@ export type LearnerLLMOutput = {
     text: string;
     targetConcept?: string;
     derivedFrom: LearnerResponseDerivedFrom;
+    /**
+     * True when the question asks how or why the teacher's previous answer
+     * itself works, rather than about the lesson material. The model reports
+     * it; the guard does the counting (learner.depth.ts).
+     */
+    followsUp?: boolean;
   };
 };
 

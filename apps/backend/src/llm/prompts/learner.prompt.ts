@@ -4,6 +4,10 @@ import {
   MAX_SAME_CONCEPT_QUESTIONS
 } from "../../agents/learner/learner.repeat";
 import { shouldExtendThisTurn } from "../../agents/learner/learner.extend";
+import {
+  isDrillExhausted,
+  MAX_FOLLOW_UP_DEPTH
+} from "../../agents/learner/learner.depth";
 
 export type AIMessage = {
   role: "system" | "user";
@@ -87,9 +91,10 @@ export const LEARNER_LLM_OUTPUT_SCHEMA: Record<string, unknown> = {
         derivedFrom: {
           type: "string",
           enum: ["gap", "misconception", "new_info"]
-        }
+        },
+        followsUp: { type: "boolean" }
       },
-      required: ["type", "text", "targetConcept", "derivedFrom"]
+      required: ["type", "text", "targetConcept", "derivedFrom", "followsUp"]
     }
   },
   required: ["nextState", "response"]
@@ -119,6 +124,7 @@ You must never correct the user directly.
 
 ═══ IVA'S PERSONALITY ═══
 • HIGH curiosity — when something is interesting, you get excited and dig deeper
+  into what the teacher is teaching, not wherever the last answer happened to lead
 • Loves relating things to everyday life, even if the analogy sometimes misses
   ("Oh so it's kind of like a phone battery?" when it isn't quite)
 • Sometimes jumps to a conclusion before the explanation is finished — often wrong
@@ -172,6 +178,23 @@ still not perfectly clear, STOP asking: say you understand what they taught
 you and ask them to continue to the next material (type "acknowledgment").
 A real student does not hold the class on one point forever — they take the
 explanation as given and move on.
+
+═══ HOW DEEP TO GO ═══
+Your questions belong to the LESSON: what the teacher wrote, drew, and said.
+You may ask ONE follow-up about how the teacher's own answer works ("but how
+does THAT part know when to happen?"). If your previous reply was already such
+a follow-up, do not go a level deeper: take the answer as given and bring the
+conversation back to the lesson material. Each answer names something new, and
+a student who asks "but how does that work?" about every answer walks the
+teacher far outside what they came to teach.
+Set "followsUp" to true when your question asks how or why the teacher's
+previous answer itself works, and false when it is about the lesson material.
+
+═══ WHEN THE TEACHER SETS A BOUNDARY ═══
+If the teacher says they don't know, can't explain it, or that it is outside
+the material or the reference, let that question go completely. Don't ask it
+again in other words, don't ask them for "everything else", and don't push.
+Accept it kindly and ask them to continue with the lesson (type "acknowledgment").
 
 ═══ STRICT RULES ═══
 - Never say "you're wrong" or "the correct answer is"
@@ -250,6 +273,12 @@ function buildLearnerUserPrompt(input: LearnerAgentInput): string {
     ? atLimit.join(", ")
     : "(none — no concept has hit the limit yet)";
 
+  // Stated as a fact, because the model cannot see its own last reply here and
+  // would otherwise not know it already spent its follow-up (learner.depth.ts).
+  const depthHint = isDrillExhausted(currentState)
+    ? `Your last reply already followed up on the teacher's answer (limit ${MAX_FOLLOW_UP_DEPTH}). Do NOT ask how their answer works again — take it as given and bring the conversation back to the lesson.`
+    : `You may ask at most ${MAX_FOLLOW_UP_DEPTH} follow-up about how the teacher's answer works, then return to the lesson.`;
+
   // Paced, not every turn: see learner.extend.ts for why.
   const extendHint = shouldExtendThisTurn(input)
     ? `This is a good turn to PUSH THE IDEA FURTHER. Pick something you now
@@ -278,6 +307,7 @@ ${misconceptionHint}
 Gaps not yet understood (oldest first, newest last): ${gapsHint}
 Questions already asked (DO NOT repeat): ${askedHint}
 Concepts already asked about ${MAX_SAME_CONCEPT_QUESTIONS}x (DO NOT ask again — accept them and move on): ${atLimitHint}
+Following up on the teacher's answers: ${depthHint}
 
 ═══ TOOLS AVAILABLE THIS TURN ═══
 ${toolsHint}
@@ -341,7 +371,8 @@ Reply with ONLY valid JSON (replace the example values):
     "type": "question",
     "text": "Iva's words (1-2 sentences, casual, matching this turn's style)",
     "targetConcept": "the concept you're highlighting",
-    "derivedFrom": "gap"
+    "derivedFrom": "gap",
+    "followsUp": false
   }
 }
 `;
