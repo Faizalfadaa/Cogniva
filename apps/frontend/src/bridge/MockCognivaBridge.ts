@@ -302,7 +302,7 @@ export class MockCognivaBridge implements CognivaBridge {
   }
 
   // Mirrors the backend's offline fallback: entry points into open libraries,
-  // pre-filtered to the topic, never an invented document title. Same honesty
+  // with a topic query where supported, never an invented document title. Same honesty
   // rule as the server — a fabricated link looks authoritative and leads nowhere.
   async suggestReferences(workspaceId: string, hint?: string): Promise<ReferenceSuggestionsDTO> {
     await delay(900);
@@ -322,9 +322,9 @@ export class MockCognivaBridge implements CognivaBridge {
         {
           id: 'openstax-1',
           title: `OpenStax — open textbook on ${topic}`,
-          url: `https://openstax.org/search?q=${query}`,
+          url: 'https://openstax.org/subjects',
           source: 'OpenStax',
-          kind: 'pdf',
+          kind: 'book',
           summary: 'Free university textbooks, available as a PDF per chapter.',
           whyRelevant: 'The best option when you need a downloadable PDF.',
           verified: false,
@@ -333,7 +333,7 @@ export class MockCognivaBridge implements CognivaBridge {
         {
           id: 'libretexts-2',
           title: `LibreTexts — textbook chapter on ${topic}`,
-          url: `https://libretexts.org/search.html?q=${query}`,
+          url: 'https://commons.libretexts.org/',
           source: 'LibreTexts',
           kind: 'book',
           summary: 'Open textbooks run by a consortium of universities.',

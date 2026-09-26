@@ -123,7 +123,7 @@ export function WorkspaceHeader({
 
         {/* Reference material: upload a PDF that grounds the post-session
             evaluation. Flows only to the Evaluator, never to the Learner. */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
+        <div className={styles.referenceActions}>
           {pdfUrl && (
             <a
               href={resolvePdfHref(pdfUrl)}

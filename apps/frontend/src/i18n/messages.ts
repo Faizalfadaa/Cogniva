@@ -221,8 +221,8 @@ export const messages = {
     id: 'Beberapa hasil dilewati karena tidak ada yang bertanggung jawab atas isinya, seperti wiki yang bisa diedit siapa saja, situs tanya jawab, dan unggahan pribadi. Materi ini menjadi kunci penilaian penjelasanmu, jadi sumbernya harus bisa dipertanggungjawabkan.',
   },
   'reference.noticeOffline': {
-    en: 'Online search is unavailable right now, so these are entry points into open libraries, pre-filtered for your topic, not specific document titles. Open one, then upload the PDF if you find something that fits.',
-    id: 'Pencarian online sedang tidak tersedia, jadi ini pintu masuk ke perpustakaan terbuka yang sudah disaring untuk topikmu, bukan judul dokumen tertentu. Buka salah satunya, lalu unggah PDF-nya kalau kamu menemukan yang cocok.',
+    en: 'Online search is unavailable right now. These links open library catalogs where you can search for your topic. Open one, then upload the PDF if you find something that fits.',
+    id: 'Pencarian online sedang tidak tersedia. Tautan ini membuka katalog perpustakaan untuk mencari topikmu. Buka salah satunya, lalu unggah PDF-nya kalau kamu menemukan yang cocok.',
   },
 
   // --- home -----------------------------------------------------------------

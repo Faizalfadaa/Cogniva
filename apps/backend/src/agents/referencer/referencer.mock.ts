@@ -6,8 +6,8 @@
  * article about a topic exists, and a made-up title over an invented URL is
  * worse than no suggestion at all: it looks authoritative and leads nowhere.
  * So the offline list never names a document. It points at the *catalog* of
- * well-known open libraries, pre-filtered to the topic, and says so plainly.
- * Every URL is a stable entry point that resolves whatever the topic is.
+ * well-known open libraries, with a topic query where supported. Production
+ * checks these entry points before displaying them, just like search results.
  *
  * Every library here also has to pass the source policy in referencer.trust.ts —
  * this list is the fallback for the same feature, so it cannot offer what the
@@ -58,9 +58,9 @@ const LIBRARIES: Library[] = [
   {
     id: "openstax",
     title: (topic) => `OpenStax — open textbook on ${topic}`,
-    url: (q) => `https://openstax.org/search?q=${q}`,
+    url: () => "https://openstax.org/subjects",
     source: "OpenStax",
-    kind: "pdf",
+    kind: "book",
     trust: "high",
     summary: "Free peer-reviewed university textbooks, available as a full PDF per chapter.",
     whyRelevant: "If you need reference material you can download as a PDF, this is the tidiest source.",
@@ -68,7 +68,7 @@ const LIBRARIES: Library[] = [
   {
     id: "libretexts",
     title: (topic) => `LibreTexts — textbook chapter on ${topic}`,
-    url: (q) => `https://libretexts.org/search.html?q=${q}`,
+    url: () => "https://commons.libretexts.org/",
     source: "LibreTexts",
     kind: "book",
     trust: "high",
@@ -100,7 +100,7 @@ const LIBRARIES: Library[] = [
 
 const NOTICE =
   "Online search is unavailable right now, so these are entry points into open libraries, " +
-  "pre-filtered for your topic — not specific document titles. Open one, then upload the PDF " +
+  "where you can search for your topic — not specific document titles. Open one, then upload the PDF " +
   "if you find something that fits.";
 
 /** Build the offline option list. Pure and deterministic. */
