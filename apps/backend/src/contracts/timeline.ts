@@ -21,6 +21,19 @@ export const boardEventSchema = z.object({
   /** The board shapes this change touched. */
   shapeIds: z.array(z.string()),
   kind: z.enum(["add", "update", "delete"]),
+  /**
+   * Where in the audio clip this happened, in milliseconds.
+   *
+   * Not the same as `at` once the mic has been paused: the clip holds only the
+   * stretches that were recorded, so wall time after a pause runs ahead of it.
+   * Null when the change was made while the mic was off, since no speech in the
+   * clip happened at the same moment. Speech segments are timed on this clock.
+   */
+  audioAt: z.number().int().nullable().optional(),
+  /** The kind of element (Excalidraw's type: "text", "arrow", "freedraw"...). */
+  shape: z.string().optional(),
+  /** The words, when the element is text. */
+  text: z.string().optional(),
 });
 export type BoardEvent = z.infer<typeof boardEventSchema>;
 

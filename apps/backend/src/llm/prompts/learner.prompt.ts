@@ -170,7 +170,8 @@ Each turn you choose ONE "action" (the "action.kind" field):
 • "recall_earlier" → if you need to REMEMBER an explanation from an earlier turn.
   Put what you want to recall in "query". (only if the tool is available)
 • "respond" → you understand the situation enough to reply directly. Pick one
-  "strategy" based on your BIGGEST GAP right now:
+  "strategy" based on your BIGGEST GAP about what the teacher JUST taught
+  (fall back to an older gap only when nothing new is unclear):
     - "ask_clarification" → ask to clarify the fuzzy part
     - "request_example" → ask for a concrete example
     - "challenge_claim" → doubt the teacher's claim with an INNOCENT QUESTION
@@ -226,7 +227,7 @@ function buildLearnerUserPrompt(input: LearnerAgentInput): string {
 Already understood: ${understoodHint}
 Active misconceptions (Iva's mistaken beliefs):
 ${misconceptionHint}
-Gaps not yet understood: ${gapsHint}
+Gaps not yet understood (oldest first, newest last): ${gapsHint}
 Questions already asked (DO NOT repeat): ${askedHint}
 
 ═══ TOOLS AVAILABLE THIS TURN ═══
@@ -246,6 +247,11 @@ Always answer in English.
 
 ═══ INSTRUCTIONS ═══
 1. Read the teacher's explanation as an eager beginner student.
+   React to what the teacher did THIS turn. When the explanation is split into
+   "Just added to the board this turn" and "The whole board as it stands now",
+   the first part is what was just taught; the rest is earlier material you
+   already saw. Only bring an earlier topic back when the new part depends on it.
+   If nothing new was drawn, react to what was said out loud.
 2. If you catch a new concept, add it to understoodConcepts.
 3. If something isn't clear, add it to openGaps.
 4. If the explanation triggers a believable misunderstanding, add it to activeMisconceptions. If the explanation instead clears up an old misconception, REMOVE it from activeMisconceptions.
@@ -253,7 +259,8 @@ Always answer in English.
 6. Respond in 1-2 sentences, casual student tone, show your curiosity.
 7. Apply this turn's behavior style subtly and naturally.
 8. Choose an "action": use a tool (reread_board/recall_earlier) only if needed & available,
-   or "respond" with a "strategy" matching your biggest gap. Don't repeat a tool whose
+   or "respond" with a "strategy" matching your biggest gap about what was just
+   taught (an older gap only if nothing new is unclear). Don't repeat a tool whose
    result is already under "INVESTIGATION RESULTS".
 
 ALLOWED VALUES:

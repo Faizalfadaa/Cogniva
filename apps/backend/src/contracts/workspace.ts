@@ -232,6 +232,8 @@ export interface EvaluationReport {
 export interface EvaluationTranscriptTurn {
   turnIndex: number;
   boardText: string;
+  /** What was added to the board this turn (see evaluator TranscriptTurn). */
+  newBoardText?: string;
   speech?: string;
   /**
    * The chat that followed this turn, both sides, in the order it was sent.
@@ -316,18 +318,34 @@ export const createWorkspaceSchema = z.object({
   locale: z.enum(LOCALES).optional(),
 });
 
-export const submitCheckpointSchema = z.object({
-  /** Raw base64 (no data-URL prefix) PNG of the board. */
-  snapshotImage: z.string(),
-  snapshotMime: z.string().default("image/png"),
-  whiteboardSnapshot: z.unknown(),
-  /** Raw base64 audio clip of the spoken explanation, optional. */
-  audio: z.string().optional(),
-  audioMime: z.string().optional(),
-  /** Board-change timeline for this checkpoint (Phase 1). Optional so older
-   * clients keep posting valid checkpoints. */
-  timeline: timelineSchema.optional(),
-});
+export const submitCheckpointSchema = z
+  .object({
+    /**
+     * Raw base64 (no data-URL prefix) PNG of the board. Absent on a voice-only
+     * turn, where the user explained out loud without drawing anything.
+     */
+    snapshotImage: z.string().optional(),
+    snapshotMime: z.string().default("image/png"),
+    whiteboardSnapshot: z.unknown(),
+    /** Raw base64 audio clip of the spoken explanation, optional. */
+    audio: z.string().optional(),
+    audioMime: z.string().optional(),
+    /** Board-change timeline for this checkpoint (Phase 1). Optional so older
+     * clients keep posting valid checkpoints. */
+    timeline: timelineSchema.optional(),
+    /**
+     * Raw base64 PNG of only what changed on the board since the last Teach.
+     * Absent on the first Teach, when everything is new, and when nothing was
+     * drawn since.
+     */
+    newContentImage: z.string().optional(),
+  })
+  // Either channel can carry the turn, but one of them has to: a checkpoint
+  // with neither gives the student nothing to react to, and would still cost a
+  // full turn to find that out.
+  .refine((body) => Boolean(body.snapshotImage?.trim() || body.audio?.trim()), {
+    message: "A checkpoint needs a board image, an audio clip, or both.",
+  });
 
 export const sendMessageSchema = z.object({
   content: z.string().min(1),

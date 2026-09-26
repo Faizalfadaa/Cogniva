@@ -39,6 +39,12 @@ const COPY: Record<SessionErrorKind, Copy> = {
     text: 'error.aiText',
     className: styles.errorBannerAi,
   },
+  empty_board: {
+    icon: '✏️',
+    title: 'error.emptyTitle',
+    text: 'error.emptyText',
+    className: styles.errorBannerEmpty,
+  },
 }
 
 /**

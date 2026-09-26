@@ -6,7 +6,9 @@ import type { BoardChange } from '../components/whiteboardTypes'
 import type { SessionError } from '../components/errorTypes'
 import { useNetworkStatus } from '../hooks/useNetworkStatus'
 import type { WhiteboardHandle } from '../components/Whiteboard'
-import { useAudioRecorder } from '../hooks/useAudioRecorder'
+import { useAudioRecorder, type RecordedSpan } from '../hooks/useAudioRecorder'
+import { toAudioTime } from '../hooks/voiceActivity'
+import { changedSince, versionsOf, type BoardVersions, type ElementLike } from '../components/boardDiff'
 
 type TeachingMode = 'editing' | 'locked'
 
@@ -14,6 +16,9 @@ const POLL_INTERVAL_MS = 1000
 
 /** Once the text is in, a voiced reply is polled faster: each poll can bring the next sentence. */
 const SPEECH_POLL_INTERVAL_MS = 500
+
+/** How long the "nothing to teach yet" nudge stays up on its own. */
+const EMPTY_NUDGE_MS = 6000
 
 /**
  * Rebase the editor's wall-clock board changes onto the recording's origin
@@ -26,16 +31,22 @@ const SPEECH_POLL_INTERVAL_MS = 500
  */
 function buildTimeline(
   changes: BoardChange[],
-  recordingStartedAt: number | null
+  recordingStartedAt: number | null,
+  spans: readonly RecordedSpan[]
 ): TimelineDTO | undefined {
   if (recordingStartedAt === null) return undefined
 
   return {
     recordingStartedAt: new Date(recordingStartedAt).toISOString(),
-    events: changes.map(({ at, shapeIds, kind }) => ({
+    events: changes.map(({ at, shapeIds, kind, shape, text }) => ({
       at: at - recordingStartedAt,
+      // On the clip's own clock, which is what speech segments are timed on:
+      // the two only agree with `at` until the mic is first paused.
+      audioAt: toAudioTime(at, spans),
       shapeIds,
       kind,
+      ...(shape ? { shape } : {}),
+      ...(text ? { text } : {}),
     })),
   }
 }
@@ -52,6 +63,37 @@ export function useTeachingSession(
   const online = useNetworkStatus()
   const audio = useAudioRecorder()
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /**
+   * The board as it stood at the last successful Teach, element by element.
+   *
+   * What changed since then is exported on its own and read separately, so
+   * the student can be told what the teacher just added rather than handed the
+   * whole board every turn as if all of it were new. Loaded from the latest
+   * checkpoint so a reload or another device picks up where the lesson is.
+   *
+   * `null` until known, and then nothing is marked as new: the whole board is
+   * read as today, which is the safe default.
+   */
+  const taughtRef = useRef<BoardVersions | null>(null)
+
+  useEffect(() => {
+    if (!workspaceId) return
+    let active = true
+    bridge
+      .getCheckpoints(workspaceId)
+      .then((list) => {
+        if (!active) return
+        const last = [...list]
+          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+          .pop()
+        const doc = last?.whiteboardSnapshot as { elements?: ElementLike[] } | undefined
+        taughtRef.current = versionsOf(doc?.elements)
+      })
+      .catch((err) => console.error('[useTeachingSession] loading the last taught board failed', err))
+    return () => {
+      active = false
+    }
+  }, [bridge, workspaceId])
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -109,15 +151,34 @@ export function useTeachingSession(
     // Stop the active recording segment (if any) so the final chunk is committed,
     // then flush all accumulated chunks since the last checkpoint into one blob.
     await audio.stop()
+    // Read before flush(), which resets both.
+    const spoke = audio.heardVoice()
+    const spans = audio.recordedSpans()
     const audioBlob = audio.flush()
     // Drained in the same breath as the audio so the two always describe the
     // same span. recordingStartedAt survives the flush, so it can still be read.
     const boardChanges = handle.flushTimeline?.() ?? []
-    const timeline = buildTimeline(boardChanges, audio.recordingStartedAt)
+    const timeline = buildTimeline(boardChanges, audio.recordingStartedAt, spans)
     const { document, image } = await handle.exportSnapshot()
+    const elements = (document as { elements?: ElementLike[] } | undefined)?.elements
 
-    if (!image) {
-      // Canvas is still empty - nothing meaningful to send to Vision, so cancel.
+    // Only after an earlier Teach: on the first one everything is new, and the
+    // full reading already says so.
+    const taught = taughtRef.current
+    const changed = image && taught && taught.size > 0 ? changedSince(taught, elements) : []
+    const newContentImage =
+      changed.length > 0 ? await handle.exportImageOf?.(changed) : undefined
+
+    // The board and the voice are both teaching, so either one is enough to
+    // start a turn: an empty board with something said over it goes out as a
+    // voice-only turn, and the backend skips the board reading.
+    //
+    // Only when both are empty is there nothing for the student to react to.
+    // This used to cancel silently, which looked exactly like the button being
+    // broken. `spoke` rather than `audioBlob` because the mic starts on its own:
+    // there is nearly always a clip, and most of the time it is room noise.
+    if (!image && !(audioBlob && spoke)) {
+      setError({ kind: 'empty_board' })
       setPending(false)
       setMode('editing')
       audio.start()
@@ -126,10 +187,11 @@ export function useTeachingSession(
 
     try {
       const checkpoint = await bridge.submitCheckpoint(workspaceId, {
-        snapshotImage: image,
+        snapshotImage: image ?? null,
         whiteboardSnapshot: document,
         audio: audioBlob,
         timeline,
+        newContentImage,
       })
       setLatestCheckpoint(checkpoint)
 
@@ -143,6 +205,8 @@ export function useTeachingSession(
         return
       }
 
+      // The student has this board now; the next Teach is measured from here.
+      taughtRef.current = versionsOf(elements)
       pollForResponse(checkpoint.id)
     } catch (err) {
       // The bridge throws a plain Error for a non-2xx response and a TypeError
@@ -187,6 +251,17 @@ export function useTeachingSession(
     }
     setError((prev) => (prev?.kind === 'network' ? null : prev))
   }, [online])
+
+  // The empty-board nudge describes a moment, not a condition that persists:
+  // left up, it would go on saying "the board is empty" while the user draws.
+  useEffect(() => {
+    if (error?.kind !== 'empty_board') return
+    const timer = setTimeout(
+      () => setError((prev) => (prev?.kind === 'empty_board' ? null : prev)),
+      EMPTY_NUDGE_MS
+    )
+    return () => clearTimeout(timer)
+  }, [error])
 
   useEffect(() => stopPolling, [stopPolling])
 

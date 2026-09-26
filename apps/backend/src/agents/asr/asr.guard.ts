@@ -18,7 +18,38 @@ export function normalizeAsrLLMOutput(raw: Record<string, unknown>): AsrLLMOutpu
         ? raw.language.trim()
         : config.ASR_DEFAULT_LANGUAGE,
     ambiguities,
+    segments: normalizeSegments(raw.segments),
   };
+}
+
+/**
+ * Keep only segments whose times make sense, in time order.
+ *
+ * A time the model got wrong would pair a sentence with the wrong drawing, and
+ * nothing downstream could tell. So anything that is not a finite, non-negative
+ * start with an end no earlier than it is dropped rather than repaired, and
+ * empty text goes too: a segment with no words lines nothing up.
+ */
+export function normalizeSegments(value: unknown): AsrLLMOutput["segments"] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((s): s is Record<string, unknown> => typeof s === "object" && s !== null)
+    .map((s) => ({
+      start: s.start,
+      end: s.end,
+      text: typeof s.text === "string" ? s.text.trim() : "",
+    }))
+    .filter(
+      (s): s is { start: number; end: number; text: string } =>
+        typeof s.start === "number" &&
+        typeof s.end === "number" &&
+        Number.isFinite(s.start) &&
+        Number.isFinite(s.end) &&
+        s.start >= 0 &&
+        s.end >= s.start &&
+        s.text.length > 0,
+    )
+    .sort((a, b) => a.start - b.start);
 }
 
 /**
@@ -55,6 +86,13 @@ export function toSpeechTranscript(
     needsConfirmation,
     suggestedClarification: needsConfirmation
       ? defaultClarification(output.ambiguities, "speech")
+      : undefined,
+    segments: output.segments.length
+      ? output.segments.map((s) => ({
+          startMs: Math.round(s.start * 1000),
+          endMs: Math.round(s.end * 1000),
+          text: s.text,
+        }))
       : undefined,
   };
 }

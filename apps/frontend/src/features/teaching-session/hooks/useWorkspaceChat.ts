@@ -26,13 +26,40 @@ export interface ChatToast {
 }
 
 interface UseWorkspaceChatOptions {
-  seedMessages?: Array<{ id: string; content: string }>
+  /**
+   * The student's greeting, shown ahead of the real conversation.
+   *
+   * `undefined` means not decided yet (see useFirstSession) and shows none;
+   * `[]` means no greeting, which is every session after the first. It can
+   * arrive after the conversation has: it is kept out of every count, so it
+   * never shows up as unread or as a toast.
+   *
+   * Each line carries its own time, anchored to when the workspace was made, so
+   * the greeting is the same on every load and always sorts first. It used to be
+   * stamped with the time the page opened, which put a greeting from the first
+   * session at the bottom of the conversation on any later visit.
+   */
+  seedMessages?: Array<{ id: string; content: string; createdAt: string }>
+}
+
+/**
+ * The greeting lives only in the browser; the server has never heard of it.
+ * Recognised by id so it can be kept out of anything that counts the real
+ * conversation.
+ */
+const SEED_PREFIX = 'seed-'
+
+function isSeed(message: { id: string }): boolean {
+  return message.id.startsWith(SEED_PREFIX)
 }
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 
 function readCountKey(workspaceId: string) {
-  return `cogniva:chat-read:${workspaceId}`
+  // v2: counts the real conversation only, without the greeting. A v1 count
+  // included it, and read against the new counting it would sit three too high,
+  // hiding the next three replies from the unread badge.
+  return `cogniva:chat-read:v2:${workspaceId}`
 }
 
 function sessionMsgsKey(workspaceId: string) {
@@ -97,7 +124,11 @@ export function useWorkspaceChat(
   // base instead of re-generating seeds with a fresh Date.now() — otherwise the
   // new seed timestamps would be newer than real backend messages and sort them
   // into the wrong position.
-  const persistedOnMount = useRef<ChatMessageDTO[]>(loadSessionMsgs(workspaceId))
+  // The stored greeting is dropped: whether there is one is decided again on
+  // every visit, and a copy from the first session must not outlive it.
+  const persistedOnMount = useRef<ChatMessageDTO[]>(
+    loadSessionMsgs(workspaceId).filter((m) => !isSeed(m))
+  )
 
   // A conversation restored from this tab's storage has already been heard.
   // Marked before the first render uses it, so none of it is spoken again.
@@ -108,21 +139,20 @@ export function useWorkspaceChat(
     markHeardUrls(persistedOnMount.current.map((m) => m.learnerAudioUrl))
   }
 
-  const seedRef = useRef<ChatMessageDTO[]>(
-    persistedOnMount.current.length > 0
-      ? persistedOnMount.current  // use persisted as stable base; timestamps already fixed
-      : (options.seedMessages ?? []).map((m, i) => ({
-          id: m.id,
-          sender: 'learner' as const,
-          content: m.content,
-          // Anchor to a fixed past time so subsequent real messages always sort after
-          createdAt: new Date(Date.now() - (options.seedMessages!.length - i) * 3000).toISOString(),
-        }))
-  )
+  const seedsReady = options.seedMessages !== undefined
+  // Rebuilt every render and read through a ref by the poll loop, which would
+  // otherwise keep the greeting it saw when it started.
+  const seedRef = useRef<ChatMessageDTO[]>([])
+  seedRef.current = (options.seedMessages ?? []).map((m) => ({
+    id: m.id,
+    sender: 'learner' as const,
+    content: m.content,
+    createdAt: m.createdAt,
+  }))
+  const seedKey = seedRef.current.map((m) => m.id + m.content).join('|')
 
-  const [messages, setMessages] = useState<ChatMessageDTO[]>(
-    persistedOnMount.current.length > 0 ? persistedOnMount.current : seedRef.current
-  )
+  // What this tab saw last, shown at once while the first poll is in flight.
+  const [messages, setMessages] = useState<ChatMessageDTO[]>(persistedOnMount.current)
 
   const [isOpen, setIsOpen] = useState(false)
   const [toasts, setToasts] = useState<ChatToast[]>([])
@@ -143,12 +173,19 @@ export function useWorkspaceChat(
   const fastUntilRef = useRef(0)
 
   function mergeMessages(seeds: ChatMessageDTO[], fetched: ChatMessageDTO[]): ChatMessageDTO[] {
-    const seedIds = new Set(seeds.map((s) => s.id))
-    const fresh = fetched.filter((m) => !seedIds.has(m.id))
+    const fresh = fetched.filter((m) => !isSeed(m))
     return [...seeds, ...fresh].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     )
   }
+
+  // The greeting decided (or changed, when the learner or language does):
+  // swap it into what is on screen without waiting for the next poll.
+  useEffect(() => {
+    if (!seedsReady) return
+    setMessages((prev) => mergeMessages(seedRef.current, prev))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedsReady, seedKey])
 
   useEffect(() => {
     if (!workspaceId) return
@@ -188,7 +225,9 @@ export function useWorkspaceChat(
           return changed ? next : prev
         })
 
-        const learnerMsgs = merged.filter((m) => m.sender === 'learner')
+        // The greeting is not counted: it was just played to the user in the
+        // introduction, so it is neither unread nor worth a toast.
+        const learnerMsgs = merged.filter((m) => m.sender === 'learner' && !isSeed(m))
         const learnerCount = learnerMsgs.length
 
         if (isOpenRef.current) {
@@ -280,7 +319,7 @@ export function useWorkspaceChat(
   )
 
   function markAllRead(msgs: ChatMessageDTO[]) {
-    const learnerCount = msgs.filter((m) => m.sender === 'learner').length
+    const learnerCount = msgs.filter((m) => m.sender === 'learner' && !isSeed(m)).length
     readLearnerCountRef.current = learnerCount
     saveReadCount(workspaceId, learnerCount)
     prevLearnerCountRef.current = learnerCount
@@ -309,7 +348,8 @@ export function useWorkspaceChat(
 
   const unreadCount = Math.max(
     0,
-    messages.filter((m) => m.sender === 'learner').length - readLearnerCountRef.current
+    messages.filter((m) => m.sender === 'learner' && !isSeed(m)).length -
+      readLearnerCountRef.current
   )
 
   const dismissError = useCallback(() => setError(null), [])
