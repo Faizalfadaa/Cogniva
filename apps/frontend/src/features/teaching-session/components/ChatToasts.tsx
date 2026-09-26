@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { ChatToast } from '../hooks/useWorkspaceChat'
 import { spokenText, useUtteranceProgress } from '../hooks/useLearnerVoice'
 import { useT } from '../../../i18n/LanguageProvider'
@@ -11,6 +11,8 @@ interface ChatToastsProps {
   toasts: ChatToast[]
   onDismiss: (id: string) => void
   onOpenChat: () => void
+  /** Where the stack sits, so it comes out of the chat button wherever it is. */
+  placement?: { style: CSSProperties; alignStart: boolean }
 }
 
 interface ToastItemProps {
@@ -70,11 +72,14 @@ function ToastItem({ toast, onDismiss, onOpenChat }: ToastItemProps) {
   )
 }
 
-export function ChatToasts({ toasts, onDismiss, onOpenChat }: ChatToastsProps) {
+export function ChatToasts({ toasts, onDismiss, onOpenChat, placement }: ChatToastsProps) {
   if (toasts.length === 0) return null
 
   return (
-    <div className={styles.chatToastsContainer}>
+    <div
+      className={styles.chatToastsContainer}
+      style={placement && { ...placement.style, alignItems: placement.alignStart ? 'flex-start' : 'flex-end' }}
+    >
       {toasts.map((t) => (
         <ToastItem key={t.id} toast={t} onDismiss={onDismiss} onOpenChat={onOpenChat} />
       ))}

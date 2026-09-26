@@ -68,9 +68,9 @@ export const WORKSPACE_TOUR_STEPS: TourStep[] = [
     placement: 'left',
   },
   {
-    selector: '[data-tour="pdf-upload"]',
-    title: 'tour.pdfTitle',
-    body: 'tour.pdfBody',
+    selector: '[data-tour="reference-button"]',
+    title: 'tour.referenceTitle',
+    body: 'tour.referenceBody',
     placement: 'bottom',
   },
   {

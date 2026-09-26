@@ -1,10 +1,22 @@
+import { useRef, useState, type PointerEvent } from 'react'
 import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/TeachingSession.module.css'
+import type { LauncherOffset } from '../hooks/useLauncherPosition'
+
+/**
+ * How far the pointer has to travel before a press becomes a drag. Below this
+ * it is a click with an unsteady hand, and should still open the chat.
+ */
+const DRAG_THRESHOLD = 5
 
 interface ChatLauncherProps {
   chatOpen: boolean
   chatUnread: number
   onToggleChat: () => void
+  /** Where the button sits over the canvas (see useLauncherPosition). */
+  offset: LauncherOffset
+  /** Called as the button is dragged. */
+  onMove: (next: LauncherOffset) => void
   /** Secondary detail: whose chat this opens. Optional — the glyph carries the meaning. */
   learnerAvatarUrl?: string
   learnerName?: string
@@ -33,12 +45,54 @@ export function ChatLauncher({
   chatOpen,
   chatUnread,
   onToggleChat,
+  offset,
+  onMove,
   learnerAvatarUrl,
   learnerName,
 }: ChatLauncherProps) {
   const t = useT()
+  const dragRef = useRef<{ x: number; y: number; from: LauncherOffset; moved: boolean } | null>(null)
+  // The click that follows a drag's release must not open the chat.
+  const swallowClickRef = useRef(false)
+  const [dragging, setDragging] = useState(false)
 
   if (chatOpen) return null
+
+  const onPointerDown = (e: PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return
+    dragRef.current = { x: e.clientX, y: e.clientY, from: offset, moved: false }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  const onPointerMove = (e: PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current
+    if (!drag) return
+    const dx = e.clientX - drag.x
+    const dy = e.clientY - drag.y
+    if (!drag.moved) {
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return
+      drag.moved = true
+      setDragging(true)
+    }
+    // Measured from the bottom-right, so moving right or down shrinks it.
+    onMove({ right: drag.from.right - dx, bottom: drag.from.bottom - dy })
+  }
+
+  const endDrag = () => {
+    const drag = dragRef.current
+    dragRef.current = null
+    if (!drag?.moved) return
+    swallowClickRef.current = true
+    setDragging(false)
+  }
+
+  const onClick = () => {
+    if (swallowClickRef.current) {
+      swallowClickRef.current = false
+      return
+    }
+    onToggleChat()
+  }
 
   const who = learnerName ?? t('stage.theLearner')
   const label = t('stage.openChat', { name: who })
@@ -47,11 +101,16 @@ export function ChatLauncher({
     <button
       type="button"
       data-tour="chat-launcher"
-      className={styles.chatLauncher}
-      onClick={onToggleChat}
+      className={`${styles.chatLauncher} ${dragging ? styles.chatLauncherDragging : ''}`}
+      style={{ right: offset.right, bottom: offset.bottom }}
+      onClick={onClick}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
       aria-label={label}
       aria-expanded={chatOpen}
-      title={label}
+      title={`${label}. ${t('stage.dragHint')}`}
     >
       <ChatBubbleIcon />
 

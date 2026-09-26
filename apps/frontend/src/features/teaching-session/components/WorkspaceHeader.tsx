@@ -1,6 +1,6 @@
-import { type CSSProperties } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { TeachButton } from './TeachButton'
+import { ReferenceMenu } from './ReferenceMenu'
 import type { TitleSaveStatus } from '../hooks/useWorkspaceTitleAutosave'
 import { useLearnerVoice } from '../hooks/useLearnerVoice'
 import { useT, type Translate } from '../../../i18n/LanguageProvider'
@@ -30,26 +30,16 @@ interface WorkspaceHeaderProps {
   referenceSource?: { url: string; title: string; source: string }
 }
 
-/** The backend returns a relative /api path; mock/blobs are already absolute. */
-function resolvePdfHref(pdfUrl: string): string {
-  if (/^(https?:|blob:|data:)/.test(pdfUrl)) return pdfUrl
-  const base = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
-  return `${base}${pdfUrl}`
-}
-
-const pdfBtnStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '6px',
-  padding: '5px 10px',
-  fontSize: '13px',
-  fontWeight: 500,
-  color: 'var(--text-secondary, #5a5545)',
-  background: 'var(--card-bg, #fff)',
-  border: '1px solid rgba(0,0,0,0.12)',
-  borderRadius: '8px',
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
+/** Headphones, struck through while deafened. */
+function HeadphonesIcon({ deafened }: { deafened: boolean }) {
+  return (
+    <svg className={styles.deafenIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+      {deafened && <path className={styles.deafenSlash} d="M2 2l20 20" />}
+    </svg>
+  )
 }
 
 function saveStatusLabel(status: TitleSaveStatus, t: Translate): string {
@@ -99,12 +89,11 @@ export function WorkspaceHeader({
           ←
         </button>
 
-        {/* Separate from the arrow above: that one goes to the dashboard, this
-            one leaves the app entirely for the public site. */}
-        <Link to="/" className={styles.landingLink} title={t('header.homeTitle')}>
-          <img src="/cogniva_logo.png" alt="" aria-hidden="true" className={styles.landingLinkLogo} />
-          <span>{t('header.home')}</span>
-        </Link>
+        {/* Brand only, not a way out. There used to be a Home link here beside
+            the arrow, and two exits next to each other in a teaching screen
+            made it easy to leave mid-lesson by the wrong one. The arrow is the
+            one way back. */}
+        <img src="/cogniva_logo.png" alt="" aria-hidden="true" className={styles.brandMark} />
 
         {/* "Untitled Document" is only a placeholder - the value stays the real
             (possibly empty) title, not written into value, so it isn't saved as a
@@ -121,95 +110,39 @@ export function WorkspaceHeader({
           {saveStatusLabel(saveStatus, t)}
         </span>
 
-        {/* Reference material: upload a PDF that grounds the post-session
-            evaluation. Flows only to the Evaluator, never to the Learner. */}
-        <div className={styles.referenceActions}>
-          {pdfUrl && (
-            <a
-              href={resolvePdfHref(pdfUrl)}
-              target="_blank"
-              rel="noreferrer"
-              style={{ ...pdfBtnStyle, textDecoration: 'none' }}
-              title={t('header.viewReference')}
-            >
-              📄 {t('header.referenceAttached')}
-            </a>
-          )}
-
-          {/* A web source and an upload are mutually exclusive, so only one of
-              these two chips is ever on screen. */}
-          {!pdfUrl && referenceSource && (
-            <a
-              href={referenceSource.url}
-              target="_blank"
-              rel="noreferrer"
-              style={{ ...pdfBtnStyle, textDecoration: 'none', maxWidth: '220px' }}
-              title={`${referenceSource.title} — ${referenceSource.source}`}
-            >
-              <span
-                style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-              >
-                🔗 {referenceSource.title || referenceSource.source}
-              </span>
-            </a>
-          )}
-          <label
-            data-tour="pdf-upload"
-            style={{ ...pdfBtnStyle, opacity: uploadingPdf ? 0.6 : 1 }}
-            title={t('header.uploadPdfTitle')}
-          >
-            {uploadingPdf
-              ? t('header.uploading')
-              : pdfUrl
-                ? t('header.replace')
-                : `📎 ${t('header.uploadPdf')}`}
-            <input
-              type="file"
-              accept="application/pdf,.pdf"
-              style={{ display: 'none' }}
-              disabled={uploadingPdf}
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) onUploadPdf(file)
-                e.target.value = ''
-              }}
-            />
-          </label>
-
-          {/* The way out for a user who has nothing to upload: an agent looks
-              material up and offers options to choose from. */}
-          <button
-            type="button"
-            data-tour="reference-finder"
-            onClick={onFindReference}
-            style={{ ...pdfBtnStyle }}
-            title={t('header.findReferenceTitle')}
-          >
-            🔎 {t('header.findReference')}
-          </button>
-        </div>
+        {/* Reference material grounds the post-session evaluation. It flows
+            only to the Evaluator, never to the Learner. */}
+        <ReferenceMenu
+          pdfUrl={pdfUrl}
+          referenceSource={referenceSource}
+          uploading={uploadingPdf}
+          onUpload={onUploadPdf}
+          onFindWithAgent={onFindReference}
+        />
       </div>
 
       <div className={styles.headerRight}>
-        {/* Mute the learner's synthesized voice. Reads its state from the shared
-            player, so no prop drilling is needed. */}
         <LanguageToggle style={{ marginRight: '4px' }} />
 
+        {/* Deafen: stop hearing the learner's synthesized voice, the way a call
+            app's headphones button works. A speaker icon read as "the volume of
+            this page", which it is not. Reads its state from the shared player,
+            so no prop drilling is needed. */}
         <button
-          className={voice.muted || !voice.available ? styles.voiceBtnMuted : styles.voiceBtn}
+          className={voice.muted ? styles.deafenBtnOn : styles.deafenBtn}
           onClick={voice.toggleMuted}
           disabled={!voice.available}
-          aria-label={voice.muted ? t('header.unmute') : t('header.mute')}
+          aria-label={voice.muted ? t('header.undeafen') : t('header.deafen')}
           aria-pressed={voice.muted}
           title={
             !voice.available
               ? t('header.voiceUnavailable')
               : voice.muted
-                ? t('header.voiceOff')
-                : t('header.voiceOn')
+                ? t('header.undeafen')
+                : t('header.deafen')
           }
         >
-          {voice.muted || !voice.available ? '🔇' : '🔊'}
+          <HeadphonesIcon deafened={voice.muted || !voice.available} />
         </button>
 
         {!micPermissionDenied && (
