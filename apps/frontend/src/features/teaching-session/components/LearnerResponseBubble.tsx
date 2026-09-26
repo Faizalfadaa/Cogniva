@@ -4,11 +4,13 @@ import type { LearnerCharacter } from '../../../lib/Learner'
 import type { LearnerSpeechDTO } from '../../../dto/LearnerSpeechDTO'
 import { spokenText, useLearnerVoice, useUtteranceProgress } from '../hooks/useLearnerVoice'
 import { useT } from '../../../i18n/LanguageProvider'
+import { TypingIndicator } from './TypingIndicator'
 
 interface LearnerResponseBubbleProps {
   learner: LearnerCharacter
   text?: string
   pending: boolean
+  hidden?: boolean
   checkpointId?: string
   /** Legacy single clip, for checkpoints recorded before per-sentence speech. */
   audioUrl?: string
@@ -23,6 +25,7 @@ export function LearnerResponseBubble({
   learner,
   text,
   pending,
+  hidden = false,
   checkpointId,
   audioUrl,
   speech,
@@ -57,7 +60,8 @@ export function LearnerResponseBubble({
     return () => clearTimeout(timer)
   }, [checkpointId, lineDone])
 
-  if (dismissed || (!pending && !text)) return null
+  // Keep playback effects mounted while the conversation panel owns the UI.
+  if (hidden || dismissed || (!pending && !text)) return null
 
   const waiting = pending || progress?.phase === 'waiting'
   const clips = !voice.available
@@ -98,7 +102,7 @@ export function LearnerResponseBubble({
             )}
           </span>
           <p className={styles.notifText} aria-live="polite">
-            {waiting ? '...' : spokenText(text ?? '', speech, progress)}
+            {waiting ? <TypingIndicator name={learner.name} /> : spokenText(text ?? '', speech, progress)}
           </p>
         </div>
         <button
