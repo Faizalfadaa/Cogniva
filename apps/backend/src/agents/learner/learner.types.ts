@@ -3,12 +3,28 @@ export type Misconception = {
   belief: string;
 };
 
+/**
+ * How many times the student has pressed on one core concept, so it can stop
+ * after two instead of circling (see learner.repeat.ts). `key` is the normalized
+ * comparison key; `label` is the concept as the student named it.
+ */
+export type AskedConcept = {
+  key: string;
+  label: string;
+  count: number;
+};
+
 export type LearnerState = {
   sessionId: string;
   understoodConcepts: string[];
   activeMisconceptions: Misconception[];
   openGaps: string[];
   questionsAsked: string[];
+  /**
+   * Optional: states written before the repeat limit existed have no tally, and
+   * the model never fills this in — the guard does.
+   */
+  askedConcepts?: AskedConcept[];
   updatedAtTurn: number;
 };
 

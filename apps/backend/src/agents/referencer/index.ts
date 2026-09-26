@@ -36,6 +36,7 @@ export type {
   FetchedReference,
   ReferenceKind,
   ReferenceOption,
+  ReferenceProblemCode,
   ReferenceSuggestions,
   ReferenceSuggestionSource,
   ReferencerLLMOutput,

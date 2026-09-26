@@ -59,10 +59,24 @@ export interface ReferenceSourceDTO {
 }
 
 /** Result of adopting one option as the session's reference material. */
+/** Why a chosen source could not be turned into reference material. */
+export type ReferenceProblemCode =
+  | 'invalid-link'
+  | 'not-web'
+  | 'blocked-host'
+  | 'refused'
+  | 'too-large'
+  | 'unsupported-type'
+  | 'timeout'
+  | 'unreachable'
+  | 'too-little-text'
+
 export interface UseReferenceResultDTO {
   ok: boolean
   /** Why it could not be used, in English. Empty when ok. */
   problem: string
+  /** The same reason as a stable code, so it can be shown in the reader's language. */
+  problemCode?: ReferenceProblemCode
   /** Characters of reference text extracted. */
   chars: number
 }

@@ -28,6 +28,7 @@ export type {
   FetchedReference,
   ReferenceKind,
   ReferenceOption,
+  ReferenceProblemCode,
   ReferenceSuggestions,
   SuggestReferencesArgs,
 } from "./referencer/index.js";

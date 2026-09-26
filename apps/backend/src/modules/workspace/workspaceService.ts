@@ -22,6 +22,7 @@ import {
   seedLearnerState,
   seedLearnerStateFromEvaluation,
   type ChatExchange,
+  type ReferenceProblemCode,
   type ReferenceSuggestions,
   type TranscriptTurn,
 } from "../../agents/index.js";
@@ -114,7 +115,7 @@ export async function deleteWorkspace(id: string): Promise<boolean> {
 
 export async function updateMeta(
   id: string,
-  meta: { title?: string; description?: string; learnerId?: string },
+  meta: { title?: string; description?: string; learnerId?: string; locale?: Locale },
 ): Promise<Workspace | undefined> {
   const ws = await workspaces.get(id);
   if (!ws) return undefined;
@@ -123,6 +124,12 @@ export async function updateMeta(
   // The picked student, so speech can be synthesized in the voice the user is
   // actually looking at (§TTS). Validated where it is used, not here.
   if (meta.learnerId !== undefined) ws.learnerId = meta.learnerId;
+  // The session language is chosen when the workspace is opened and fixed from
+  // the first teaching turn onwards: the student has spoken in it by then, and
+  // the report is written in it, so changing it would leave a session half in
+  // one language. A later request is ignored rather than refused — the client
+  // has no business asking, and nothing it is doing depends on the answer.
+  if (meta.locale !== undefined && ws.state === "Draft") ws.locale = meta.locale;
   return touch(ws);
 }
 
@@ -253,6 +260,8 @@ export interface UseReferenceResult {
   ok: boolean;
   /** Empty when ok; otherwise why the source could not be used, in English. */
   problem: string;
+  /** The same reason as a stable code, so the UI can translate it. */
+  problemCode?: ReferenceProblemCode;
   /** How much reference text was extracted. Useful signal for the UI. */
   chars: number;
   workspace?: Workspace;
@@ -273,7 +282,9 @@ export async function useReference(
   if (!ws) return undefined;
 
   const fetched = await referencer.read(choice.url, topicNameOf(ws));
-  if (!fetched.ok) return { ok: false, problem: fetched.problem, chars: 0 };
+  if (!fetched.ok) {
+    return { ok: false, problem: fetched.problem, problemCode: fetched.problemCode, chars: 0 };
+  }
 
   const text = fetched.text.slice(0, config.RAG_MAX_REFERENCE_CHARS);
   await workspaces.saveReference(id, text);

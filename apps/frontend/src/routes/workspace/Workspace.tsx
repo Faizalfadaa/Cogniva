@@ -16,6 +16,9 @@ import { ProductTour } from '../../features/tour/ProductTour'
 import { WORKSPACE_TOUR_STEPS } from '../../features/tour/tourSteps'
 import { useAppTour } from '../../features/tour/useAppTour'
 import { LearnerSelect } from '../../features/teaching-session/components/LearnerSelect'
+import { SessionLanguage } from '../../features/teaching-session/components/SessionLanguage'
+import { useSessionLanguage } from '../../features/teaching-session/hooks/useSessionLanguage'
+import type { Locale } from '../../i18n/messages'
 import { useTeachingSession } from '../../features/teaching-session/state/useTeachingSession'
 import { useWorkspaceTitleAutosave } from '../../features/teaching-session/hooks/useWorkspaceTitleAutosave'
 import { useIntroSeen } from '../../features/teaching-session/hooks/useIntroSeen'
@@ -96,6 +99,8 @@ export default function WorkspacePage() {
    */
   const introDone = intro.seen || firstSession === false
   const setup = useSessionSetup(id ?? '')
+  const language = useSessionLanguage(id ?? '')
+  const [savingLanguage, setSavingLanguage] = useState(false)
   const tour = useAppTour('workspace')
   const { userName } = useUserStore()
   const navigate = useNavigate()
@@ -183,8 +188,14 @@ export default function WorkspacePage() {
    * `intro.seen` covers the same ground from the other side: if they have
    * already met a student here, the choice was effectively made.
    */
+  const needsLanguagePick = !language.chosen && workspace?.state === 'Draft' && !intro.seen
+
   const needsLearnerPick =
-    !chosenLearnerId && !workspace?.learnerId && workspace?.state === 'Draft' && !intro.seen
+    !needsLanguagePick &&
+    !chosenLearnerId &&
+    !workspace?.learnerId &&
+    workspace?.state === 'Draft' &&
+    !intro.seen
 
   const handleSelectLearner = useCallback(
     (learnerId: string) => {
@@ -206,6 +217,34 @@ export default function WorkspacePage() {
   )
 
   /**
+   * The language the session runs in, chosen once on the way in.
+   *
+   * The dialog offers it and the workspace stores it, so the student speaks in
+   * it and the report comes back in it. The server only accepts the change
+   * while the workspace is still a Draft, which is exactly when this is asked.
+   * A failed write leaves the language the workspace was created with; the
+   * dialog still closes, because asking again on every open would be worse than
+   * running in the inherited language.
+   */
+  const handleChooseLanguage = useCallback(
+    async (next: Locale) => {
+      if (!id) return
+      setSavingLanguage(true)
+      try {
+        if (next !== workspace?.locale) {
+          setWorkspace(await bridge.updateWorkspaceMeta(id, { locale: next }))
+        }
+      } catch (err) {
+        console.error('[Workspace] saving the session language failed', err)
+      } finally {
+        setSavingLanguage(false)
+        language.markChosen()
+      }
+    },
+    [bridge, id, language, workspace?.locale]
+  )
+
+  /**
    * Ask what the session is about, once, before the student introduces
    * themselves — the topic is what the Learner reacts to and what the Evaluator
    * grades, so it is worth having before the first explanation rather than
@@ -215,14 +254,15 @@ export default function WorkspacePage() {
    * by existing, and interrupting a resumed session with a form would be absurd.
    */
   const needsSetup =
-    !needsLearnerPick && !setup.done && workspace?.state === 'Draft'
+    !needsLanguagePick && !needsLearnerPick && !setup.done && workspace?.state === 'Draft'
 
   /**
    * Second leg of the app tour, resumed from the dashboard. Held until the
    * greeting is over and the setup panel is gone: those own the screen with
    * their own overlays, and two dimmed layers at once would be a mess.
    */
-  const showTour = tour.active && introDone && !needsLearnerPick && !needsSetup
+  const showTour =
+    tour.active && introDone && !needsLanguagePick && !needsLearnerPick && !needsSetup
 
   // One banner, two sources. Teaching errors win: the user just pressed Teach
   // and is waiting on that, whereas a chat poll fails quietly in the background.
@@ -291,6 +331,14 @@ export default function WorkspacePage() {
           />
 
           {/* Pick a student, set up the topic, then play their greeting. */}
+          {needsLanguagePick && workspace && (
+            <SessionLanguage
+              current={workspace.locale}
+              onChoose={(next) => void handleChooseLanguage(next)}
+              saving={savingLanguage}
+            />
+          )}
+
           {needsLearnerPick && <LearnerSelect onSelect={handleSelectLearner} />}
 
           {needsSetup && (
@@ -303,9 +351,13 @@ export default function WorkspacePage() {
             />
           )}
 
-          {!needsLearnerPick && !needsSetup && !intro.seen && firstSession === true && (
-            <LearnerIntro learner={learner} userName={userName ?? ''} onDone={intro.markSeen} />
-          )}
+          {!needsLanguagePick &&
+            !needsLearnerPick &&
+            !needsSetup &&
+            !intro.seen &&
+            firstSession === true && (
+              <LearnerIntro learner={learner} userName={userName ?? ''} onDone={intro.markSeen} />
+            )}
 
           {/* Toast notifications — float over canvas, only when sidebar is closed */}
           {introDone && !needsSetup && !chat.isOpen && (

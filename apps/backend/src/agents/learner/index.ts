@@ -116,6 +116,10 @@ export function seedLearnerStateFromEvaluation(
       : previous?.activeMisconceptions ?? [],
     openGaps,
     questionsAsked: previous?.questionsAsked ?? [],
+    // The repeat tally starts over for the new round: the user is about to teach
+    // this material again, so the student gets its two questions per concept
+    // again rather than opening the round already out of them.
+    askedConcepts: [],
     updatedAtTurn: previous?.updatedAtTurn ?? 0,
   };
 }

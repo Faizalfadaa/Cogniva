@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useBridge } from '../../../bridge/BridgeProvider'
-import type { ReferenceOptionDTO, ReferenceSuggestionsDTO } from '../../../dto/ReferenceDTO'
+import type {
+  ReferenceOptionDTO,
+  ReferenceProblemCode,
+  ReferenceSuggestionsDTO,
+} from '../../../dto/ReferenceDTO'
 import { useLocale, useT } from '../../../i18n/LanguageProvider'
-import { LOCALE_TAGS } from '../../../i18n/messages'
+import { LOCALE_TAGS, type MessageKey } from '../../../i18n/messages'
 import styles from '../../../styles/ReferenceFinder.module.css'
 
 interface ReferenceFinderProps {
@@ -22,6 +26,27 @@ const KIND_ICON: Record<ReferenceOptionDTO['kind'], string> = {
   book: '📚',
 }
 
+/** Why the server could not read a source, in the language on screen. */
+const PROBLEM_KEY: Record<ReferenceProblemCode, MessageKey> = {
+  'invalid-link': 'reference.problemInvalidLink',
+  'not-web': 'reference.problemNotWeb',
+  'blocked-host': 'reference.problemBlockedHost',
+  refused: 'reference.problemRefused',
+  'too-large': 'reference.problemTooLarge',
+  'unsupported-type': 'reference.problemUnsupportedType',
+  timeout: 'reference.problemTimeout',
+  unreachable: 'reference.problemUnreachable',
+  'too-little-text': 'reference.problemTooLittleText',
+}
+
+/** Notices the search returns about the list as a whole. */
+const NOTICE_KEY = {
+  thin: 'reference.noticeThin',
+  unverified: 'reference.noticeUnverified',
+  rejected: 'reference.noticeRejected',
+  offline: 'reference.noticeOffline',
+} as const
+
 /**
  * Finds reference material for a user who has none.
  *
@@ -32,8 +57,8 @@ const KIND_ICON: Record<ReferenceOptionDTO['kind'], string> = {
  *
  * Adopting is the slow step — the page has to be fetched and turned into notes —
  * so it reports its own outcome instead of closing optimistically. A source that
- * cannot be read is a normal answer here, not an error: the list stays open and
- * the user picks another.
+ * cannot be read is a normal answer here, not an error: it is marked unusable in
+ * place, with the reason, the next option is selected, and the list stays open.
  */
 export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: ReferenceFinderProps) {
   const bridge = useBridge()
@@ -46,6 +71,8 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
   const [adopting, setAdopting] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState('')
+  /** Options the server has already refused, by id, with the reason to show. */
+  const [unusable, setUnusable] = useState<Record<string, string>>({})
 
   // The dialog outlives its own async work — the user can close it mid-search —
   // so nothing writes state after unmount.
@@ -62,6 +89,7 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
     setError('')
     setDone('')
     setSelected(null)
+    setUnusable({})
     try {
       const result = await bridge.suggestReferences(workspaceId, hint.trim() || undefined)
       if (!alive.current) return
@@ -108,7 +136,16 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       })
       if (!alive.current) return
       if (!result.ok) {
-        setError(result.problem || t('reference.unusable'))
+        // Say why in the reader's language, mark the option so the list shows
+        // which one was tried, and move the selection to the next one left.
+        const reason = result.problemCode
+          ? t(PROBLEM_KEY[result.problemCode])
+          : result.problem || t('reference.unusable')
+        const refused = { ...unusable, [option.id]: reason }
+        setUnusable(refused)
+        setError(`${reason} ${t('reference.pickAnother')}`)
+        const next = suggestions?.options.find((o) => !refused[o.id] && o.id !== option.id)
+        setSelected(next?.id ?? null)
         return
       }
       setDone(
@@ -122,7 +159,7 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
       if (alive.current) setAdopting(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bridge, workspaceId, suggestions, selected, onAdopted, t, locale])
+  }, [bridge, workspaceId, suggestions, selected, unusable, onAdopted, t, locale])
 
   const options = suggestions?.options ?? []
 
@@ -181,81 +218,96 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
             sentence still gets it shown rather than nothing. */}
         {suggestions?.noticeCodes?.length ? (
           <p className={styles.notice}>
-            {suggestions.noticeCodes
-              .map((code) =>
-                t(
-                  ({
-                    thin: 'reference.noticeThin',
-                    unverified: 'reference.noticeUnverified',
-                    rejected: 'reference.noticeRejected',
-                    offline: 'reference.noticeOffline',
-                  } as const)[code],
-                ),
-              )
-              .join(' ')}
+            {suggestions.noticeCodes.map((code) => t(NOTICE_KEY[code])).join(' ')}
           </p>
         ) : (
           suggestions?.notice && <p className={styles.notice}>{suggestions.notice}</p>
         )}
 
         <div className={styles.list}>
+          {/* The search takes seconds; a spinner and a full-size line say so
+              rather than leaving the panel looking empty and stuck. */}
           {searching && (
-            <p className={styles.status}>{t('reference.searchingFor', { topic })}</p>
+            <p className={styles.status} role="status" aria-live="polite">
+              <span className={styles.spinner} aria-hidden="true" />
+              {t('reference.searchingFor', { topic })}
+            </p>
           )}
 
           {!searching && options.length === 0 && (
-            <p className={styles.status}>{t('reference.empty')}</p>
+            <p className={`${styles.status} ${styles.statusQuiet}`}>{t('reference.empty')}</p>
           )}
 
           {!searching &&
-            options.map((option) => (
-              <label
-                key={option.id}
-                className={option.id === selected ? styles.cardSelected : styles.card}
-              >
-                <input
-                  type="radio"
-                  name="reference-option"
-                  className={styles.radio}
-                  checked={option.id === selected}
-                  onChange={() => setSelected(option.id)}
-                  disabled={adopting}
-                />
-                <div className={styles.cardBody}>
-                  <div className={styles.cardTop}>
-                    <span className={styles.kind} aria-hidden="true">
-                      {KIND_ICON[option.kind] ?? '📄'}
-                    </span>
-                    <span className={styles.cardTitle}>{option.title}</span>
-                  </div>
-
-                  <div className={styles.meta}>
-                    <span className={styles.publisher}>{option.source}</span>
-                    {option.verified ? (
-                      <span className={styles.badgeOk} title={t('reference.verifiedTitle')}>
-                        {t('reference.verified')}
+            options.map((option) => {
+              const refused = unusable[option.id]
+              const cardClass = refused
+                ? `${styles.card} ${styles.cardUnusable}`
+                : option.id === selected
+                  ? styles.cardSelected
+                  : styles.card
+              return (
+                <label key={option.id} className={cardClass} title={refused || undefined}>
+                  <input
+                    type="radio"
+                    name="reference-option"
+                    className={styles.radio}
+                    checked={option.id === selected}
+                    onChange={() => setSelected(option.id)}
+                    disabled={adopting || Boolean(refused)}
+                  />
+                  <div className={styles.cardBody}>
+                    <div className={styles.cardTop}>
+                      <span className={styles.kind} aria-hidden="true">
+                        {KIND_ICON[option.kind] ?? '📄'}
                       </span>
+                      <span className={styles.cardTitle}>{option.title}</span>
+                    </div>
+
+                    <div className={styles.meta}>
+                      <span className={styles.publisher}>{option.source}</span>
+                      {refused ? (
+                        <span className={styles.badgeUnusable}>{t('reference.optionUnusable')}</span>
+                      ) : option.verified ? (
+                        <span className={styles.badgeOk} title={t('reference.verifiedTitle')}>
+                          {t('reference.verified')}
+                        </span>
+                      ) : (
+                        <span className={styles.badgeWarn} title={t('reference.unverifiedTitle')}>
+                          {t('reference.unverified')}
+                        </span>
+                      )}
+                      <a
+                        className={styles.link}
+                        href={option.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {t('reference.open')} ↗
+                      </a>
+                    </div>
+
+                    {refused ? (
+                      <p className={styles.summary}>{refused}</p>
                     ) : (
-                      <span className={styles.badgeWarn} title={t('reference.unverifiedTitle')}>
-                        {t('reference.unverified')}
-                      </span>
+                      <>
+                        {option.summary && <p className={styles.summary}>{option.summary}</p>}
+                        {option.whyRelevant && <p className={styles.why}>{option.whyRelevant}</p>}
+                      </>
                     )}
-                    <a
-                      className={styles.link}
-                      href={option.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      {t('reference.open')} ↗
-                    </a>
                   </div>
+                </label>
+              )
+            })}
 
-                  {option.summary && <p className={styles.summary}>{option.summary}</p>}
-                  {option.whyRelevant && <p className={styles.why}>{option.whyRelevant}</p>}
-                </div>
-              </label>
-            ))}
+          {/* Fetching and reading a page is the slowest step in the dialog. */}
+          {adopting && (
+            <p className={styles.status} role="status" aria-live="polite">
+              <span className={styles.spinner} aria-hidden="true" />
+              {t('reference.preparing')}
+            </p>
+          )}
         </div>
 
         {error && <p className={styles.error}>{error}</p>}
