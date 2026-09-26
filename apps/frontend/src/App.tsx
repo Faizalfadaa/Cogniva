@@ -8,14 +8,16 @@ import { useLocale } from './i18n/LanguageProvider'
 import { setVoiceAvailable } from './features/teaching-session/hooks/useLearnerVoice'
 
 export default function App() {
-  const { locale } = useLocale()
+  const { sessionLocale } = useLocale()
 
   // The learner only has an English voice, so an Indonesian session runs silent.
+  // Keyed on the session's language, not the interface's: an Indonesian session
+  // stays silent even when its reader has the interface in English.
   // Wired here rather than inside the player: the player knows whether it has a
   // voice, and the language layer knows nothing about audio.
   useEffect(() => {
-    setVoiceAvailable(locale === 'en')
-  }, [locale])
+    setVoiceAvailable(sessionLocale === 'en')
+  }, [sessionLocale])
 
   return (
     <Routes>

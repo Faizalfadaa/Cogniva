@@ -47,6 +47,8 @@ export interface ReferenceSuggestionsDTO {
   source: 'search' | 'offline'
   /** Caveat to show above the list. Empty when there is nothing to disclose. */
   notice: string
+  /** `notice` as stable codes, so it can be shown in the reader's language. */
+  noticeCodes?: Array<'thin' | 'unverified' | 'rejected' | 'offline'>
 }
 
 /** Where reference material came from, when it was not an uploaded PDF. */

@@ -125,18 +125,34 @@ async function searchForReferences(args: SuggestReferencesArgs): Promise<Referen
   if (options.length === 0) {
     const offline = suggestOffline(args);
     return rejected.length > 0
-      ? { ...offline, notice: `${REJECTED_NOTICE} ${offline.notice}` }
+      ? {
+          ...offline,
+          notice: `${REJECTED_NOTICE} ${offline.notice}`,
+          noticeCodes: ["rejected", ...(offline.noticeCodes ?? [])],
+        }
       : offline;
   }
 
+  // The English sentences stay for API clients and logs; the codes let the
+  // interface show the same notices in the reader's language.
   const notices: string[] = [];
-  if (options.length < Math.min(2, limit)) notices.push(THIN_RESULT_NOTICE);
+  const noticeCodes: NonNullable<ReferenceSuggestions["noticeCodes"]> = [];
+  if (options.length < Math.min(2, limit)) {
+    notices.push(THIN_RESULT_NOTICE);
+    noticeCodes.push("thin");
+  }
   // Worth saying only when it explains something the user can see — a list that
   // came back shorter than they asked for.
-  if (rejected.length > 0 && options.length < limit) notices.push(REJECTED_NOTICE);
-  if (options.some((option) => !option.verified)) notices.push(UNVERIFIED_NOTICE);
+  if (rejected.length > 0 && options.length < limit) {
+    notices.push(REJECTED_NOTICE);
+    noticeCodes.push("rejected");
+  }
+  if (options.some((option) => !option.verified)) {
+    notices.push(UNVERIFIED_NOTICE);
+    noticeCodes.push("unverified");
+  }
 
-  return { topic, options, source: "search", notice: notices.join(" ") };
+  return { topic, options, source: "search", notice: notices.join(" "), noticeCodes };
 }
 
 /** One grounded search, shaped and filtered. `avoid` is passed on to the prompt. */

@@ -4,22 +4,22 @@ import { LOCALES, messages, type Locale, type MessageKey } from './messages'
 /**
  * The interface language, chosen by the user and remembered per browser.
  *
- * Two things use it, and they are deliberately the same setting: the words on
- * screen, and the language the AI student answers in (which the backend reads
- * from the workspace). A session where the interface is Indonesian but the
- * student replies in English would be the worst of both.
+ * There are two languages in play.
+ *
+ * The *preference* is the reader's, kept per browser. The dashboard, the public
+ * pages and everything outside a session are written in it.
+ *
+ * The *session language* belongs to a workspace and is fixed when it is
+ * created. It decides what the student says, what the report is written in and
+ * whether a voice exists. While a session's board or its evaluation is open,
+ * the whole screen is shown in that language, interface included, so a page
+ * never mixes an Indonesian conversation with English buttons or the other way
+ * round. The switch turns into a label naming it, because it cannot be changed
+ * there. Leaving restores the preference untouched.
  *
  * Nothing here is async and there is no loader: both dictionaries ship in the
  * bundle, because they are a few hundred short strings and a flash of the wrong
  * language costs more than the bytes save.
- *
- * There are two languages in play, not one. The *preference* is the user's, kept
- * per browser. The *pin* is a workspace's, set while a session is open: a
- * session is written, spoken and reported in one language, so it is shown in
- * that language whatever the reader normally prefers, and the switch goes away
- * until they leave. Leaving restores the preference untouched — opening someone
- * else's Indonesian session should not change what language your dashboard is
- * in.
  */
 
 const LOCALE_KEY = 'cogniva:locale'
@@ -47,11 +47,13 @@ function interpolate(text: string, values?: Record<string, string | number>): st
 export type Translate = (key: MessageKey, values?: Record<string, string | number>) => string
 
 interface LanguageValue {
-  /** What to render in: the pinned language when a session is open, else the preference. */
+  /** What to render in: the session's language while one is open, else the preference. */
   locale: Locale
   setLocale: (locale: Locale) => void
   /** True while a session holds the language, i.e. it cannot be changed here. */
   pinned: boolean
+  /** The open session's language, or the reader's own when no session is open. */
+  sessionLocale: Locale
   pin: (locale: Locale | null) => void
   t: Translate
 }
@@ -87,6 +89,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       locale,
       setLocale,
       pinned: pinnedLocale !== null,
+      sessionLocale: locale,
       pin,
       t: (key, values) => interpolate(messages[key][locale], values),
     }),
@@ -107,22 +110,29 @@ export function useT(): Translate {
   return useLanguage().t
 }
 
-/** The current language and a setter, for the switcher. */
+/**
+ * The current language and its setter, plus the open session's language.
+ *
+ * Inside a session the two are the same; `sessionLocale` exists so code about
+ * what the student says or whether a voice exists reads as what it means.
+ */
 export function useLocale(): {
   locale: Locale
   setLocale: (locale: Locale) => void
   pinned: boolean
+  sessionLocale: Locale
 } {
-  const { locale, setLocale, pinned } = useLanguage()
-  return { locale, setLocale, pinned }
+  const { locale, setLocale, pinned, sessionLocale } = useLanguage()
+  return { locale, setLocale, pinned, sessionLocale }
 }
 
 /**
- * Show this screen in a session's own language for as long as it is open.
+ * Show this screen entirely in a session's own language for as long as it is open.
  *
- * Pass the workspace's locale — or undefined while it is still loading, which
- * pins nothing and leaves the reader's preference in place. Unmounting releases
- * the pin, so navigating back to the dashboard returns to their own language.
+ * Pass the workspace's locale, or undefined while it is still loading, which
+ * pins nothing and leaves the reader's preference in place for that moment.
+ * Unmounting releases the pin, so navigating back to the dashboard returns to
+ * their own language.
  */
 export function usePinnedLocale(locale: Locale | undefined): void {
   const { pin } = useLanguage()

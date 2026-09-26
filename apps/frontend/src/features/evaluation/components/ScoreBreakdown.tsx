@@ -103,7 +103,7 @@ export function ScoreBreakdown({
                       <div
                         className={styles.axisBar}
                         role="img"
-                        aria-label={`${axis.label}: ${axis.value} / 100`}
+                        aria-label={t('evaluation.axisOutOf100', { label: axis.label, value: axis.value })}
                       >
                         <div className={styles.axisBarFill} style={{ width: `${axis.value}%` }} />
                       </div>

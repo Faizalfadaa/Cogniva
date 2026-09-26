@@ -125,5 +125,5 @@ export function suggestOffline(args: SuggestReferencesArgs): ReferenceSuggestion
     trust: library.trust,
   }));
 
-  return { topic, options, source: "offline", notice: NOTICE };
+  return { topic, options, source: "offline", notice: NOTICE, noticeCodes: ["offline"] };
 }

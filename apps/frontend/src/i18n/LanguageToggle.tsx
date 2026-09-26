@@ -48,14 +48,16 @@ const optionActive: CSSProperties = {
 }
 
 export function LanguageToggle({ style }: { style?: CSSProperties }) {
-  const { locale, setLocale, pinned } = useLocale()
+  const { locale, setLocale, pinned, sessionLocale } = useLocale()
   const t = useT()
 
+  // Inside a session the label names the session's language, the one the whole
+  // screen is shown in and that cannot be changed there.
   if (pinned) {
     return (
       <LocaleBadge
-        locale={locale}
-        title={t('common.languageLocked', { language: LOCALE_LABELS[locale] })}
+        locale={sessionLocale}
+        title={t('common.languageLocked', { language: LOCALE_LABELS[sessionLocale] })}
         style={style}
       />
     )

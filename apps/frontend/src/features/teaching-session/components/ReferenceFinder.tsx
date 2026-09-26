@@ -177,7 +177,26 @@ export function ReferenceFinder({ workspaceId, topic, onClose, onAdopted }: Refe
           </button>
         </div>
 
-        {suggestions?.notice && <p className={styles.notice}>{suggestions.notice}</p>}
+        {/* Coded notices are translated; a server that only sends the English
+            sentence still gets it shown rather than nothing. */}
+        {suggestions?.noticeCodes?.length ? (
+          <p className={styles.notice}>
+            {suggestions.noticeCodes
+              .map((code) =>
+                t(
+                  ({
+                    thin: 'reference.noticeThin',
+                    unverified: 'reference.noticeUnverified',
+                    rejected: 'reference.noticeRejected',
+                    offline: 'reference.noticeOffline',
+                  } as const)[code],
+                ),
+              )
+              .join(' ')}
+          </p>
+        ) : (
+          suggestions?.notice && <p className={styles.notice}>{suggestions.notice}</p>
+        )}
 
         <div className={styles.list}>
           {searching && (
