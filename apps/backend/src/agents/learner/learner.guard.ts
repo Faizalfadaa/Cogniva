@@ -20,6 +20,13 @@ import {
   probeKey,
   recordProbe
 } from "./learner.repeat";
+import {
+  backToLessonText,
+  boundaryText,
+  isDrillExhausted,
+  nextFollowUpDepth,
+  teacherSetBoundary
+} from "./learner.depth";
 
 const allowedResponseTypes: LearnerResponseType[] = [
   "question",
@@ -111,13 +118,17 @@ export function normalizeLearnerOutput(
       ? "extend"
       : "probe";
 
+  // Whether this question asks how the teacher's own answer works. The model
+  // says so; learner.depth.ts counts it.
+  const followsUp = raw.response?.followsUp === true;
+
   // The response is settled first: the repeat limit can turn a third question
   // into "I get it, let's move on", and the state has to count what was
   // actually said, not what the model proposed.
-  const response = normalizeResponse(raw.response, input, kind);
+  const response = normalizeResponse(raw.response, input, kind, followsUp);
 
   return {
-    nextState: normalizeState(raw.nextState, input, response, kind),
+    nextState: normalizeState(raw.nextState, input, response, kind, followsUp),
     response
   };
 }
@@ -126,7 +137,8 @@ function normalizeState(
   state: Partial<LearnerState> | undefined,
   input: LearnerAgentInput,
   response: LearnerResponse,
-  kind: AskedConceptKind
+  kind: AskedConceptKind,
+  followsUp = false
 ): LearnerState {
   return {
     sessionId: input.sessionId,
@@ -147,6 +159,7 @@ function normalizeState(
       input.currentState.questionsAsked
     ),
     askedConcepts: nextAskedConcepts(input, response, kind),
+    followUpDepth: nextFollowUpDepth(input.currentState, response, followsUp),
     updatedAtTurn: input.turnIndex
   };
 }
@@ -178,7 +191,8 @@ function nextAskedConcepts(
 function normalizeResponse(
   response: LearnerLLMOutput["response"] | undefined,
   input: LearnerAgentInput,
-  kind: AskedConceptKind = "probe"
+  kind: AskedConceptKind = "probe",
+  followsUp = false
 ): LearnerResponse {
   const safeType = getSafeResponseType(response?.type);
   const safeDerivedFrom = getSafeDerivedFrom(response?.derivedFrom);
@@ -196,6 +210,18 @@ function normalizeResponse(
     typeof response?.targetConcept === "string"
       ? response.targetConcept.trim()
       : undefined;
+
+  // The teacher just said they can't take this further. Another question,
+  // however it is worded, would be the student ignoring that (learner.depth.ts).
+  if (isProbingType(safeType) && teacherSetBoundary(input.teachingText)) {
+    return acknowledgment(input, boundaryText(input.teachingText), targetConcept);
+  }
+
+  // The last reply already asked how the teacher's own answer works. A second
+  // one in a row walks the lesson away from the material (learner.depth.ts).
+  if (isProbingType(safeType) && followsUp && isDrillExhausted(input.currentState)) {
+    return acknowledgment(input, backToLessonText(input.teachingText), targetConcept);
+  }
 
   // Two questions on this concept have already been answered. Asking a third
   // time is what leaves the user stuck, so the student takes the explanation as
@@ -350,6 +376,22 @@ function normalizeMisconceptions(
       belief: item.belief.trim()
     }))
     .filter((item) => item.concept && item.belief);
+}
+
+/** The student letting a question go and handing the floor back. */
+function acknowledgment(
+  input: LearnerAgentInput,
+  text: string,
+  targetConcept: string | undefined
+): LearnerResponse {
+  return {
+    responseId: createId("lr"),
+    turnIndex: input.turnIndex,
+    type: "acknowledgment",
+    text,
+    targetConcept,
+    derivedFrom: "new_info"
+  };
 }
 
 function createDefaultQuestion(input: LearnerAgentInput): string {

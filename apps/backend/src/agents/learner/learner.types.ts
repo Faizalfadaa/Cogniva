@@ -34,6 +34,13 @@ export type LearnerState = {
    * the model never fills this in — the guard does.
    */
   askedConcepts?: AskedConcept[];
+  /**
+   * How many questions in a row have asked how the teacher's own previous
+   * answer works, rather than about the lesson (see learner.depth.ts). Optional
+   * for the same reason as `askedConcepts`, and kept by the guard, never by the
+   * model.
+   */
+  followUpDepth?: number;
   updatedAtTurn: number;
 };
 
@@ -71,6 +78,13 @@ export type LearnerAgentInput = {
    * The student's current state. For the first turn, use createInitialLearnerState().
    */
   currentState: LearnerState;
+
+  /**
+   * The name of the character the user picked, which the student gives when
+   * asked. Absent outside a workspace (the bare session API has no character),
+   * and the prompt then falls back to its own name.
+   */
+  learnerName?: string;
 
   /** Names of the tools allowed this turn (filled by the agent loop). */
   availableTools?: string[];
@@ -137,6 +151,12 @@ export type LearnerLLMOutput = {
     text: string;
     targetConcept?: string;
     derivedFrom: LearnerResponseDerivedFrom;
+    /**
+     * True when the question asks how or why the teacher's previous answer
+     * itself works, rather than about the lesson material. The model reports
+     * it; the guard does the counting (learner.depth.ts).
+     */
+    followsUp?: boolean;
   };
 };
 

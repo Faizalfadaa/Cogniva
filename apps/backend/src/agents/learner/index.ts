@@ -20,6 +20,7 @@ import type { SpeechTranscript } from "../../contracts/speech.js";
 import type { Timeline } from "../../contracts/timeline.js";
 import { narrate } from "./narration.js";
 import { runLearnerTurn } from "./learner.agent.js";
+import { EARLIER_BOARD_HEADING } from "./learner.depth.js";
 import type { LearnerTools } from "./learner.types";
 
 export type { LearnerTools } from "./learner.types";
@@ -40,6 +41,8 @@ export interface RespondArgs {
   onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void;
   /** When each board change was made, on the audio clip's clock (see narration.ts). */
   timeline?: Timeline;
+  /** The character's name, which the student answers to (see LearnerAgentInput). */
+  learnerName?: string;
 }
 
 /**
@@ -178,7 +181,7 @@ export function composeTeachingText(
   if (lined) sections.push(lined);
   if (board) {
     sections.push(
-      `The whole board as it stands now, including earlier material (context, not what was just taught):\n${board}`,
+      `${EARLIER_BOARD_HEADING}, including earlier material (context, not what was just taught):\n${board}`,
     );
   }
   return sections.join("\n\n");
@@ -200,11 +203,12 @@ export class LearnerAgent {
     tools,
     onUsage,
     timeline,
+    learnerName,
   }: RespondArgs): Promise<[LearnerResponse, LearnerState]> {
     const teachingText = composeTeachingText(interpretation, speech, timeline);
 
     const output = await runLearnerTurn(
-      { sessionId: state.sessionId, turnIndex, teachingText, currentState: state },
+      { sessionId: state.sessionId, turnIndex, teachingText, currentState: state, learnerName },
       { useMock: this.options.forceMock, tools, onUsage },
     );
 
