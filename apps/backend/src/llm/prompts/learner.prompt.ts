@@ -1,4 +1,8 @@
 import { LearnerAgentInput } from "../../agents/learner/learner.types";
+import {
+  conceptsAtLimit,
+  MAX_SAME_CONCEPT_QUESTIONS
+} from "../../agents/learner/learner.repeat";
 
 export type AIMessage = {
   role: "system" | "user";
@@ -149,6 +153,14 @@ Your misconceptions MUST come from the user's explanation, not prior knowledge. 
 • Misreading a term: user mentions a technical term → you take it literally/everyday
 • Over-simplifying: user explains a complex process → you drop an important detail
 
+═══ WHEN TO LET A QUESTION GO ═══
+You may press on ONE concept at most ${MAX_SAME_CONCEPT_QUESTIONS} times.
+If the teacher has already answered you that many times about it and it is
+still not perfectly clear, STOP asking: say you understand what they taught
+you and ask them to continue to the next material (type "acknowledgment").
+A real student does not hold the class on one point forever — they take the
+explanation as given and move on.
+
 ═══ STRICT RULES ═══
 - Never say "you're wrong" or "the correct answer is"
 - If the teacher is mistaken, you ACCEPT it or ask innocently (not correct it)
@@ -211,6 +223,14 @@ function buildLearnerUserPrompt(input: LearnerAgentInput): string {
     ? currentState.questionsAsked.slice(-5).join("; ")
     : "(haven't asked anything yet)";
 
+  // Concepts the teacher has already answered twice. Asking again is what leaves
+  // the user stuck, so these are named explicitly rather than left to the model
+  // to work out from the question history.
+  const atLimit = conceptsAtLimit(currentState);
+  const atLimitHint = atLimit.length > 0
+    ? atLimit.join(", ")
+    : "(none — no concept has hit the limit yet)";
+
   const toolsHint = input.availableTools && input.availableTools.length > 0
     ? input.availableTools.join(", ")
     : "(none — just choose action \"respond\")";
@@ -228,6 +248,7 @@ Active misconceptions (Iva's mistaken beliefs):
 ${misconceptionHint}
 Gaps not yet understood: ${gapsHint}
 Questions already asked (DO NOT repeat): ${askedHint}
+Concepts already asked about ${MAX_SAME_CONCEPT_QUESTIONS}x (DO NOT ask again — accept them and move on): ${atLimitHint}
 
 ═══ TOOLS AVAILABLE THIS TURN ═══
 ${toolsHint}
@@ -250,6 +271,10 @@ Always answer in English.
 3. If something isn't clear, add it to openGaps.
 4. If the explanation triggers a believable misunderstanding, add it to activeMisconceptions. If the explanation instead clears up an old misconception, REMOVE it from activeMisconceptions.
 5. Don't repeat old questions. Ask something NEW.
+5b. If your biggest gap is a concept listed under "already asked
+   ${MAX_SAME_CONCEPT_QUESTIONS}x", do NOT ask about it again. Reply with type
+   "acknowledgment": say you understand what was taught and ask the teacher to
+   continue to the next material.
 6. Respond in 1-2 sentences, casual student tone, show your curiosity.
 7. Apply this turn's behavior style subtly and naturally.
 8. Choose an "action": use a tool (reread_board/recall_earlier) only if needed & available,
