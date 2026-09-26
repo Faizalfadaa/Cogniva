@@ -1,0 +1,1455 @@
+/* Inner marketing pages: Product, Students, Debrief, Pricing, Technology, About.
+
+   The nav, footer and landing sections keep their original styles in
+   styles/LandingPage.module.css; this module only adds the building blocks the
+   inner pages need, drawn in the same language: the app's display face
+   (Fredoka) for headings, mono uppercase labels, forest / lime / cream
+   surfaces, 20px cards and pill buttons.
+
+   Colour flips on dark and lime surfaces are done with an ancestor class
+   (.onDark, .onLime) rather than a second copy of every text class. */
+.root {
+  --mk-max: 1180px;
+  --mk-gutter: 28px;
+
+  --mk-ink: var(--text-primary);
+  --mk-body: var(--text-secondary);
+  --mk-muted: var(--text-muted);
+  --mk-faint: #b6ae9a;
+  --mk-bg: var(--page-bg);
+  --mk-cream: var(--cream);
+  --mk-cream-edge: var(--border-cream);
+  --mk-paper: #fffdf6;
+  --mk-card-edge: var(--border-warm);
+  --mk-rule: #e6e0d0;
+  --mk-sand: var(--border-sand);
+  --mk-parchment: var(--parchment);
+  --mk-soft: var(--divider-warm);
+  --mk-forest: var(--forest-dark);
+  --mk-forest-2: var(--forest-mid);
+  --mk-forest-edge: #3c4a26;
+  --mk-on-forest: var(--text-on-forest);
+  --mk-on-forest-text: var(--text-on-dark);
+  --mk-on-forest-body: var(--text-on-forest-muted);
+  --mk-on-forest-muted: #9aab6a;
+  --mk-on-forest-faint: #8b9a6a;
+  --mk-on-forest-dim: var(--text-on-forest-faint);
+  --mk-lime: var(--lime);
+  --mk-lime-hover: var(--lime-hover);
+  --mk-lime-edge: var(--lime-edge);
+  --mk-green: var(--green-accent);
+  --mk-green-deep: var(--green-deep);
+  --mk-link-edge: #c8d98a;
+
+  --mk-display: var(--font-display);
+  --mk-sans: var(--font-body);
+  --mk-mono: var(--font-mono);
+  --mk-ease: var(--ease-out);
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.root :focus-visible {
+  outline: 2px solid var(--mk-green-deep);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.onDark :focus-visible {
+  outline-color: var(--mk-lime);
+}
+
+@media (max-width: 600px) {
+  .root {
+    --mk-gutter: 18px;
+  }
+}
+
+/* ─── Sections ─── */
+.bgPage {
+  background: var(--mk-bg);
+}
+
+.bgCream {
+  background: var(--mk-cream);
+  border-top: 1px solid var(--mk-cream-edge);
+  border-bottom: 1px solid var(--mk-cream-edge);
+}
+
+.bgForest {
+  background: var(--mk-forest);
+}
+
+.bgLime {
+  background: var(--mk-lime);
+}
+
+.container {
+  max-width: var(--mk-max);
+  margin: 0 auto;
+  padding: 88px var(--mk-gutter);
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.gapLg {
+  gap: 44px;
+}
+
+.gapMd {
+  gap: 28px;
+}
+
+.split {
+  max-width: var(--mk-max);
+  margin: 0 auto;
+  padding: 88px var(--mk-gutter);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px;
+}
+
+.col {
+  flex: 1 1 440px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.colSide {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Page heroes: title and lead on the left, jump links on the right. */
+.pageHero {
+  max-width: var(--mk-max);
+  margin: 0 auto;
+  padding: 76px var(--mk-gutter);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px;
+  align-items: flex-end;
+}
+
+.pageHeroMain {
+  flex: 1 1 520px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.jumpLinks {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+/* ─── Type ─── */
+.eyebrow {
+  font: 500 11px/1.3 var(--mk-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mk-muted);
+}
+
+.h1 {
+  margin: 0;
+  font: 800 clamp(34px, 4.8vw, 56px) / 1.04 var(--mk-display);
+  letter-spacing: -0.03em;
+  color: var(--mk-ink);
+  text-wrap: balance;
+}
+
+.h2 {
+  margin: 0;
+  font: 800 clamp(30px, 3.6vw, 44px) / 1.08 var(--mk-display);
+  letter-spacing: -0.025em;
+  color: var(--mk-ink);
+  text-wrap: balance;
+}
+
+.h2Lg {
+  font-size: clamp(30px, 3.6vw, 44px);
+}
+
+.h3 {
+  margin: 0;
+  font: 700 19px/1.25 var(--mk-display);
+  color: var(--mk-ink);
+}
+
+.h3Sm {
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.h3Lg {
+  margin: 0;
+  font: 800 26px/1.2 var(--mk-display);
+  letter-spacing: -0.02em;
+  color: var(--mk-ink);
+}
+
+.lead {
+  margin: 0;
+  max-width: 620px;
+  font: 400 17px/1.7 var(--mk-sans);
+  color: var(--mk-body);
+  text-wrap: pretty;
+}
+
+.text {
+  margin: 0;
+  font: 400 15.5px/1.75 var(--mk-sans);
+  color: var(--mk-body);
+  text-wrap: pretty;
+}
+
+.small {
+  margin: 0;
+  font: 400 14.5px/1.7 var(--mk-sans);
+  color: var(--mk-body);
+  text-wrap: pretty;
+}
+
+.inkText {
+  color: var(--mk-ink);
+}
+
+.note {
+  margin: 0;
+  font: 500 12.5px/1.6 var(--mk-mono);
+  color: var(--mk-faint);
+}
+
+.tag {
+  font: 700 10.5px/1.3 var(--mk-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mk-green);
+}
+
+.num {
+  font: 800 13px/1 var(--mk-display);
+  color: var(--mk-faint);
+}
+
+.mono {
+  font-family: var(--mk-mono);
+}
+
+.italic {
+  font-style: italic;
+}
+
+.cardTitle {
+  font: 700 15px/1.3 var(--mk-display);
+  color: var(--mk-ink);
+}
+
+.onDark .eyebrow {
+  color: var(--mk-on-forest-muted);
+}
+
+.onDark .h1,
+.onDark .h2,
+.onDark .h3,
+.onDark .h3Lg,
+.onDark .cardTitle {
+  color: var(--mk-on-forest);
+}
+
+.onDark .lead,
+.onDark .text,
+.onDark .small {
+  color: var(--mk-on-forest-body);
+}
+
+.onDark .inkText {
+  color: var(--mk-on-forest-text);
+}
+
+.onDark .note {
+  color: var(--mk-on-forest-dim);
+}
+
+.onDark .tag,
+.onDark .num {
+  color: var(--mk-lime);
+}
+
+.onLime .h2,
+.onLime .h3,
+.onLime .h3Lg,
+.onLime .text,
+.onLime .inkText {
+  color: var(--mk-forest);
+}
+
+.onLime .tag {
+  color: var(--mk-green-deep);
+}
+
+/* ─── Section heads ─── */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.headMain {
+  flex: 1 1 420px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.headAside {
+  flex: 1 1 320px;
+  max-width: 400px;
+}
+
+.headStack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 680px;
+}
+
+/* ─── Links and buttons ─── */
+.link {
+  align-self: flex-start;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--mk-link-edge);
+  font: 700 14px/1.3 var(--mk-sans);
+  color: var(--mk-green-deep);
+  text-decoration: none;
+  transition: color var(--dur-fast), border-color var(--dur-fast);
+}
+
+.link:hover {
+  color: var(--mk-forest);
+  border-bottom-color: var(--mk-lime);
+}
+
+.jumpLinks .link {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.onDark .link {
+  color: var(--mk-lime);
+  border-bottom-color: var(--mk-forest-edge);
+}
+
+.btnLime,
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  font: 700 15px/1 var(--mk-sans);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
+}
+
+.btnLime {
+  padding: 16px 26px;
+  border: none;
+  background: var(--mk-lime);
+  color: var(--mk-forest);
+  box-shadow: 0 2px 0 var(--mk-lime-edge);
+}
+
+.btnLime:hover {
+  background: var(--mk-lime-hover);
+}
+
+.btnGhost {
+  padding: 15px 24px;
+  border: 1.5px solid var(--mk-sand);
+  background: transparent;
+  color: var(--mk-body);
+}
+
+.btnGhost:hover {
+  border-color: var(--mk-forest);
+  color: var(--mk-forest);
+}
+
+.btnSm {
+  padding: 13px 22px;
+  font-size: 14px;
+}
+
+.btnSm.btnGhost {
+  padding: 12px 21px;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ─── Grids and cards ─── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--min, 258px)), 1fr));
+  gap: 20px;
+}
+
+.gridTight {
+  gap: 16px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Same surface as the landing page's step and belief cards. */
+.card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 26px 24px 28px;
+  border: 1px solid var(--mk-card-edge);
+  border-radius: 20px;
+  background: var(--card-bg);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+
+.cardPaper {
+  border-color: var(--mk-cream-edge);
+  background: var(--mk-paper);
+}
+
+.cardCream {
+  border-color: var(--mk-cream-edge);
+  background: var(--mk-cream);
+}
+
+.cardParchment {
+  border-color: transparent;
+  background: var(--mk-parchment);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  gap: 7px;
+}
+
+/* Inside a forest section: the landing page's student card surface. */
+.cardForest {
+  border-color: transparent;
+  background: var(--mk-forest-2);
+  border-radius: var(--radius-xl);
+}
+
+/* A dark card sitting in a light section; pair with .onDark. */
+.cardDark {
+  border-color: var(--mk-forest);
+  background: var(--mk-forest);
+}
+
+.cardLime {
+  border-color: var(--mk-lime);
+  background: var(--mk-lime);
+}
+
+.cardLg {
+  padding: 34px 36px;
+  border-radius: var(--radius-xl);
+}
+
+.cardMd {
+  padding: 32px 34px;
+  border-radius: var(--radius-xl);
+}
+
+.cardRow {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 32px;
+}
+
+.cardRowTight {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.alignCenter {
+  align-items: center;
+}
+
+.cardCol {
+  flex: 1 1 340px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .cardLg,
+  .cardMd {
+    padding: 26px 22px;
+  }
+}
+
+/* ─── Rows ─── */
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding: 22px 0;
+  border-top: 1px solid var(--mk-rule);
+}
+
+.rowCream {
+  border-top-color: var(--mk-cream-edge);
+}
+
+.onDark .row {
+  border-top-color: var(--mk-forest-2);
+}
+
+.rowKey {
+  flex: 0 0 200px;
+  font: 700 15px/1.35 var(--mk-display);
+  color: var(--mk-ink);
+}
+
+.rowKeyNumbered {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.rowVal {
+  flex: 1 1 420px;
+  max-width: 740px;
+  margin: 0;
+  font: 400 15px/1.75 var(--mk-sans);
+  color: var(--mk-body);
+  text-wrap: pretty;
+}
+
+.rowMono {
+  flex: 0 0 250px;
+  font: 500 12.5px/1.6 var(--mk-mono);
+  color: var(--mk-body);
+}
+
+.rowNo {
+  font: 800 13px/1 var(--mk-display);
+  color: var(--mk-faint);
+}
+
+@media (max-width: 640px) {
+  .rowKey,
+  .rowMono {
+    flex-basis: 100%;
+  }
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--mk-parchment);
+  font: 500 11.5px/1.2 var(--mk-mono);
+  color: var(--mk-muted);
+}
+
+.onDark .chip {
+  background: var(--mk-forest-2);
+  color: var(--mk-on-forest-body);
+}
+
+.monoLines {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.monoLine {
+  font: 500 12px/1.6 var(--mk-mono);
+  color: var(--mk-on-forest-muted);
+}
+
+/* ─── FAQ: the landing page's accordion ─── */
+.faqList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+  width: 100%;
+}
+
+.faqItem {
+  overflow: hidden;
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-lg);
+  background: var(--card-bg);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.faqItem:hover {
+  border-color: var(--border-sand);
+}
+
+.faqItemOpen {
+  border-color: var(--border-sand);
+  box-shadow: 0 8px 24px rgba(30, 45, 8, 0.07);
+}
+
+.faqQ {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border: none;
+  background: none;
+  font: 700 15px/1.35 var(--font-display);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.faqQText {
+  flex: 1;
+}
+
+.faqChevron {
+  flex: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.faqItemOpen .faqChevron {
+  transform: rotate(180deg);
+}
+
+.faqA {
+  margin: 0;
+  padding: 0 20px 18px;
+  font: 400 14px/1.65 var(--font-body);
+  color: var(--text-secondary);
+}
+
+/* ─── Shared bits used by several pages ─── */
+.bigValue {
+  font: 800 30px/1 var(--mk-display);
+  color: var(--mk-lime);
+}
+
+.pill {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--pill-bg);
+  font: 700 10.5px/1 var(--mk-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pill-fg);
+}
+
+.warnCard {
+  border-color: #f0cdc4;
+  background: #fbe3dd;
+}
+
+.numberedLine {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.numberedLine .mono {
+  flex: none;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--mk-faint);
+}
+
+.numberedLine span:last-child {
+  font: 600 14.5px/1.6 var(--mk-sans);
+  color: var(--mk-ink);
+}
+
+/* ─── Students ─── */
+.castSide {
+  flex: 0 0 168px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.castPortrait {
+  width: 132px;
+  height: 132px;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  object-position: top center;
+  background: var(--tint);
+}
+
+.castTrait {
+  font: 700 10.5px/1.3 var(--mk-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--ink);
+}
+
+.castMain {
+  flex: 1 1 420px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.castName {
+  margin: 0;
+  font: 800 30px/1.1 var(--mk-display);
+  letter-spacing: -0.025em;
+  color: var(--mk-ink);
+}
+
+.castQuote {
+  max-width: 520px;
+  padding: 16px 20px;
+  border-left: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--mk-cream);
+}
+
+.castQuote p {
+  margin: 0;
+  font: italic 400 16.5px/1.7 var(--mk-sans);
+  color: var(--mk-ink);
+}
+
+@media (max-width: 640px) {
+  .castSide {
+    flex-basis: 100%;
+  }
+}
+
+/* ─── Debrief ─── */
+.scoreCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 30px 32px;
+  border-radius: var(--radius-xl);
+  background: var(--mk-forest-2);
+}
+
+.scoreRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.bigScore {
+  font: 800 68px/1 var(--mk-display);
+  letter-spacing: -0.03em;
+  color: var(--score, var(--mk-lime));
+}
+
+.scoreOf {
+  font: 500 18px/1 var(--mk-sans);
+  color: var(--mk-on-forest-faint);
+}
+
+.verdicts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.verdict strong {
+  font: 800 22px/1 var(--mk-display);
+  color: var(--verdict, var(--mk-lime));
+}
+
+.verdict span {
+  font: 500 12px/1.2 var(--mk-sans);
+  color: var(--mk-on-forest-muted);
+}
+
+.axis {
+  align-items: center;
+}
+
+.axisHead {
+  flex: 0 0 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.axisName {
+  font: 700 18px/1.2 var(--mk-display);
+  color: var(--mk-ink);
+}
+
+.axisMeasure {
+  font: 500 12.5px/1.4 var(--mk-sans);
+  color: var(--mk-muted);
+}
+
+.axisBarCol {
+  flex: 1 1 280px;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bar {
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--mk-soft);
+}
+
+.barFill {
+  width: var(--w);
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--c);
+}
+
+.axisValue {
+  flex: 0 0 62px;
+  text-align: right;
+  font: 800 26px/1 var(--mk-display);
+  letter-spacing: -0.02em;
+  color: var(--mk-ink);
+}
+
+.quoteBar {
+  padding: 4px 0 4px 20px;
+  border-left: 2px solid #e4d9ba;
+}
+
+.nextTip {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 18px 20px;
+  border-radius: var(--radius-lg);
+  background: var(--mk-parchment);
+}
+
+.nextIcon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  border-radius: 6px;
+  background: var(--mk-lime);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 12px/1 var(--mk-sans);
+  color: var(--mk-forest);
+}
+
+.letterCard {
+  flex: 1 1 360px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--mk-card-edge);
+  border-radius: var(--radius-xl);
+  background: var(--card-bg);
+}
+
+.letterHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--mk-cream-edge);
+  background: var(--mk-cream);
+}
+
+.letterAvatar {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  object-position: top center;
+  background: #dfe8c0;
+}
+
+.letterBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 26px 28px;
+}
+
+.letterBody p {
+  margin: 0;
+  font: 400 15.5px/1.8 var(--mk-sans);
+  color: var(--mk-ink);
+  text-wrap: pretty;
+}
+
+.letterBody .letterSign {
+  font-style: italic;
+  color: var(--mk-body);
+}
+
+/* ─── Pricing ─── */
+.billing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--mk-soft);
+}
+
+.billingTab {
+  min-height: 36px;
+  padding: 9px 18px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font: 600 12.5px/1 var(--mk-sans);
+  color: #8a8272;
+  cursor: pointer;
+  transition: all var(--dur-base) var(--ease-out);
+}
+
+.billingTabOn {
+  background: var(--card-bg);
+  color: var(--mk-ink);
+  box-shadow: 0 1px 2px rgba(30, 45, 8, 0.12);
+}
+
+.centerHero {
+  max-width: var(--mk-max);
+  margin: 0 auto;
+  padding: 76px var(--mk-gutter) 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+}
+
+.centerHero .h1 {
+  max-width: 760px;
+}
+
+.centerHero .lead {
+  max-width: 580px;
+}
+
+.plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 32px 30px 34px;
+  border: 1px solid var(--mk-card-edge);
+  border-radius: var(--radius-xl);
+  background: var(--card-bg);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+
+.plan:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 34px rgba(30, 45, 8, 0.1);
+}
+
+.planDark {
+  border-color: var(--mk-forest);
+  background: var(--mk-forest);
+  box-shadow: 0 26px 60px -34px rgba(30, 45, 8, 0.6);
+}
+
+.planDark:hover {
+  box-shadow: 0 30px 66px -30px rgba(30, 45, 8, 0.66);
+}
+
+.planBadge {
+  position: absolute;
+  top: -11px;
+  left: 30px;
+  padding: 6px 13px;
+  border-radius: var(--radius-pill);
+  background: var(--mk-lime);
+  font: 700 10.5px/1 var(--mk-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mk-forest);
+}
+
+.planHead {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planName {
+  margin: 0;
+  font: 700 21px/1 var(--mk-display);
+  color: var(--mk-ink);
+}
+
+.planTag {
+  margin: 0;
+  font: 400 13.5px/1.6 var(--mk-sans);
+  color: var(--mk-muted);
+}
+
+.priceBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.priceRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 7px;
+}
+
+.price {
+  font: 800 40px/1 var(--mk-display);
+  letter-spacing: -0.02em;
+  color: var(--mk-ink);
+  white-space: nowrap;
+}
+
+.priceSm {
+  font-size: 30px;
+}
+
+.priceUnit,
+.priceNote {
+  font: 500 13.5px/1.2 var(--mk-sans);
+  color: var(--mk-muted);
+}
+
+.priceNote {
+  font-size: 12px;
+}
+
+.planRule {
+  height: 1px;
+  background: var(--mk-soft);
+}
+
+.planCta {
+  text-align: center;
+  width: 100%;
+}
+
+.features {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font: 400 14px/1.6 var(--mk-sans);
+  color: var(--mk-ink);
+}
+
+.tick {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  border-radius: 5px;
+  background: #e9ffa8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 10px/1 var(--mk-sans);
+  color: var(--mk-green-deep);
+}
+
+.btnOutline {
+  border-color: var(--mk-forest);
+  color: var(--mk-forest);
+}
+
+.btnOutline:hover {
+  background: var(--mk-forest);
+  color: var(--mk-on-forest);
+}
+
+.onDark .planName {
+  color: var(--mk-on-forest);
+}
+
+.onDark .planTag,
+.onDark .priceUnit,
+.onDark .priceNote {
+  color: var(--mk-on-forest-muted);
+}
+
+.onDark .price {
+  color: var(--mk-lime);
+}
+
+.onDark .planRule {
+  background: var(--mk-forest-2);
+}
+
+.onDark .feature {
+  color: var(--mk-on-forest-text);
+}
+
+.onDark .tick {
+  background: var(--mk-lime);
+  color: var(--mk-forest);
+}
+
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 28px;
+  border: 1px solid var(--mk-cream-edge);
+  border-radius: 20px;
+  background: var(--mk-cream);
+}
+
+.noticeIcon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  background: #ffe8a8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 800 16px/1 var(--mk-display);
+  color: #6b4e00;
+}
+
+.notice p {
+  flex: 1 1 420px;
+}
+
+/* Comparison tables: real tables, scrolled inside their own box on phones. */
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+}
+
+.table th {
+  padding: 0 16px 14px 0;
+  text-align: left;
+  font: 700 10.5px/1.3 var(--mk-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mk-muted);
+}
+
+.table th.tableHighlight {
+  color: var(--mk-green-deep);
+}
+
+.table td {
+  padding: 16px 16px 16px 0;
+  border-top: 1px solid var(--mk-cream-edge);
+  font: 400 14px/1.5 var(--mk-sans);
+  color: var(--mk-body);
+  vertical-align: top;
+}
+
+.table td:first-child {
+  font-weight: 600;
+  font-size: 14.5px;
+  color: var(--mk-ink);
+}
+
+.table td.tableHighlight {
+  font-weight: 600;
+  color: var(--mk-green-deep);
+}
+
+.market {
+  display: flex;
+  flex-direction: column;
+}
+
+.marketRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 20px 22px;
+  border-top: 1px solid var(--mk-forest-2);
+  border-radius: var(--radius-lg);
+}
+
+.marketName {
+  flex: 1 1 260px;
+  font: 700 15.5px/1.4 var(--mk-display);
+  color: var(--mk-on-forest);
+}
+
+.marketPrice {
+  flex: 0 0 190px;
+  font: 500 13.5px/1.5 var(--mk-mono);
+  color: var(--mk-on-forest-muted);
+}
+
+.marketWhat {
+  flex: 1 1 320px;
+  max-width: 420px;
+  font: 400 14.5px/1.6 var(--mk-sans);
+  color: var(--mk-on-forest-body);
+}
+
+.marketOurs {
+  border-top-color: transparent;
+  background: var(--mk-lime);
+}
+
+.marketOurs .marketName,
+.marketOurs .marketWhat {
+  color: var(--mk-forest);
+}
+
+.marketOurs .marketPrice {
+  color: var(--mk-green-deep);
+}
+
+/* ─── Technology ─── */
+.layerHead {
+  flex: 0 0 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.layerName {
+  font: 700 19px/1.2 var(--mk-display);
+  color: var(--mk-ink);
+}
+
+.onDark .layerName {
+  color: var(--mk-lime);
+}
+
+.layerTech {
+  font: 500 11.5px/1.4 var(--mk-mono);
+  color: var(--mk-muted);
+}
+
+.onDark .layerTech {
+  color: var(--mk-on-forest-faint);
+}
+
+.agentMakes {
+  flex: 1 1 280px;
+  max-width: 420px;
+}
+
+.agentMeta {
+  flex: 1 1 220px;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dimTag {
+  font: 700 10px/1.3 var(--mk-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mk-on-forest-dim);
+}
+
+.vocabRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.vocabStep {
+  flex: 0 0 148px;
+  font: 500 12px/1.5 var(--mk-mono);
+  color: var(--mk-lime);
+}
+
+.pipe {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  padding: 18px 22px;
+  border-radius: var(--radius-lg);
+}
+
+.pipeStage {
+  flex: 0 0 120px;
+  font: 700 13.5px/1.4 var(--mk-display);
+  color: var(--mk-ink);
+}
+
+.pipeSpec {
+  flex: 1 1 140px;
+  font: 500 12.5px/1.6 var(--mk-mono);
+  color: var(--mk-body);
+}
+
+/* ─── About ─── */
+.timelineHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.statCard {
+  gap: 7px;
+}
+
+.statCardValue {
+  font: 800 26px/1 var(--mk-display);
+  letter-spacing: -0.02em;
+  color: var(--mk-ink);
+}
+
+.onDark .statCardValue {
+  color: var(--mk-lime);
+}
+
+.gapTitle {
+  flex: 0 0 230px;
+  font: 700 15px/1.4 var(--mk-display);
+  color: var(--mk-lime);
+}
+
+.futureItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.futureNo {
+  flex: none;
+  font: 800 13px/1.5 var(--mk-display);
+  color: var(--mk-on-forest-dim);
+}
+
+.futureText {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.futureTitle {
+  font: 700 14.5px/1.35 var(--mk-display);
+  color: var(--mk-on-forest);
+}
+
+.infoCol {
+  flex: 1 1 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+@media (max-width: 640px) {
+  .layerHead,
+  .gapTitle,
+  .vocabStep,
+  .pipeStage {
+    flex-basis: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .plan,
+  .faqItem,
+  .faqChevron,
+  .billingTab {
+    transition: none;
+  }
+
+  .plan:hover {
+    transform: none;
+  }
+}
