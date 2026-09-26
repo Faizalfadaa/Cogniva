@@ -37,6 +37,8 @@ export interface DirectFetchResult {
   text: string;
   /** Empty when the fetch worked; otherwise why it did not. */
   problem: string;
+  /** The same reason as a stable code, for the interface to translate. */
+  problemCode?: ReferenceProblemCode;
 }
 
 /** Reject loopback, link-local and private ranges before any request is made. */
@@ -55,54 +57,138 @@ function isPrivateHost(hostname: string): boolean {
   return false;
 }
 
+import type { ReferenceProblemCode } from "./referencer.types.js";
+
+/** How long to wait before the single retry below. */
+const RETRY_DELAY_MS = 1200;
+
+/** One attempt, plus whether trying again is worth the user's wait. */
+interface Attempt extends DirectFetchResult {
+  retry?: boolean;
+}
+
 /** Fetch a URL and return its readable text. Never throws. */
 export async function fetchSourceText(url: string): Promise<DirectFetchResult> {
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
-    return { text: "", problem: "That link is not valid." };
+    return { text: "", problem: "That link is not valid.", problemCode: "invalid-link" };
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return { text: "", problem: "That link is not a web address." };
+    return { text: "", problem: "That link is not a web address.", problemCode: "not-web" };
   }
   if (isPrivateHost(parsed.hostname)) {
-    return { text: "", problem: "That address is not allowed to be fetched." };
+    return {
+      text: "",
+      problem: "That address is not allowed to be fetched.",
+      problemCode: "blocked-host",
+    };
   }
 
+  // A timeout or a 5xx is usually a slow host rather than an unreadable page,
+  // and the user is sitting in a dialog waiting on it. One retry costs a couple
+  // of seconds and turns a fair share of those misses into usable material.
+  const first = await attemptFetch(parsed);
+  if (!first.retry) return withoutRetryFlag(first);
+  await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+  return withoutRetryFlag(await attemptFetch(parsed));
+}
+
+function withoutRetryFlag({ retry: _retry, ...result }: Attempt): DirectFetchResult {
+  return result;
+}
+
+async function attemptFetch(parsed: URL): Promise<Attempt> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const response = await fetch(parsed.toString(), {
       redirect: "follow",
       signal: controller.signal,
-      headers: { "user-agent": USER_AGENT, accept: "text/html,application/pdf,text/plain,*/*" },
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "text/html,application/xhtml+xml,application/pdf,text/plain;q=0.9,*/*;q=0.8",
+        // Indonesian study sites often serve a different page, or none at all,
+        // to a client that asks for no language in particular.
+        "accept-language": "id,en;q=0.9",
+      },
     });
     if (!response.ok) {
-      return { text: "", problem: `That source refused to open (${response.status}).` };
+      return {
+        text: "",
+        problem: `That source refused to open (${response.status}).`,
+        problemCode: "refused",
+        retry: response.status >= 500,
+      };
     }
 
     const type = (response.headers.get("content-type") ?? "").toLowerCase();
     const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.byteLength > MAX_BYTES) {
-      return { text: "", problem: "That file is too large to process." };
+      return { text: "", problem: "That file is too large to process.", problemCode: "too-large" };
     }
 
-    if (type.includes("pdf") || buffer.subarray(0, 5).toString("latin1") === "%PDF-") {
+    // The header is a hint, not a fact: plenty of hosts serve a PDF as
+    // application/octet-stream and HTML with no type at all, and both used to
+    // land in "cannot be read" with a perfectly readable body in hand. So the
+    // bytes decide first and the header only breaks ties.
+    if (looksLikePdf(buffer) || type.includes("pdf")) {
       return { text: await extractPdf(buffer), problem: "" };
     }
-    if (type.includes("html") || type.includes("xml") || type === "") {
-      return { text: htmlToText(buffer.toString("utf8")), problem: "" };
+
+    const decoded = decodeBody(buffer, type);
+    if (looksLikeHtml(decoded) || type.includes("html") || type.includes("xml") || type === "") {
+      return { text: htmlToText(decoded), problem: "" };
     }
-    if (type.startsWith("text/")) {
-      return { text: buffer.toString("utf8"), problem: "" };
+    if (type.startsWith("text/") || type.includes("json")) {
+      return { text: decoded, problem: "" };
     }
-    return { text: "", problem: "That file type cannot be read." };
+    return {
+      text: "",
+      problem: "That file type cannot be read.",
+      problemCode: "unsupported-type",
+    };
   } catch (error) {
     const aborted = error instanceof Error && error.name === "AbortError";
-    return { text: "", problem: aborted ? "That source took too long to open." : "Could not open that source." };
+    return {
+      text: "",
+      problem: aborted ? "That source took too long to open." : "Could not open that source.",
+      problemCode: aborted ? "timeout" : "unreachable",
+      retry: true,
+    };
   } finally {
     clearTimeout(timer);
+  }
+}
+
+function looksLikePdf(buffer: Buffer): boolean {
+  return buffer.subarray(0, 5).toString("latin1") === "%PDF-";
+}
+
+/** Enough of the start to tell markup from a binary blob. */
+function looksLikeHtml(text: string): boolean {
+  const head = text.slice(0, 2000).toLowerCase();
+  return head.includes("<!doctype html") || head.includes("<html") || head.includes("<body");
+}
+
+/**
+ * Decode with the charset the response declares, header first and then the
+ * document's own meta tag. Older Indonesian school sites still serve
+ * windows-1252 and iso-8859-1; read as UTF-8 those turn every accented
+ * character into a replacement mark, which the Evaluator would then grade
+ * an explanation against.
+ */
+function decodeBody(buffer: Buffer, contentType: string): string {
+  const charsetOf = (value: string): string | undefined =>
+    /charset=["']?([\w-]+)/.exec(value)?.[1]?.toLowerCase();
+
+  const declared = charsetOf(contentType) ?? charsetOf(buffer.subarray(0, 2048).toString("latin1"));
+  if (!declared || declared === "utf-8" || declared === "utf8") return buffer.toString("utf8");
+  try {
+    return new TextDecoder(declared).decode(buffer);
+  } catch {
+    return buffer.toString("utf8");
   }
 }
 

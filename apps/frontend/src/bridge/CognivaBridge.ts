@@ -23,9 +23,11 @@ export interface CognivaBridge {
 
   // Workspace meta
   getWorkspace(workspaceId: string): Promise<WorkspaceDTO>;
+  // `locale` is only honoured while the session has not started — the server
+  // ignores it afterwards, when the student has already spoken in it.
   updateWorkspaceMeta(
     workspaceId: string,
-    meta: { title?: string; description?: string; learnerId?: string }
+    meta: { title?: string; description?: string; learnerId?: string; locale?: Locale }
   ): Promise<WorkspaceDTO>;
   uploadWorkspacePdf(workspaceId: string, file: File): Promise<WorkspaceDTO>;
 

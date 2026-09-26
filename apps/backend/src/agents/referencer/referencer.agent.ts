@@ -210,7 +210,13 @@ async function shapeIntoOptions(
 }
 
 /** Below this, what came back is a stub or an error page, not study material. */
-const MIN_REFERENCE_CHARS = 400;
+/**
+ * Below this, a page is a stub rather than reference material: a link farm, a
+ * cookie wall, a heading with nothing under it. Set low enough that a short but
+ * real explainer still counts — at 400 the finder was rejecting usable pages and
+ * the user saw a list where several options refused to be picked.
+ */
+const MIN_REFERENCE_CHARS = 250;
 
 /**
  * Read a chosen source and return its text, ready to become the session's
@@ -251,12 +257,14 @@ export async function fetchReferenceText(
   }
 
   // Prefer the download's own diagnosis (a 403, a timeout) over a generic line:
-  // it tells the user whether another option would fare better.
+  // it tells the user whether another option would fare better. The code says
+  // the same thing to the interface, which shows it in the reader's language.
   return {
     ...base,
     problem:
       direct.problem ||
       "That page does not hold enough text to use as reference material. Try another option.",
+    problemCode: direct.problemCode ?? "too-little-text",
   };
 }
 

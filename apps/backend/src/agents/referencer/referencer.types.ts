@@ -100,7 +100,21 @@ export interface FetchedReference {
   ok: boolean;
   /** Human-readable reason when `ok` is false. */
   problem: string;
+  /** The same reason as a stable code, so a client can translate it. */
+  problemCode?: ReferenceProblemCode;
 }
+
+/** Why a source could not be turned into reference material. */
+export type ReferenceProblemCode =
+  | "invalid-link"
+  | "not-web"
+  | "blocked-host"
+  | "refused"
+  | "too-large"
+  | "unsupported-type"
+  | "timeout"
+  | "unreachable"
+  | "too-little-text";
 
 /** Raw model output for the JSON pass, before the guard gets to it. */
 export type ReferencerLLMOutput = {

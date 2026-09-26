@@ -135,11 +135,67 @@
   gap: 8px;
 }
 
+/* The wait is the whole experience of this dialog — a search takes seconds — so
+   it says so in body-text size with a moving spinner, not in muted small print. */
 .status {
-  margin: 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 28px 0;
   text-align: center;
-  font-size: 13px;
-  color: var(--text-muted);
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.statusQuiet {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.spinner {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--green-accent);
+  border-radius: 50%;
+  animation: referenceSpin 0.8s linear infinite;
+}
+
+@keyframes referenceSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* A source the server could not read. Kept in the list, greyed and unselectable,
+   so the reader can see which one they already tried. */
+.cardUnusable {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cardUnusable:hover {
+  border-color: var(--border-warm);
+}
+
+.badgeUnusable {
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  color: #a4321c;
+  background: #fbe3dd;
 }
 
 .card,

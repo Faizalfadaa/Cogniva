@@ -302,6 +302,8 @@ export const updateMetaSchema = z.object({
    * usable voice, so an unknown id degrades to the default instead of 400ing a
    * request whose only fault is a newer client. */
   learnerId: z.string().max(40).optional(),
+  /** Only honoured while the session has not started; see updateMeta. */
+  locale: z.enum(LOCALES).optional(),
 });
 
 export const saveDraftSchema = z.object({

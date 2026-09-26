@@ -1539,3 +1539,82 @@
   .stageBodySpeaking .stageGlow,
   .stageBodySpeaking .stageMeterBar { animation: none; }
 }
+
+/* ── Session language picker ──
+   Same scrim and panel as the character picker (.selectOverlay/.selectPanel):
+   picking the language and then the student is one sequence, so it looks like
+   one. Two cards rather than the switch in the header, because this choice is
+   permanent for the session and deserves to be read before it is made. */
+.langGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.langCard,
+.langCardCurrent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 20px 22px;
+  background: var(--forest-mid);
+  border: 2px solid transparent;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.langCardCurrent {
+  border-color: var(--lime);
+}
+
+.langCard:hover,
+.langCardCurrent:hover {
+  transform: translateY(-2px);
+  border-color: var(--lime);
+}
+
+.langCard:focus-visible,
+.langCardCurrent:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+}
+
+.langCard:disabled,
+.langCardCurrent:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}
+
+.langCode {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--lime);
+}
+
+.langName {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-on-forest);
+}
+
+.langCurrent {
+  font-size: 12px;
+  color: var(--text-on-forest-muted);
+}
+
+.langNote {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-on-forest-muted);
+  text-align: center;
+}

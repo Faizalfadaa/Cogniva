@@ -90,6 +90,22 @@ export const messages = {
   'header.stopRecordAudio': { en: 'Stop recording audio', id: 'Berhenti merekam suara' },
 
   // --- picking a student ----------------------------------------------------
+  'sessionLang.dialog': { en: 'Choose the session language', id: 'Pilih bahasa sesi' },
+  'sessionLang.title': { en: 'Which language is this session in?', id: 'Sesi ini pakai bahasa apa?' },
+  'sessionLang.subtitle': {
+    en: 'Your student speaks and writes in this language, and the report comes back in it.',
+    id: 'Muridmu berbicara dan menulis dalam bahasa ini, dan laporannya juga memakai bahasa ini.',
+  },
+  'sessionLang.note': {
+    en: 'It is fixed once the session starts, so a session never mixes two languages.',
+    id: 'Bahasa ini tidak bisa diganti setelah sesi dimulai, jadi satu sesi tidak akan campur dua bahasa.',
+  },
+  'sessionLang.voiceNote': {
+    en: 'The student only has a voice in English; an Indonesian session is silent.',
+    id: 'Murid hanya punya suara dalam bahasa Inggris; sesi berbahasa Indonesia berjalan tanpa suara.',
+  },
+  'sessionLang.current': { en: 'current', id: 'sekarang' },
+  'sessionLang.saving': { en: 'Setting the language...', id: 'Menyetel bahasa...' },
   'learnerSelect.title': { en: 'Who would you like to teach?', id: 'Siapa yang mau kamu ajari?' },
   'learnerSelect.subtitle': {
     en: 'Pick a student for this workspace. They will stay with you for the whole session.',
@@ -208,6 +224,29 @@ export const messages = {
   'reference.searchFailed': { en: 'The search failed. Try again in a moment.', id: 'Pencarian gagal. Coba lagi sebentar.' },
   'reference.useFailed': { en: 'Could not save the reference. Try again.', id: 'Gagal menyimpan referensi. Coba lagi.' },
   'reference.unusable': { en: 'That source cannot be used.', id: 'Sumber itu tidak bisa dipakai.' },
+  'reference.optionUnusable': { en: 'cannot be used', id: 'tidak bisa dipakai' },
+  'reference.pickAnother': { en: 'Pick another source from the list.', id: 'Pilih sumber lain dari daftar.' },
+  'reference.problemInvalidLink': { en: 'That link is not valid.', id: 'Tautannya tidak valid.' },
+  'reference.problemNotWeb': { en: 'That link is not a web address.', id: 'Tautannya bukan alamat web.' },
+  'reference.problemBlockedHost': {
+    en: 'That address is not allowed to be opened.',
+    id: 'Alamat itu tidak boleh dibuka.',
+  },
+  'reference.problemRefused': {
+    en: 'That source refused to open.',
+    id: 'Sumber itu menolak dibuka.',
+  },
+  'reference.problemTooLarge': { en: 'That file is too large to process.', id: 'Berkasnya terlalu besar untuk diproses.' },
+  'reference.problemUnsupportedType': {
+    en: 'That file type cannot be read.',
+    id: 'Jenis berkas itu tidak bisa dibaca.',
+  },
+  'reference.problemTimeout': { en: 'That source took too long to open.', id: 'Sumber itu terlalu lama dibuka.' },
+  'reference.problemUnreachable': { en: 'That source could not be opened.', id: 'Sumber itu tidak bisa dibuka.' },
+  'reference.problemTooLittleText': {
+    en: 'That page does not hold enough text to grade an explanation against.',
+    id: 'Halaman itu tidak punya cukup teks untuk dipakai menilai penjelasan.',
+  },
   'reference.noticeThin': {
     en: 'The search found only a few usable sources. If none of them fit, you can still upload a PDF of your own.',
     id: 'Pencarian hanya menemukan sedikit sumber yang bisa dipakai. Kalau tidak ada yang cocok, kamu tetap bisa mengunggah PDF sendiri.',
