@@ -30,6 +30,19 @@ import { workspaceRoutes } from "../src/api/rest/workspaces.js";
 const app = Fastify();
 const guest = { "x-guest-session": "guest-session-evaluator-chat" };
 
+/**
+ * Per-test ceiling, well above vitest's 5s default.
+ *
+ * Each test drives the real thing: a board goes in, the student answers it in
+ * the background, a message goes in, the student answers that too, and only
+ * then does the session finish. Every one of those is a poll with its own
+ * budget, and on a cold run (first file executed, caches empty) they add up
+ * past five seconds even though nothing is wrong. A test that fails on the
+ * first run of the morning and passes for the rest of the day teaches people
+ * to rerun instead of to read.
+ */
+const SLOW = 30_000;
+
 /** The input the Evaluator was handed on the last finish. */
 let captured: EvaluatorInput | undefined;
 
@@ -132,7 +145,7 @@ it("hands the Evaluator each chat message on the turn it was sent during", async
   // The student's side comes too: the user's reply is unjudgeable without the
   // question it answers.
   expect(turns[0].chat!.some((message) => message.sender === "learner")).toBe(true);
-});
+}, SLOW);
 
 it("carries the exchange into the report the debrief screen reads", async () => {
   const created = await app.inject({ method: "POST", url: "/api/workspaces", headers: guest });
@@ -149,4 +162,4 @@ it("carries the exchange into the report the debrief screen reads", async () => 
   expect(chatInReport.map((message: any) => message.text)).toContain(
     "Chlorophyll reflects green, which is why leaves look green.",
   );
-});
+}, SLOW);
