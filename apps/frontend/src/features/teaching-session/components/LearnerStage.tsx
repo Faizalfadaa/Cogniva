@@ -18,6 +18,7 @@ import {
   type LearnerVoice,
 } from '../hooks/useLearnerVoice'
 import { useT, type Translate } from '../../../i18n/LanguageProvider'
+import { TypingIndicator } from './TypingIndicator'
 
 const STAGE_MIN_PX = 300
 const STAGE_MAX_RATIO = 0.5 // at most half the canvas
@@ -28,6 +29,7 @@ interface LearnerStageProps {
   learner: LearnerCharacter
   messages: ChatMessageDTO[]
   isOpen: boolean
+  isTyping?: boolean
   onToggle: () => void
   onSend: (content: string) => void
 }
@@ -75,7 +77,7 @@ function TranscriptBubble({
         message.sender === 'user' ? styles.chatBubbleUser : styles.chatBubbleLearner
       }`}
     >
-      {waiting ? '…' : spokenText(message.content, message.speech, progress)}
+      {waiting ? <TypingIndicator name={learnerName} /> : spokenText(message.content, message.speech, progress)}
       {!waiting && hasAudio(message, voice) && (
         <button
           className={styles.chatBubbleSpeak}
@@ -107,6 +109,7 @@ export function LearnerStage({
   learner,
   messages,
   isOpen,
+  isTyping = false,
   onToggle,
   onSend,
 }: LearnerStageProps) {
@@ -192,7 +195,7 @@ export function LearnerStage({
       // Apply before paint, without a smooth animation that can fight manual scrolling.
       transcript.scrollTop = transcript.scrollHeight
     }
-  }, [isOpen, transcriptVersion, characterMinimized])
+  }, [isOpen, transcriptVersion, characterMinimized, isTyping])
 
   // Follow both layout transitions and text revealed by per-sentence playback.
   useLayoutEffect(() => {
@@ -342,7 +345,7 @@ export function LearnerStage({
         role="log"
         aria-label={t('stage.conversationWith', { name: learner.name })}
       >
-        {messages.length === 0 ? (
+        {messages.length === 0 && !isTyping ? (
           <p className={styles.chatSidebarEmpty}>{t('stage.nothingSaid')}</p>
         ) : (
           messages.map((m) => (
@@ -354,6 +357,11 @@ export function LearnerStage({
               t={t}
             />
           ))
+        )}
+        {isTyping && (
+          <div className={`${styles.chatBubble} ${styles.chatBubbleLearner}`}>
+            <TypingIndicator name={learner.name} />
+          </div>
         )}
       </div>
 

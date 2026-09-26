@@ -328,6 +328,7 @@ export default function WorkspacePage() {
           <ErrorBanner error={activeError} onDismiss={dismissActiveError} />
 
           <LearnerResponseBubble
+            hidden={chat.isOpen}
             learner={learner}
             text={session.latestCheckpoint?.learnerResponse}
             pending={session.pending}
@@ -409,6 +410,7 @@ export default function WorkspacePage() {
             learner={learner}
             messages={chat.messages}
             isOpen={chat.isOpen}
+            isTyping={session.pending || chat.isTyping}
             onToggle={chat.toggle}
             onSend={chat.sendMessage}
           />

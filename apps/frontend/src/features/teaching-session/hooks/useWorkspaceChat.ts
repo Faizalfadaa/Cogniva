@@ -155,6 +155,7 @@ export function useWorkspaceChat(
   const [messages, setMessages] = useState<ChatMessageDTO[]>(persistedOnMount.current)
 
   const [isOpen, setIsOpen] = useState(false)
+  const [sendingCount, setSendingCount] = useState(0)
   const [toasts, setToasts] = useState<ChatToast[]>([])
   const [error, setError] = useState<SessionError | null>(null)
 
@@ -293,6 +294,7 @@ export function useWorkspaceChat(
     async (content: string) => {
       const trimmed = content.trim()
       if (!trimmed) return
+      setSendingCount((count) => count + 1)
       fastUntilRef.current = Date.now() + FAST_AFTER_SEND_MS
       try {
         const sent = await bridge.sendChatMessage(workspaceId, trimmed)
@@ -313,6 +315,8 @@ export function useWorkspaceChat(
             ? { kind: 'ai_unavailable', detail: err instanceof Error ? err.message : String(err) }
             : { kind: 'network' }
         )
+      } finally {
+        setSendingCount((count) => count - 1)
       }
     },
     [bridge, workspaceId]
@@ -356,6 +360,8 @@ export function useWorkspaceChat(
 
   return {
     messages,
+    // Chat replies arrive asynchronously through polling after the send resolves.
+    isTyping: !error && (sendingCount > 0 || messages[messages.length - 1]?.sender === 'user'),
     isOpen,
     unreadCount,
     toasts,

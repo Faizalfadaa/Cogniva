@@ -145,7 +145,7 @@ export function WorkspaceHeader({
           <HeadphonesIcon deafened={voice.muted || !voice.available} />
         </button>
 
-        {!micPermissionDenied && (
+        {mode === 'editing' && !pending && !micPermissionDenied && (
           <button
             data-tour="mic-button"
             className={isRecording ? styles.micBtnActive : styles.micBtnIdle}

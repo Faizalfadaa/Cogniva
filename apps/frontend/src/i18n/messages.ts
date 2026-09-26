@@ -83,6 +83,7 @@ export const messages = {
   'header.stop': { en: 'Stop', id: 'Berhenti' },
   'header.teach': { en: 'Teach', id: 'Ajarkan' },
   'header.thinking': { en: 'Thinking...', id: 'Sedang berpikir...' },
+  'stage.typing': { en: '{name} is typing...', id: '{name} sedang mengetik...' },
   'header.continueEditing': { en: 'Continue editing', id: 'Lanjut menulis' },
   'header.finishSession': { en: 'Finish Session', id: 'Selesaikan sesi' },
   'header.finishing': { en: 'Finishing...', id: 'Menyelesaikan...' },
