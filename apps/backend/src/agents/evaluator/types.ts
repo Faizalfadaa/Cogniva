@@ -16,8 +16,8 @@ export type { EvaluationResult, Finding, FindingCategory };
 /**
  * One teaching turn flattened to just what the Evaluator reads. The orchestrator
  * stores full TeachingTurns (§6.6); the REST layer projects them down to this
- * shape (board reading + spoken transcript + the student's reply) so the agent
- * stays decoupled from storage.
+ * shape (board reading + spoken transcript + the student's reply + the chat
+ * that followed) so the agent stays decoupled from storage.
  */
 export interface TranscriptTurn {
   turnIndex: number;
@@ -27,6 +27,27 @@ export interface TranscriptTurn {
   speech?: string;
   /** The student's (Learner's) utterance this turn — question/confusion/etc. */
   learnerUtterance?: string;
+  /**
+   * The chat that followed this turn, both sides, in the order it was sent.
+   *
+   * The board and the microphone are not the only places teaching happens. The
+   * student asks a question in the chat panel and the user answers it there,
+   * and that answer is often the most pointed explanation in the whole session,
+   * because it is aimed at a confusion the student just named. The Evaluator
+   * read none of it until this field existed: a concept explained only in chat
+   * was scored MISSED, and one explained wrongly in chat cost nothing.
+   *
+   * Both sides are here because the user's line rarely stands on its own. "Yes,
+   * the thylakoid membrane" is only judgeable next to the question it answers.
+   */
+  chat?: ChatExchange[];
+}
+
+/** One chat bubble, flattened to the two things the Evaluator reads. */
+export interface ChatExchange {
+  /** "user" is the teacher; "learner" is the student persona. */
+  sender: "user" | "learner";
+  text: string;
 }
 
 /**

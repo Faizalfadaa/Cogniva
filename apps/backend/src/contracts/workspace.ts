@@ -233,6 +233,21 @@ export interface EvaluationTranscriptTurn {
   turnIndex: number;
   boardText: string;
   speech?: string;
+  /**
+   * The chat that followed this turn, both sides, in the order it was sent.
+   *
+   * Both sides, unlike `learnerUtterance` which the report deliberately drops:
+   * a reply on its own is unreadable. "Yes, in the thylakoid membrane" means
+   * nothing without the question above it, so the exchange is kept whole and
+   * the screen marks up only the teacher's half.
+   */
+  chat?: EvaluationChatMessage[];
+}
+
+/** One chat bubble as the debrief screen shows it. */
+export interface EvaluationChatMessage {
+  sender: ChatSender;
+  text: string;
 }
 
 /**

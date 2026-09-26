@@ -22,7 +22,7 @@ export { PlannerAgent, decideStep, planWithRules, shouldReplan, takeFeasible, is
 export type { Plan, PlanStep, PlanStepKind, PlanTraceEntry, TurnSituation } from "./planner/index.js";
 export { AsrAgent } from "./asr/index.js";
 export { EvaluatorAgent, getEvaluator, setEvaluator, runEvaluator } from "./evaluator/index.js";
-export type { EvaluatorInput, TranscriptTurn } from "./evaluator/index.js";
+export type { ChatExchange, EvaluatorInput, TranscriptTurn } from "./evaluator/index.js";
 export { ReferencerAgent, fetchReferenceText, suggestReferences } from "./referencer/index.js";
 export type {
   FetchedReference,

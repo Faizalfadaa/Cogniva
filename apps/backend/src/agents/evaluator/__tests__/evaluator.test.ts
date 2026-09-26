@@ -200,6 +200,10 @@ describe("normalizeEvaluation: sourceQuote", () => {
       turnIndex: 0,
       boardText: "Chlorophyll absorbs red and blue light.\n  Green is reflected.",
       speech: "The oxygen comes from splitting water.",
+      chat: [
+        { sender: "learner", text: "Is chlorophyll what makes the leaf green?" },
+        { sender: "user", text: "Yes, and green is the one colour it does not absorb." },
+      ],
     },
   ];
 
@@ -234,6 +238,32 @@ describe("normalizeEvaluation: sourceQuote", () => {
     );
 
     expect(result.findings[0].sourceQuote).toBe("comes from splitting water");
+  });
+
+  it("keeps a quote the user typed in the chat", () => {
+    const result = normalizeEvaluation(
+      withQuote("green is the one colour it does not absorb"),
+      "s",
+      "e",
+      turns,
+    );
+
+    expect(result.findings[0].sourceQuote).toBe(
+      "green is the one colour it does not absorb",
+    );
+  });
+
+  it("refuses a quote taken from the student's chat line", () => {
+    // The words are in the turn, but the student said them. Anchoring a
+    // finding there would credit the user with the question they were asked.
+    const result = normalizeEvaluation(
+      withQuote("what makes the leaf green"),
+      "s",
+      "e",
+      turns,
+    );
+
+    expect(result.findings[0].sourceQuote).toBeUndefined();
   });
 
   it("tolerates reflowed whitespace and returns the board's own text", () => {

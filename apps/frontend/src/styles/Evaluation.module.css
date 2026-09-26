@@ -1495,6 +1495,77 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   The chat under a turn
+═══════════════════════════════════════════════════════════ */
+/* Indented behind a rule, so the exchange reads as a branch off the turn rather
+   than as another channel in the same column. The two speakers are told apart
+   by who is named and by weight, not by opposing alignment: these lines carry
+   findings, and a right-aligned run of marked text is far harder to read than
+   a left-aligned one. */
+.turnChat {
+  margin-top: 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border-sand);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.turnChatLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.turnChatList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.turnChatRow {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.turnChatWho {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.turnChatText {
+  white-space: pre-wrap;
+  min-width: 0;
+}
+
+/* The user's own words: the half that gets marked up, so it reads at full
+   strength. The student's line is context for it and steps back. */
+.turnChatFromUser .turnChatWho {
+  color: var(--forest-dark);
+}
+
+.turnChatFromUser .turnChatText {
+  color: var(--text-primary);
+}
+
+.turnChatFromLearner .turnChatWho,
+.turnChatFromLearner .turnChatText {
+  color: var(--text-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════════
    Follow-up suggestion
 ═══════════════════════════════════════════════════════════ */
 .followUpBox {
@@ -1642,7 +1713,8 @@
 
 /* The shell is 1080px wide now; prose is capped so lines do not run long. */
 .turnBody,
-.turnSpeech {
+.turnSpeech,
+.turnChatText {
   max-width: 78ch;
 }
 

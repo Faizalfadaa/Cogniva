@@ -13,11 +13,20 @@
 
 import type { EvaluationFindingDTO, EvaluationTranscriptTurnDTO } from '../../../dto/EvaluationReportDTO'
 
-/** Which of a turn's two text channels a quote was found in. */
-export type QuoteField = 'boardText' | 'speech'
+/** Which of a turn's text channels a quote was found in. */
+export type QuoteField = 'boardText' | 'speech' | 'chat'
 
 export interface QuoteMatch {
   field: QuoteField
+  /**
+   * Which chat bubble, when `field` is 'chat'.
+   *
+   * Chat is the one channel a turn can hold several of, so the field alone no
+   * longer says where to draw the mark. Indexed into the turn's own `chat`
+   * array, learner bubbles included, so the number lines up with what the
+   * screen renders.
+   */
+  chatIndex?: number
   /** Character offset of the quote within that field's text. */
   index: number
   /** The matched text, echoed back so callers need not re-slice. */
@@ -25,13 +34,17 @@ export interface QuoteMatch {
 }
 
 /**
- * Find `quote` in `turn`, board text first and speech second.
+ * Find `quote` in `turn`: board text, then speech, then the user's chat.
  *
  * Board text wins ties because it is the channel the user deliberately wrote;
- * speech is the transcribed afterthought around it.
+ * speech is the transcribed afterthought around it; chat came after both.
+ *
+ * Learner bubbles are skipped. The backend guard already refuses to anchor a
+ * finding to them, and searching them here could only produce a mark claiming
+ * the user said something the student did.
  */
 export function highlightQuoteInText(
-  turn: Pick<EvaluationTranscriptTurnDTO, 'boardText' | 'speech'>,
+  turn: Pick<EvaluationTranscriptTurnDTO, 'boardText' | 'speech' | 'chat'>,
   quote: string | null | undefined,
 ): QuoteMatch | null {
   if (!quote) return null
@@ -43,6 +56,13 @@ export function highlightQuoteInText(
   const speech = turn.speech ?? ''
   const inSpeech = speech.indexOf(quote)
   if (inSpeech >= 0) return { field: 'speech', index: inSpeech, text: quote }
+
+  const chat = turn.chat ?? []
+  for (let i = 0; i < chat.length; i++) {
+    if (chat[i].sender !== 'user') continue
+    const at = chat[i].text.indexOf(quote)
+    if (at >= 0) return { field: 'chat', chatIndex: i, index: at, text: quote }
+  }
 
   return null
 }

@@ -105,11 +105,14 @@ RULES:
 
 SOURCE QUOTES:
 For each finding (except MISSED with no related turn), quote the EXACT sentence
-or phrase (verbatim substring, not paraphrased) from that turn's board text or
-speech that supports this finding, in the sourceQuote field. The quote must be
-an exact substring so it can be located and highlighted in the original text --
-do not summarize or rephrase it. If you cannot quote the turn word for word,
-leave sourceQuote out entirely rather than approximating it.
+or phrase (verbatim substring, not paraphrased) from that turn's board text,
+speech, or "Teacher (chat)" line that supports this finding, in the sourceQuote
+field. The quote must be an exact substring so it can be located and highlighted
+in the original text -- do not summarize or rephrase it. If you cannot quote the
+turn word for word, leave sourceQuote out entirely rather than approximating it.
+
+Never quote a "Student (chat)" line. Those are the student's words, not the
+teacher's, and a finding is a judgement of what the teacher taught.
 
 FOLLOW-UP SUGGESTIONS:
 For each finding with category WRONG, MISSED, or CONFUSING, write a short,
@@ -169,6 +172,11 @@ ${input.keyConcepts.length ? input.keyConcepts.map((c) => `- ${c}`).join("\n") :
 ${input.commonMisconceptions.length ? input.commonMisconceptions.map((c) => `- ${c}`).join("\n") : "(none)"}
 
 # Session Transcript (turn by turn)
+A turn can carry four channels: what was written on the board, what was said
+aloud over it, how the student reacted, and the chat that followed. A
+"Teacher (chat)" line is teaching just as much as the board is -- often the
+sharpest teaching in the session, because it answers a confusion the student
+had just named. Judge a concept as MISSED only when it appears in none of them.
 ${transcript}
 
 # Task
@@ -219,5 +227,14 @@ function renderTurn(turn: EvaluatorInput["turns"][number]): string {
   if (turn.speech?.trim()) lines.push(`  Speech: ${turn.speech.trim()}`);
   if (turn.learnerUtterance?.trim())
     lines.push(`  Student reaction: ${turn.learnerUtterance.trim()}`);
+  // Labelled by speaker, because who said a thing decides what it means: the
+  // same sentence is an explanation from the teacher and a guess from the
+  // student. "Teacher" rather than "user" so the model reads the transcript as
+  // a lesson rather than as an app session.
+  for (const message of turn.chat ?? []) {
+    if (!message.text?.trim()) continue;
+    const who = message.sender === "user" ? "Teacher (chat)" : "Student (chat)";
+    lines.push(`  ${who}: ${message.text.trim()}`);
+  }
   return lines.join("\n");
 }

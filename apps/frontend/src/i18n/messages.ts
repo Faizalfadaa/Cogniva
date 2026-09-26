@@ -466,6 +466,9 @@ export const messages = {
   'evaluation.statWords': { en: 'words taught', id: 'kata diajarkan' },
   'evaluation.turnLabel': { en: 'Turn {index}', id: 'Giliran {index}' },
   'evaluation.spokenLabel': { en: 'Spoken', id: 'Lisan' },
+  'evaluation.chatLabel': { en: 'In the chat', id: 'Di obrolan' },
+  'evaluation.chatYou': { en: 'You', id: 'Kamu' },
+  'evaluation.chatLearner': { en: 'Your student', id: 'Muridmu' },
 
   // --- trend, timing, board replay, practice --------------------------------
   'evaluation.trendTitle': {

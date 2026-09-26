@@ -156,6 +156,18 @@ const mockTranscript = [
     turnIndex: 1,
     boardText: 'The light reactions run in the thylakoid membrane and make ATP.',
     speech: 'The oxygen released comes from splitting water, not from the CO2.',
+    // A concept the user only ever explained in the chat panel, which is
+    // exactly the case the Detail tab used to show nothing for.
+    chat: [
+      {
+        sender: 'learner' as const,
+        text: 'Wait, so is ATP the sugar the plant keeps?',
+      },
+      {
+        sender: 'user' as const,
+        text: 'No, ATP is the battery that powers the reaction. The sugar is glucose.',
+      },
+    ],
   },
 ];
 
@@ -176,13 +188,21 @@ const mockFindings: EvaluationReportDTO['findings'] = [
     followUp: 'Say it once, in one direction: water is split, and the oxygen released comes from that water.',
   },
   {
+    // Quoted from the chat, not the board: the one place this was explained.
+    category: 'CORRECT',
+    concept: 'What ATP is for',
+    detail: 'You caught the mix-up the moment I asked and drew the line cleanly.',
+    evidenceTurnIndex: 1,
+    sourceQuote: 'ATP is the battery that powers the reaction',
+  },
+  {
     // No sourceQuote: stands in for a finding whose quote the backend guard
     // rejected, so the UI falls back to marking the whole turn.
     category: 'WRONG',
-    concept: 'What ATP is for',
-    detail: 'ATP is the energy carrier, not the sugar the plant stores.',
+    concept: 'Where glucose is built',
+    detail: 'The sugar is assembled in the stroma, not in the thylakoid membrane.',
     evidenceTurnIndex: 1,
-    followUp: 'Separate the two next time: ATP powers the reaction, glucose is what gets stored.',
+    followUp: 'Separate the two stages next time: the membrane makes ATP, the stroma builds the sugar.',
   },
   {
     category: 'MISSED',

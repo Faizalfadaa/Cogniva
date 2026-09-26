@@ -13,6 +13,16 @@ const turn = {
   speech: 'That is why leaves look green to our eyes.',
 }
 
+/** A turn whose only mention of ATP is in the chat that followed it. */
+const withChat = {
+  turnIndex: 0,
+  boardText: 'The light reactions run in the thylakoid membrane.',
+  chat: [
+    { sender: 'learner' as const, text: 'Is ATP the sugar the plant keeps?' },
+    { sender: 'user' as const, text: 'No, it is the battery that powers it.' },
+  ],
+}
+
 describe('highlightQuoteInText', () => {
   it('finds a quote in the board text', () => {
     const match = highlightQuoteInText(turn, 'absorbs red and blue light')
@@ -53,6 +63,26 @@ describe('highlightQuoteInText', () => {
       index: 0,
       text: 'ATP',
     })
+  })
+
+  it('finds a quote in what the user typed in chat, and says which bubble', () => {
+    const match = highlightQuoteInText(withChat, 'the battery that powers it')
+
+    expect(match).toEqual({
+      field: 'chat',
+      chatIndex: 1,
+      index: 10,
+      text: 'the battery that powers it',
+    })
+    expect(
+      withChat.chat[1].text.slice(match!.index, match!.index + match!.text.length),
+    ).toBe('the battery that powers it')
+  })
+
+  it('never anchors to the student, whose words are in the same list', () => {
+    // The phrase only occurs in a learner bubble. Marking it would show the
+    // user's own question back to them as evidence of what they taught.
+    expect(highlightQuoteInText(withChat, 'Is ATP the sugar')).toBeNull()
   })
 })
 

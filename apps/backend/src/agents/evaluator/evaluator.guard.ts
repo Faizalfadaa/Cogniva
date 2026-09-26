@@ -123,7 +123,29 @@ function resolveSourceQuote(
   const turn = turns.find((t) => t.turnIndex === evidenceTurnIndex);
   if (!turn) return undefined;
 
-  return findVerbatim(turn.boardText, quote) ?? findVerbatim(turn.speech, quote);
+  // The teacher's own chat lines only. The student's are in the same list and
+  // the model is told not to quote them, but a finding anchored to the
+  // student's words would claim the teacher said something they never did, so
+  // this does not rely on the instruction being followed.
+  const taught = (turn.chat ?? []).filter((message) => message.sender === "user");
+
+  return (
+    findVerbatim(turn.boardText, quote) ??
+    findVerbatim(turn.speech, quote) ??
+    firstVerbatim(taught, quote)
+  );
+}
+
+/** The first of these lines that contains `quote` verbatim, if any. */
+function firstVerbatim(
+  messages: { text: string }[],
+  quote: string,
+): string | undefined {
+  for (const message of messages) {
+    const found = findVerbatim(message.text, quote);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 /**

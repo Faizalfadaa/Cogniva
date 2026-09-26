@@ -33,6 +33,22 @@ export interface EvaluationTranscriptTurnDTO {
   turnIndex: number;
   boardText: string;
   speech?: string;
+  /**
+   * The chat that followed this turn, both sides, in the order it was sent.
+   *
+   * Teaching does not only happen on the board. The student asks in the chat
+   * panel and the user answers there, and that answer is part of the lesson
+   * the debrief is reviewing. Both sides are kept because the user's reply
+   * only makes sense under the question it answers; only the user's half is
+   * marked up with findings.
+   */
+  chat?: EvaluationChatMessageDTO[];
+}
+
+/** One chat bubble under a turn. */
+export interface EvaluationChatMessageDTO {
+  sender: 'user' | 'learner';
+  text: string;
 }
 
 export interface EvaluationReportDTO {
