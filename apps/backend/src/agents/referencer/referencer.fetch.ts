@@ -33,6 +33,38 @@ const TIMEOUT_MS = 20_000;
 const USER_AGENT =
   "Mozilla/5.0 (compatible; CognivaReferenceBot/1.0; +https://cogniva.web.id)";
 
+/** Check the actual page, not just its publisher. GET also works on sites that
+ * reject HEAD; cancel the body so checking a PDF does not download the file. */
+export async function checkSourceUrl(url: string): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8_000);
+  try {
+    let current = new URL(url);
+    for (let redirects = 0; redirects <= 5; redirects++) {
+      if (!['http:', 'https:'].includes(current.protocol) ||
+          current.username || current.password || isPrivateHost(current.hostname)) return null;
+      const response = await fetch(current.toString(), {
+        redirect: 'manual',
+        signal: controller.signal,
+        headers: { 'user-agent': USER_AGENT, accept: 'text/html,application/pdf,text/plain,*/*' },
+      });
+      await response.body?.cancel();
+      if ([301, 302, 303, 307, 308].includes(response.status)) {
+        const location = response.headers.get('location');
+        if (!location) return null;
+        current = new URL(location, current);
+        continue;
+      }
+      return response.ok ? current.toString() : null;
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export interface DirectFetchResult {
   text: string;
   /** Empty when the fetch worked; otherwise why it did not. */

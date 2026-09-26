@@ -24,7 +24,8 @@
  * just lost.
  *
  * Offline behavior matches every other agent: no credential, USE_MOCK_AI, or a
- * failed call all land on the deterministic list rather than an error. Nothing
+ * failed call all land on the catalog list rather than an error. Live requests
+ * check catalog URLs too; explicit mock mode stays deterministic. Nothing
  * here throws.
  */
 
@@ -36,7 +37,7 @@ import {
   buildReferenceShapePrompt,
   REFERENCER_LLM_OUTPUT_SCHEMA,
 } from "../../llm/prompts/referencer.prompt.js";
-import { fetchSourceText } from "./referencer.fetch.js";
+import { checkSourceUrl, fetchSourceText } from "./referencer.fetch.js";
 import {
   normalizeFetchedText,
   normalizeOptions,
@@ -44,6 +45,7 @@ import {
   type GuardedOptions,
 } from "./referencer.guard.js";
 import { suggestOffline } from "./referencer.mock.js";
+import { reachableOptions } from "./referencer.links.js";
 import type {
   FetchedReference,
   ReferenceSuggestions,
@@ -85,14 +87,20 @@ export async function suggestReferences(
 
   const useMock =
     request.useMock === true || process.env.USE_MOCK_AI === "true" || !config.llmAvailable();
-  if (useMock) return suggestOffline(request);
+  if (request.useMock === true || process.env.USE_MOCK_AI === "true") return suggestOffline(request);
+  if (useMock) return checkedOffline(request);
 
   try {
     return await searchForReferences(request);
   } catch (error) {
     console.error("[ReferencerAgent] Failed to find references:", error);
-    return suggestOffline(request);
+    return checkedOffline(request);
   }
+}
+
+async function checkedOffline(args: SuggestReferencesArgs): Promise<ReferenceSuggestions> {
+  const result = suggestOffline(args);
+  return { ...result, options: await reachableOptions(result.options) };
 }
 
 /**
@@ -112,7 +120,7 @@ async function searchForReferences(args: SuggestReferencesArgs): Promise<Referen
 
   let { options, rejected } = await runSearch(args, limit);
 
-  if (options.length < Math.min(2, limit) && rejected.length > 0) {
+  if (options.length < Math.min(2, limit)) {
     const retry = await runSearch(args, limit, rejected);
     if (retry.options.length > options.length) {
       options = retry.options;
@@ -123,7 +131,7 @@ async function searchForReferences(args: SuggestReferencesArgs): Promise<Referen
   // Nothing survived: a genuine miss, and the offline libraries are a more
   // useful answer than an empty list.
   if (options.length === 0) {
-    const offline = suggestOffline(args);
+    const offline = await checkedOffline(args);
     return rejected.length > 0
       ? {
           ...offline,
@@ -167,14 +175,15 @@ async function runSearch(
   if (args.onUsage && searcher.lastUsage) args.onUsage(searcher.lastUsage);
 
   const shaped = await shapeIntoOptions(found.text, found.sources, limit, args.onUsage);
-  if (shaped.options.length > 0) return shaped;
+  const live = await reachableOptions(shaped.options);
+  if (live.length > 0) return { ...shaped, options: live };
 
   // The shaping pass produced nothing usable, but the search itself did find
   // pages. Offer those rather than pretending the search failed — and keep the
   // hosts it rejected, since the retry above is steered by them.
   const direct = optionsFromSources(found.sources, limit);
   return {
-    options: direct.options,
+    options: await reachableOptions(direct.options),
     rejected: [...new Set([...shaped.rejected, ...direct.rejected])],
   };
 }
@@ -232,6 +241,12 @@ export async function fetchReferenceText(
   options: { useMock?: boolean; onUsage?: SuggestReferencesArgs["onUsage"] } = {},
 ): Promise<FetchedReference> {
   const base: FetchedReference = { url, title: "", text: "", ok: false, problem: "" };
+
+  // Recheck saved/older suggestions too. Model notes must not turn a missing
+  // page into apparently usable reference material.
+  const resolved = await checkSourceUrl(url);
+  if (!resolved) return { ...base, problem: "That source is no longer available. Search again or choose another reference." };
+  url = resolved;
 
   const useMock =
     options.useMock === true || process.env.USE_MOCK_AI === "true" || !config.llmAvailable();
