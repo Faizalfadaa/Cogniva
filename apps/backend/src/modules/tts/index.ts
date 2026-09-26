@@ -29,6 +29,18 @@ export const LEARNER_VOICES = ["yuzuki", "reina", "akira"] as const;
 export type LearnerVoice = (typeof LEARNER_VOICES)[number];
 
 /**
+ * The name each character answers to, as apps/frontend/src/lib/Learner.ts
+ * shows it. The student is told this name so it introduces itself as the
+ * character on screen: the prompt used to call every student "Iva", and asking
+ * Yuzuki her name got "My name is Iva".
+ */
+export const LEARNER_NAMES = {
+  yuzuki: "Yuzuki Akatsuki",
+  reina: "Reina Kisaragi",
+  akira: "Akira Kagetsu",
+} as const satisfies Record<LearnerVoice, string>;
+
+/**
  * The default character for a workspace nobody has chosen for.
  *
  * MUST stay identical to `deriveLearner` in
@@ -67,6 +79,17 @@ export function voiceForWorkspace(
 ): LearnerVoice {
   const chosen = LEARNER_VOICES.find((voice) => voice === learnerId);
   return chosen ?? ttsVoiceForWorkspace(workspaceId);
+}
+
+/**
+ * The name of the student in this workspace, resolved the same way as its
+ * voice, so the name it gives and the face and voice it has always agree.
+ */
+export function learnerNameForWorkspace(
+  learnerId: string | undefined,
+  workspaceId: string,
+): string {
+  return LEARNER_NAMES[voiceForWorkspace(learnerId, workspaceId)];
 }
 
 /**

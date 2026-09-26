@@ -41,6 +41,8 @@ export interface RespondArgs {
   onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void;
   /** When each board change was made, on the audio clip's clock (see narration.ts). */
   timeline?: Timeline;
+  /** The character's name, which the student answers to (see LearnerAgentInput). */
+  learnerName?: string;
 }
 
 /**
@@ -201,11 +203,12 @@ export class LearnerAgent {
     tools,
     onUsage,
     timeline,
+    learnerName,
   }: RespondArgs): Promise<[LearnerResponse, LearnerState]> {
     const teachingText = composeTeachingText(interpretation, speech, timeline);
 
     const output = await runLearnerTurn(
-      { sessionId: state.sessionId, turnIndex, teachingText, currentState: state },
+      { sessionId: state.sessionId, turnIndex, teachingText, currentState: state, learnerName },
       { useMock: this.options.forceMock, tools, onUsage },
     );
 

@@ -79,6 +79,13 @@ export type LearnerAgentInput = {
    */
   currentState: LearnerState;
 
+  /**
+   * The name of the character the user picked, which the student gives when
+   * asked. Absent outside a workspace (the bare session API has no character),
+   * and the prompt then falls back to its own name.
+   */
+  learnerName?: string;
+
   /** Names of the tools allowed this turn (filled by the agent loop). */
   availableTools?: string[];
 

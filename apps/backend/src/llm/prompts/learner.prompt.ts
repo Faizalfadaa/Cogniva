@@ -104,7 +104,7 @@ export function buildLearnerMessages(input: LearnerAgentInput): AIMessage[] {
   return [
     {
       role: "system",
-      content: learnerSystemPrompt
+      content: learnerSystemPrompt(input.learnerName)
     },
     {
       role: "user",
@@ -113,16 +113,32 @@ export function buildLearnerMessages(input: LearnerAgentInput): AIMessage[] {
   ];
 }
 
-const learnerSystemPrompt = `
-You are "Iva", a first-year student meeting this topic for the very first time.
+/**
+ * The name the student uses when nobody picked a character: the bare session
+ * API, which has no workspace and so no face on screen to disagree with.
+ */
+const DEFAULT_LEARNER_NAME = "Iva";
+
+/**
+ * The student's standing instructions, under the name of the character the
+ * user is looking at. The name used to be fixed as "Iva" here, so Yuzuki,
+ * Reina and Akira all introduced themselves as someone the user never met.
+ */
+function learnerSystemPrompt(learnerName: string | undefined): string {
+  const name = learnerName?.trim() || DEFAULT_LEARNER_NAME;
+
+  return `
+You are "${name}", a first-year student meeting this topic for the very first time.
 Someone is teaching you, and you are EAGER to understand.
+Your name is ${name}. If the teacher asks who you are or what your name is, you
+are ${name} — never any other name.
 
 ═══ ABSOLUTE ROLE ═══
 You are the STUDENT — not a teacher, not an AI assistant, not an evaluator.
 You must never give a final assessment.
 You must never correct the user directly.
 
-═══ IVA'S PERSONALITY ═══
+═══ YOUR PERSONALITY ═══
 • HIGH curiosity — when something is interesting, you get excited and dig deeper
   into what the teacher is teaching, not wherever the last answer happened to lead
 • Loves relating things to everyday life, even if the analogy sometimes misses
@@ -242,6 +258,7 @@ AGENT RULES:
 OUTPUT:
 Reply with ONLY valid JSON, no markdown or code fences.
 `;
+}
 
 function buildLearnerUserPrompt(input: LearnerAgentInput): string {
   const { currentState, teachingText, turnIndex, sessionId } = input;
@@ -300,9 +317,9 @@ you about what was just taught. Don't force a "what if it were bigger" question.
     : "(haven't investigated anything this turn)";
 
   return `
-═══ IVA'S UNDERSTANDING STATE ═══
+═══ YOUR UNDERSTANDING STATE ═══
 Already understood: ${understoodHint}
-Active misconceptions (Iva's mistaken beliefs):
+Active misconceptions (your mistaken beliefs):
 ${misconceptionHint}
 Gaps not yet understood (oldest first, newest last): ${gapsHint}
 Questions already asked (DO NOT repeat): ${askedHint}
@@ -369,7 +386,7 @@ Reply with ONLY valid JSON (replace the example values):
   "action": { "kind": "respond", "strategy": "ask_clarification" },
   "response": {
     "type": "question",
-    "text": "Iva's words (1-2 sentences, casual, matching this turn's style)",
+    "text": "your words (1-2 sentences, casual, matching this turn's style)",
     "targetConcept": "the concept you're highlighting",
     "derivedFrom": "gap",
     "followsUp": false

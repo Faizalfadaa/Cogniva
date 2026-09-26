@@ -50,7 +50,12 @@ import {
   type ReferenceExcerpt,
 } from "../retrieval/index.js";
 import { newId, sessions } from "../storage/sessionStore.js";
-import { speechSegments, synthesizeSpeech, voiceForWorkspace } from "../tts/index.js";
+import {
+  learnerNameForWorkspace,
+  speechSegments,
+  synthesizeSpeech,
+  voiceForWorkspace,
+} from "../tts/index.js";
 import { buildEvaluationReport } from "./evaluationReport.js";
 import { newWorkspaceId, workspaces } from "./workspaceStore.js";
 
@@ -648,6 +653,7 @@ async function runTeachingTurn(
     allowConfirmation: false,
     newImage: input.newImage,
     timeline: input.timeline,
+    learnerName: learnerNameForWorkspace(ws.learnerId, ws.id),
   });
 
   // Only one orchestrator call now (the planner absorbed the retry), so one
@@ -688,6 +694,7 @@ async function runChatReply(ws: Workspace, content: string): Promise<string> {
     speech: null,
     state,
     turnIndex: session.turnCount,
+    learnerName: learnerNameForWorkspace(ws.learnerId, ws.id),
   });
   await sessions.saveLearnerState(nextState);
   return response.text;
