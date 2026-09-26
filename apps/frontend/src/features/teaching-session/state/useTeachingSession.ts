@@ -120,7 +120,6 @@ export function useTeachingSession(
       // Canvas is still empty - nothing meaningful to send to Vision, so cancel.
       setPending(false)
       setMode('editing')
-      audio.start()
       return
     }
 
@@ -156,7 +155,6 @@ export function useTeachingSession(
       // Unlock the board so the work is not trapped behind a failed turn.
       setPending(false)
       setMode('editing')
-      audio.start()
     }
   }, [audio, bridge, workspaceId, whiteboardRef, pollForResponse])
 
@@ -164,8 +162,7 @@ export function useTeachingSession(
     stopPolling()
     setMode('editing')
     setPending(false)
-    audio.start()
-  }, [audio, stopPolling])
+  }, [stopPolling])
 
   const dismissError = useCallback(() => setError(null), [])
 

@@ -81,14 +81,12 @@ export function useAudioRecorder(): UseAudioRecorderResult {
     return blob
   }, [])
 
-  // Auto-start once on mount.
+  // Recording starts only from the mic button. Release the device on unmount.
   useEffect(() => {
-    start()
     return () => {
       recorderRef.current?.stop()
       streamRef.current?.getTracks().forEach((t) => t.stop())
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return { isRecording, permissionDenied, start, stop, flush, recordingStartedAt }
