@@ -275,10 +275,20 @@ export function LearnerStage({
       <div className={styles.stageHandle} onMouseDown={onDragStart} aria-hidden="true" />
 
       <div className={styles.stageHeader}>
-        <div className={styles.stageIdentity}>
+        <button
+          type="button"
+          className={styles.stageIdentity}
+          onClick={() => setCharacterMinimized((minimized) => !minimized)}
+          aria-expanded={!characterMinimized}
+          aria-controls={characterId}
+          aria-label={
+            characterMinimized ? t('stage.showCharacter') : t('stage.minimizeCharacter')
+          }
+          title={characterMinimized ? t('stage.showCharacter') : t('stage.minimizeCharacter')}
+        >
           <img src={learner.avatarUrl} alt="" className={styles.stageHeaderAvatar} />
           <span className={styles.stageName}>{learner.name}</span>
-        </div>
+        </button>
         <div className={styles.stageHeaderActions}>
           <button
             type="button"
@@ -323,34 +333,6 @@ export function LearnerStage({
             <span key={i} className={styles.stageMeterBar} data-bar={i} />
           ))}
         </div>
-      </div>
-
-      <div className={styles.stageChatToolbar}>
-        <button
-          type="button"
-          className={styles.stageIconBtn}
-          onClick={() => setCharacterMinimized((minimized) => !minimized)}
-          aria-expanded={!characterMinimized}
-          aria-controls={characterId}
-          aria-label={
-            characterMinimized ? t('stage.showCharacter') : t('stage.minimizeCharacter')
-          }
-          title={characterMinimized ? t('stage.showCharacter') : t('stage.minimizeCharacter')}
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d={characterMinimized ? 'M12 5v14m-6-6 6 6 6-6' : 'M12 19V5m-6 6 6-6 6 6'} />
-          </svg>
-        </button>
       </div>
 
       <div

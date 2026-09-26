@@ -23,7 +23,7 @@ type ReferenceMode = 'none' | 'paste' | 'upload' | 'find'
 /**
  * Session setup — what am I teaching, and what should I be judged against.
  *
- * It sits between meeting the student and the whiteboard, because both of the
+ * It appears after choosing the student and before their greeting, because both of the
  * things it collects are worth having *before* the first explanation rather than
  * after it: the topic is what the Learner reacts to, and the reference material
  * is the answer key the Evaluator grades with (§1.4 — the Learner never sees it).

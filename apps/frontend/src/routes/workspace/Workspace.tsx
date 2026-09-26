@@ -178,7 +178,7 @@ export default function WorkspacePage() {
   )
 
   /**
-   * Ask what the session is about, once, after the student has introduced
+   * Ask what the session is about, once, before the student introduces
    * themselves — the topic is what the Learner reacts to and what the Evaluator
    * grades, so it is worth having before the first explanation rather than
    * after it.
@@ -187,7 +187,7 @@ export default function WorkspacePage() {
    * by existing, and interrupting a resumed session with a form would be absurd.
    */
   const needsSetup =
-    intro.seen && !needsLearnerPick && !setup.done && workspace?.state === 'Draft'
+    !needsLearnerPick && !setup.done && workspace?.state === 'Draft'
 
   /**
    * Second leg of the app tour, resumed from the dashboard. Held until the
@@ -262,16 +262,9 @@ export default function WorkspacePage() {
             speech={session.latestCheckpoint?.speech}
           />
 
-          {/* Pick first, then meet them: the intro is held back until a student
-              exists, otherwise it would introduce the character being replaced. */}
+          {/* Pick a student, set up the topic, then play their greeting. */}
           {needsLearnerPick && <LearnerSelect onSelect={handleSelectLearner} />}
 
-          {!needsLearnerPick && !intro.seen && (
-            <LearnerIntro learner={learner} userName={userName ?? ''} onDone={intro.markSeen} />
-          )}
-
-          {/* Last beat of the opening sequence: the student is here, now say
-              what you will teach them. */}
           {needsSetup && (
             <SessionSetup
               workspaceId={id}
@@ -280,6 +273,10 @@ export default function WorkspacePage() {
               onWorkspaceChange={setWorkspace}
               onDone={setup.markDone}
             />
+          )}
+
+          {!needsLearnerPick && !needsSetup && !intro.seen && (
+            <LearnerIntro learner={learner} userName={userName ?? ''} onDone={intro.markSeen} />
           )}
 
           {/* Toast notifications — float over canvas, only when sidebar is closed */}
