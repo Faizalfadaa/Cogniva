@@ -148,6 +148,7 @@ export function useAudioRecorder(): UseAudioRecorderResult {
     return blob
   }, [])
 
+  // Recording starts only from the mic button. Release the device on unmount.
   const heardVoice = useCallback(() => !meteredRef.current || isSpeech(voiceRef.current), [])
 
   const recordedSpans = useCallback(
@@ -158,13 +159,11 @@ export function useAudioRecorder(): UseAudioRecorderResult {
 
   // Auto-start once on mount.
   useEffect(() => {
-    start()
     return () => {
       recorderRef.current?.stop()
       streamRef.current?.getTracks().forEach((t) => t.stop())
       stopMeter()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return {
