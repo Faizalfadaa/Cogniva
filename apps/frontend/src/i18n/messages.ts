@@ -54,20 +54,31 @@ export const messages = {
   'header.home': { en: 'Home', id: 'Beranda' },
   'header.untitled': { en: 'Untitled Document', id: 'Dokumen Tanpa Judul' },
   'header.workspaceTitle': { en: 'Workspace title', id: 'Judul ruang kerja' },
-  'header.referenceAttached': { en: 'Reference attached', id: 'Acuan terpasang' },
-  'header.viewReference': { en: 'View reference material', id: 'Lihat bahan acuan' },
-  'header.uploadPdf': { en: 'Reference (PDF)', id: 'Acuan (PDF)' },
-  'header.uploadPdfTitle': {
-    en: 'Upload reference material (PDF) to ground your evaluation',
-    id: 'Unggah bahan acuan (PDF) sebagai dasar penilaian',
+  'header.referenceAttached': { en: 'Reference attached', id: 'Referensi terpasang' },
+  'header.reference': { en: 'Reference', id: 'Referensi' },
+  'header.referenceTitle': {
+    en: 'Add reference material for the evaluation',
+    id: 'Tambahkan referensi untuk penilaian',
   },
-  'header.replace': { en: 'Replace', id: 'Ganti' },
+  'header.referenceMenu': { en: 'Reference material', id: 'Referensi' },
+  'header.referenceOpen': { en: 'Open the current reference', id: 'Buka referensi yang dipakai' },
+  'header.referenceYourFile': { en: 'Your uploaded file', id: 'File yang kamu unggah' },
+  'header.referenceAgent': { en: 'Find it with the agent', id: 'Carikan dengan agen' },
+  'header.referenceAgentHint': {
+    en: 'An agent looks up material on this topic',
+    id: 'Agen mencarikan bahan untuk materi ini',
+  },
+  'header.referenceUpload': { en: 'Upload a file', id: 'Unggah file' },
+  'header.referenceReplace': { en: 'Replace the file', id: 'Ganti file' },
+  'header.referenceUploadHint': {
+    en: 'Use your own material from this device',
+    id: 'Pakai bahanmu sendiri dari perangkat ini',
+  },
+  'header.referenceFootnote': {
+    en: 'Only the evaluator reads it. Your student never sees it.',
+    id: 'Hanya dipakai penilai. Muridmu tidak pernah melihatnya.',
+  },
   'header.uploading': { en: 'Uploading...', id: 'Mengunggah...' },
-  'header.findReference': { en: 'Find reference', id: 'Cari acuan' },
-  'header.findReferenceTitle': {
-    en: 'Find reference material for this topic',
-    id: 'Carikan bahan acuan untuk materi ini',
-  },
   'header.record': { en: 'Record', id: 'Rekam' },
   'header.stop': { en: 'Stop', id: 'Berhenti' },
   'header.teach': { en: 'Teach', id: 'Ajarkan' },
@@ -77,10 +88,14 @@ export const messages = {
   'header.finishSession': { en: 'Finish Session', id: 'Selesaikan sesi' },
   'header.finishing': { en: 'Finishing...', id: 'Menyelesaikan...' },
   'header.finishTeaching': { en: 'Finish teaching', id: 'Selesai mengajar' },
-  'header.mute': { en: "Mute the learner's voice", id: 'Matikan suara murid' },
-  'header.unmute': { en: "Unmute the learner's voice", id: 'Nyalakan suara murid' },
-  'header.voiceOn': { en: 'Voice on', id: 'Suara aktif' },
-  'header.voiceOff': { en: 'Voice off', id: 'Suara mati' },
+  'header.deafen': {
+    en: 'Deafen (stop hearing your student)',
+    id: 'Tulikan (berhenti mendengar muridmu)',
+  },
+  'header.undeafen': {
+    en: 'Undeafen (hear your student again)',
+    id: 'Batal tulikan (dengar muridmu lagi)',
+  },
   'header.voiceUnavailable': {
     en: 'No voice for this language yet',
     id: 'Suara belum tersedia dalam Bahasa Indonesia',
@@ -130,6 +145,7 @@ export const messages = {
   'stage.playVoice': { en: "Play {name}'s voice", id: 'Putar suara {name}' },
   'stage.say': { en: 'Say something to {name}...', id: 'Katakan sesuatu ke {name}...' },
   'stage.writeMessage': { en: 'Write a message', id: 'Tulis pesan' },
+  'stage.dragHint': { en: 'Drag to move it', id: 'Seret untuk memindahkan' },
   'stage.openChat': { en: 'Open chat with {name}', id: 'Buka obrolan dengan {name}' },
   'stage.closeChat': { en: 'Close chat', id: 'Tutup obrolan' },
   'stage.closeResponse': { en: 'Close learner response', id: 'Tutup balasan murid' },
@@ -698,10 +714,13 @@ export const messages = {
     en: 'She asks questions here, and you can answer or ask your own without pressing Teach again. Unread replies show up as a badge.',
     id: 'Dia bertanya di sini, dan kamu bisa menjawab atau balik bertanya tanpa menekan Ajarkan lagi. Balasan yang belum dibaca muncul sebagai tanda.',
   },
-  'tour.pdfTitle': { en: 'Attach a reference (optional)', id: 'Lampirkan acuan (opsional)' },
-  'tour.pdfBody': {
-    en: 'Add a PDF of the source material to ground your evaluation. Your student never sees it — only the evaluator does.',
-    id: 'Tambahkan PDF bahan aslinya sebagai dasar penilaian. Muridmu tidak pernah melihatnya — hanya penilai.',
+  'tour.referenceTitle': {
+    en: 'Add reference material (optional)',
+    id: 'Tambahkan referensi (opsional)',
+  },
+  'tour.referenceBody': {
+    en: 'Let an agent find material on your topic, or upload your own. Only the evaluator reads it; your student never sees it.',
+    id: 'Minta agen mencarikan bahan untuk materimu, atau unggah bahanmu sendiri. Hanya penilai yang membacanya, muridmu tidak pernah melihatnya.',
   },
   'tour.finishTitle': { en: 'End the round', id: 'Akhiri sesinya' },
   'tour.finishBody': {

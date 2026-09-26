@@ -25,6 +25,10 @@ import { useIntroSeen } from '../../features/teaching-session/hooks/useIntroSeen
 import { useFirstSession } from '../../features/teaching-session/hooks/useFirstSession'
 import { useSessionSetup } from '../../features/teaching-session/hooks/useSessionSetup'
 import { useWorkspaceChat } from '../../features/teaching-session/hooks/useWorkspaceChat'
+import {
+  toastPlacement,
+  useLauncherPosition,
+} from '../../features/teaching-session/hooks/useLauncherPosition'
 import { useUserStore } from '../../state/UserStore'
 import {
   getStoredLearnerId,
@@ -173,6 +177,8 @@ export default function WorkspacePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [learner, id, workspace?.locale, workspace?.createdAt, firstSession])
 
+  const launcher = useLauncherPosition()
+
   const chat = useWorkspaceChat(id ?? '', bridge, learner.name, learner.avatarUrl, {
     seedMessages,
   })
@@ -309,7 +315,7 @@ export default function WorkspacePage() {
         {/* data-tour sits on the canvas area rather than inside Whiteboard:
             the whiteboard implementation can evolve, and this
             wrapper is the one element both render into. */}
-        <div className={styles.canvasArea} data-tour="whiteboard-area">
+        <div className={styles.canvasArea} data-tour="whiteboard-area" ref={launcher.areaRef}>
           <Whiteboard
             ref={whiteboardRef}
             initialSnapshot={workspace?.currentWhiteboardSnapshot}
@@ -366,6 +372,7 @@ export default function WorkspacePage() {
               toasts={chat.toasts}
               onDismiss={chat.dismissToast}
               onOpenChat={chat.open}
+              placement={toastPlacement(launcher.offset, launcher.area)}
             />
           )}
 
@@ -379,14 +386,18 @@ export default function WorkspacePage() {
             />
           )}
 
-          {/* Chat entry point, bottom-right. Gated on introDone for the same
-              reason ChatSidebar is: before the intro is done the sidebar is not
-              mounted, so a toggle would flip state with nothing to show. */}
+          {/* Chat entry point, bottom-right until the user drags it elsewhere;
+              the panel it opens stays on the right either way. Gated on
+              introDone for the same reason ChatSidebar is: before the intro is
+              done the sidebar is not mounted, so a toggle would flip state with
+              nothing to show. */}
           {introDone && !needsSetup && (
             <ChatLauncher
               chatOpen={chat.isOpen}
               chatUnread={chat.unreadCount}
               onToggleChat={chat.toggle}
+              offset={launcher.offset}
+              onMove={launcher.move}
               learnerAvatarUrl={learner.avatarUrl}
               learnerName={learner.name}
             />
