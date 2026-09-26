@@ -1,5 +1,6 @@
 import {
   AskedConcept,
+  AskedConceptKind,
   LearnerAction,
   LearnerActionKind,
   LearnerAgentInput,
@@ -49,7 +50,8 @@ const allowedStrategies: LearnerResponseStrategy[] = [
   "request_example",
   "challenge_claim",
   "paraphrase",
-  "attempt_problem"
+  "attempt_problem",
+  "extend_example"
 ];
 
 /**
@@ -101,13 +103,21 @@ export function normalizeLearnerOutput(
   raw: LearnerLLMOutput,
   input: LearnerAgentInput
 ): LearnerAgentOutput {
+  // A question that pushes the concept to a new case is counted under its own
+  // budget, so "what about FFFFF?" is not mistaken for asking the same thing a
+  // third time (learner.repeat.ts).
+  const kind: AskedConceptKind =
+    normalizeAction(raw.action).strategy === "extend_example"
+      ? "extend"
+      : "probe";
+
   // The response is settled first: the repeat limit can turn a third question
   // into "I get it, let's move on", and the state has to count what was
   // actually said, not what the model proposed.
-  const response = normalizeResponse(raw.response, input);
+  const response = normalizeResponse(raw.response, input, kind);
 
   return {
-    nextState: normalizeState(raw.nextState, input, response),
+    nextState: normalizeState(raw.nextState, input, response, kind),
     response
   };
 }
@@ -115,7 +125,8 @@ export function normalizeLearnerOutput(
 function normalizeState(
   state: Partial<LearnerState> | undefined,
   input: LearnerAgentInput,
-  response: LearnerResponse
+  response: LearnerResponse,
+  kind: AskedConceptKind
 ): LearnerState {
   return {
     sessionId: input.sessionId,
@@ -135,7 +146,7 @@ function normalizeState(
       state?.questionsAsked,
       input.currentState.questionsAsked
     ),
-    askedConcepts: nextAskedConcepts(input, response),
+    askedConcepts: nextAskedConcepts(input, response, kind),
     updatedAtTurn: input.turnIndex
   };
 }
@@ -147,7 +158,8 @@ function normalizeState(
  */
 function nextAskedConcepts(
   input: LearnerAgentInput,
-  response: LearnerResponse
+  response: LearnerResponse,
+  kind: AskedConceptKind
 ): AskedConcept[] {
   if (!isProbingType(response.type)) {
     return [...(input.currentState.askedConcepts ?? [])];
@@ -158,13 +170,15 @@ function nextAskedConcepts(
   return recordProbe(
     input.currentState,
     key,
-    response.targetConcept?.trim() || ""
+    response.targetConcept?.trim() || "",
+    kind
   );
 }
 
 function normalizeResponse(
   response: LearnerLLMOutput["response"] | undefined,
-  input: LearnerAgentInput
+  input: LearnerAgentInput,
+  kind: AskedConceptKind = "probe"
 ): LearnerResponse {
   const safeType = getSafeResponseType(response?.type);
   const safeDerivedFrom = getSafeDerivedFrom(response?.derivedFrom);
@@ -188,7 +202,7 @@ function normalizeResponse(
   // given and asks for the next material instead (learner.repeat.ts).
   if (
     isProbingType(safeType) &&
-    isRepeatExhausted(input.currentState, probeKey(targetConcept, text))
+    isRepeatExhausted(input.currentState, probeKey(targetConcept, text), kind)
   ) {
     return {
       responseId: createId("lr"),

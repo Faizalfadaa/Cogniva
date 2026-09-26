@@ -3,6 +3,7 @@ import {
   LearnerLLMOutput,
   LearnerState
 } from "./learner.types";
+import { harderCase, shouldExtendThisTurn } from "./learner.extend";
 
 export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
   const text = input.teachingText.trim();
@@ -44,6 +45,29 @@ export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
 
   if (unclearTerm) {
     addUnique(nextState.openGaps, unclearTerm);
+  }
+
+  // Some turns the student stretches the idea instead of poking at it: it takes
+  // the teacher's own example and asks how a much bigger one would go (§3.6).
+  // Paced by shouldExtendThisTurn so it stays occasional, and skipped when the
+  // explanation has no example to build on.
+  const harder = shouldExtendThisTurn(input) ? harderCase(text) : null;
+
+  if (harder) {
+    const question = createExtendingQuestion(harder, input.turnIndex);
+
+    addUnique(nextState.questionsAsked, question);
+
+    return {
+      nextState,
+      action: { kind: "respond", strategy: "extend_example" },
+      response: {
+        type: "question",
+        text: question,
+        targetConcept: concept ?? "the latest explanation",
+        derivedFrom: "new_info"
+      }
+    };
   }
 
   const responseText = createMockResponse(concept, unclearTerm, input.turnIndex);
@@ -130,6 +154,23 @@ function extractUnclearTerm(text: string): string | null {
     .filter(Boolean);
 
   return words.find((word) => word.length > 10) ?? null;
+}
+
+/** The offline student's "and what about a bigger one?" question. */
+function createExtendingQuestion(
+  harder: { from: string; to: string },
+  turnIndex: number
+): string {
+  // styleIndex 0/1/2 -> tsundere / kuudere / yandere-lite tone, as elsewhere.
+  const styleIndex = Math.abs(turnIndex) % 3;
+
+  const templates = [
+    `Fine, ${harder.from} I follow. But what about ${harder.to}, does the same way still work?`,
+    `${harder.from} is clear. What happens with ${harder.to} — same method?`,
+    `Wait, if ${harder.from} goes like that, then ${harder.to} too? I need to know that one.`
+  ];
+
+  return templates[styleIndex];
 }
 
 function createMockResponse(

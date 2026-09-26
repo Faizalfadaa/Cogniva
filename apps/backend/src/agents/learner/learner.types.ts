@@ -12,7 +12,16 @@ export type AskedConcept = {
   key: string;
   label: string;
   count: number;
+  /**
+   * Which budget this tally is: plain questions about the concept, or questions
+   * that push it to a new case. They are counted apart because an extension is
+   * a NEW question, not the user being asked the same thing twice. Absent on
+   * entries written before extensions existed, and read as "probe".
+   */
+  kind?: AskedConceptKind;
 };
+
+export type AskedConceptKind = "probe" | "extend";
 
 export type LearnerState = {
   sessionId: string;
@@ -81,7 +90,14 @@ export type LearnerResponseStrategy =
   | "request_example"
   | "challenge_claim"
   | "paraphrase"
-  | "attempt_problem";
+  | "attempt_problem"
+  /**
+   * Take what was just taught and push it to a harder case of its own accord:
+   * taught F0 → decimal, the student asks how FFFFF would go. It builds on the
+   * explanation instead of poking at what is missing from it, which is the one
+   * kind of question that makes the teacher extend their own understanding.
+   */
+  | "extend_example";
 
 /** The student's decision: use a tool to investigate first, or respond directly. */
 export type LearnerAction = {
