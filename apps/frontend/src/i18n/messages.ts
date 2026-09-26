@@ -263,8 +263,6 @@ export const messages = {
   // --- evaluation -----------------------------------------------------------
   'evaluation.complete': { en: 'Session complete', id: 'Sesi selesai' },
   'evaluation.letterTitle': { en: 'Letter from Your Learner', id: 'Surat dari Muridmu' },
-  'evaluation.letterOpen': { en: 'Open the letter from your learner', id: 'Buka surat dari muridmu' },
-  'evaluation.clickToOpen': { en: 'Click to open', id: 'Klik untuk membuka' },
   'evaluation.toTheirTeacher': { en: 'to their teacher', id: 'untuk gurunya' },
   'evaluation.notes': { en: 'My Notes', id: 'Catatanku' },
   'evaluation.learned': { en: 'Learned', id: 'Yang dipahami' },
@@ -422,6 +420,13 @@ export const messages = {
     en: 'How accurate and complete your explanation was against the reference material.',
     id: 'Ketepatan dan kelengkapan penjelasanmu dibanding materi rujukan.',
   },
+  /* Spelled out on the screen rather than buried in the code: a score nobody
+     can reproduce is a score nobody can argue with, and the whole point of
+     computing it from the findings was to make it checkable. */
+  'evaluation.scoreFormula': {
+    en: 'Counted from the findings below: 50% accuracy, 30% completeness, 20% clarity. Depth is judged separately and is not part of this number.',
+    id: 'Dihitung dari temuan di bawah: 50% ketepatan, 30% kelengkapan, 20% kejelasan. Kedalaman dinilai terpisah dan tidak masuk ke angka ini.',
+  },
   'evaluation.notesTitle': { en: 'How This Session Went', id: 'Penilaian Sesi Ini' },
   'evaluation.nothingToAssess': { en: 'Nothing to assess yet.', id: 'Belum ada yang bisa dinilai.' },
   'evaluation.followUpLabel': { en: 'Suggested fix', id: 'Saran perbaikan' },
@@ -436,8 +441,8 @@ export const messages = {
     id: 'Penilaian dibuat per konsep dari materi rujukan. Sesi yang sangat singkat, atau workspace tanpa materi rujukan, belum menghasilkan apa pun di sini. Lanjutkan sesi dan ajarkan satu konsep lagi untuk mengisinya.',
   },
   'evaluation.notesIntro': {
-    en: 'Assessed automatically against the reference material, not your student\'s private notes. Swipe to read them one at a time.',
-    id: 'Dinilai otomatis dari materi rujukan, bukan catatan pribadi muridmu. Geser untuk membaca satu per satu.',
+    en: 'Assessed automatically against the reference material, not your student\'s private notes. Filter by category, then open a finding to read its suggested fix.',
+    id: 'Dinilai otomatis dari materi rujukan, bukan catatan pribadi muridmu. Saring per kategori, lalu buka satu temuan untuk membaca saran perbaikannya.',
   },
   'evaluation.transcriptIntro': {
     en: 'Marked passages carry an assessment note. Click one to open it in place.',
@@ -461,6 +466,61 @@ export const messages = {
     id: 'Catatan untuk giliran ini, tanpa kutipan presisi',
   },
   'evaluation.seeFollowUp': { en: 'See the suggested fix', id: 'Lihat saran perbaikan' },
+
+  // --- findings board, radar, coverage --------------------------------------
+  'evaluation.radarAria': { en: 'Score shape per axis', id: 'Bentuk skor per aksis' },
+  'evaluation.filterAria': { en: 'Filter findings by category', id: 'Saring temuan per kategori' },
+  'evaluation.filterAll': { en: 'All', id: 'Semua' },
+  'evaluation.filterEmpty': {
+    en: 'No findings in this category.',
+    id: 'Tidak ada temuan di kategori ini.',
+  },
+  'evaluation.statsTitle': { en: 'Session at a Glance', id: 'Sekilas Sesi Ini' },
+  'evaluation.statTurns': { en: 'teaching turns', id: 'giliran mengajar' },
+  'evaluation.statAssessed': { en: 'concepts assessed', id: 'konsep dinilai' },
+  'evaluation.statCovered': { en: 'of them you covered', id: 'di antaranya kamu bahas' },
+  'evaluation.statWords': { en: 'words taught', id: 'kata diajarkan' },
+  'evaluation.turnLabel': { en: 'Turn {index}', id: 'Giliran {index}' },
+  'evaluation.spokenLabel': { en: 'Spoken', id: 'Lisan' },
+
+  // --- trend, timing, board replay, practice --------------------------------
+  'evaluation.trendTitle': {
+    en: 'Across your last {count} sessions',
+    id: '{count} sesi terakhirmu',
+  },
+  'evaluation.trendVsPrevious': { en: 'vs last session', id: 'dari sesi sebelumnya' },
+  'evaluation.trendSame': { en: 'same as last session', id: 'sama seperti sesi lalu' },
+  'evaluation.trendAxisY': { en: 'Score', id: 'Skor' },
+  'evaluation.trendAxisX': { en: 'Session, oldest first', id: 'Sesi, dari yang terlama' },
+  'evaluation.recordingLabel': { en: 'Your recording', id: 'Rekamanmu' },
+  'evaluation.trendCaption': {
+    en: 'Each dot is a finished session, scored the same way. Yours is the filled one.',
+    id: 'Tiap titik adalah satu sesi selesai, dinilai dengan cara yang sama. Sesi ini yang terisi penuh.',
+  },
+  'evaluation.statSpan': { en: 'teaching span', id: 'rentang mengajar' },
+  'evaluation.statLongestGap': { en: 'longest pause', id: 'jeda terlama' },
+  'evaluation.timingCaveat': {
+    en: 'Times are measured between one "Teach" and the next, and are shown as context only. How long someone thinks before explaining is not part of the score.',
+    id: 'Waktu dihitung antara satu "Teach" dan berikutnya, dan ditampilkan sebagai konteks saja. Lama berpikir sebelum menjelaskan tidak ikut dinilai.',
+  },
+  'evaluation.boardAlt': {
+    en: 'The whiteboard you taught turn {index} from',
+    id: 'Papan tulis yang kamu pakai mengajar di giliran {index}',
+  },
+  'evaluation.boardCaption': {
+    en: 'What you drew for this turn',
+    id: 'Yang kamu tulis untuk giliran ini',
+  },
+  'evaluation.practiceConcept': {
+    en: 'Practise this concept →',
+    id: 'Latih konsep ini →',
+  },
+  'evaluation.roundPickerLabel': { en: 'Which round', id: 'Ronde ke berapa' },
+  'evaluation.roundLabel': { en: 'Round {round}', id: 'Ronde {round}' },
+  'evaluation.viewingOlderRound': {
+    en: 'You are reading an earlier round. Your newest debrief is the last tab.',
+    id: 'Kamu sedang membaca ronde yang lebih lama. Debrief terbarumu ada di tab paling kanan.',
+  },
   'evaluation.processing2b': {
     en: 'Checking each concept against the reference...',
     id: 'Mencocokkan tiap konsep dengan materi rujukan...',
@@ -487,7 +547,6 @@ export const messages = {
   'evaluation.axisClarityShort': { en: 'Clear', id: 'Jelas' },
   'evaluation.axisDepth': { en: 'Depth of Understanding', id: 'Kedalaman Pemahaman' },
   'evaluation.axisDepthShort': { en: 'Deep', id: 'Dalam' },
-  'evaluation.axisUnmeasured': { en: 'not measured yet', id: 'belum terukur' },
   'evaluation.axisOutOf100': { en: '{label}: {value} out of 100', id: '{label}: {value} dari 100' },
   'evaluation.accuracyNone': {
     en: 'Nothing was judged right or wrong yet',

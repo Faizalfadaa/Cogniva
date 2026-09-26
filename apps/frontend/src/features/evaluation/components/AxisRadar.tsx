@@ -12,6 +12,12 @@ import styles from '../../../styles/Evaluation.module.css'
  * It does not replace the numbered cards below it, it summarises them. The shape
  * answers "is this lopsided?" at a glance; the cards still carry the number and
  * the sentence explaining what each one counted.
+ *
+ * Pointing at a vertex lights the card that explains it (and the reverse), so
+ * the two halves stop being two drawings of the same numbers and start being one
+ * control: the shape says which corner is short, the card says by how much. The
+ * vertices are focusable for the same reason — a keyboard reader gets the link
+ * too, and the tooltip doubles as the hover text a pointer user sees.
  */
 
 /* Wider than it is tall, because the left and right axis tips carry text that
@@ -34,9 +40,12 @@ function pointAt(index: number, total: number, fraction: number) {
 
 interface AxisRadarProps {
   axes: ScoreAxis[]
+  /** Key of the axis currently pointed at, from either the shape or a card. */
+  activeKey: string | null
+  onActiveChange: (key: string | null) => void
 }
 
-export function AxisRadar({ axes }: AxisRadarProps) {
+export function AxisRadar({ axes, activeKey, onActiveChange }: AxisRadarProps) {
   const t = useT()
   const total = axes.length
   if (total < 3) return null
@@ -60,7 +69,7 @@ export function AxisRadar({ axes }: AxisRadarProps) {
         className={styles.radar}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="img"
-        aria-label={`Bentuk skor per aksis: ${label}`}
+        aria-label={`${t('evaluation.radarAria')}: ${label}`}
       >
         {RINGS.map((r) => (
           <polygon
@@ -93,19 +102,40 @@ export function AxisRadar({ axes }: AxisRadarProps) {
 
         {axes.map((axis, i) => {
           const p = pointAt(i, total, (axis.value ?? 0) / 100)
-          return <circle key={axis.key} className={styles.radarDot} cx={p.x} cy={p.y} r="3.5" />
+          const active = activeKey === axis.key
+          return (
+            <circle
+              key={axis.key}
+              className={`${styles.radarDot} ${active ? styles.radarDotActive : ''}`}
+              cx={p.x}
+              cy={p.y}
+              r={active ? 6 : 3.5}
+              tabIndex={0}
+              role="button"
+              aria-label={`${axis.label}: ${
+                axis.value === null ? t('evaluation.notMeasured') : axis.value
+              }`}
+              onMouseEnter={() => onActiveChange(axis.key)}
+              onMouseLeave={() => onActiveChange(null)}
+              onFocus={() => onActiveChange(axis.key)}
+              onBlur={() => onActiveChange(null)}
+            />
+          )
         })}
 
         {axes.map((axis, i) => {
           const p = pointAt(i, total, 1.34)
+          const active = activeKey === axis.key
           return (
             <text
               key={axis.key}
-              className={styles.radarLabel}
+              className={`${styles.radarLabel} ${active ? styles.radarLabelActive : ''}`}
               x={p.x}
               y={p.y}
               textAnchor="middle"
               dominantBaseline="middle"
+              onMouseEnter={() => onActiveChange(axis.key)}
+              onMouseLeave={() => onActiveChange(null)}
             >
               {axis.short}
             </text>

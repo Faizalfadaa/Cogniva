@@ -54,6 +54,7 @@ export async function runEvaluator(
         maxTokens: config.LLM_MAX_TOKENS,
         timeout: config.LLM_TIMEOUT,
         thinkingBudget: config.LLM_THINKING_BUDGET,
+        temperature: config.EVALUATOR_TEMPERATURE,
       });
 
     const raw = await llm.structured({

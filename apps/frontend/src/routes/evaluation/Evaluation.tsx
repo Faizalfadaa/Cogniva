@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import type { WorkspaceDTO } from '../../dto/WorkspaceDTO'
-import type { EvaluationReportDTO } from '../../dto/EvaluationReportDTO'
+import type {
+  EvaluationReportDTO,
+  EvaluationRoundSummaryDTO,
+  ScoreHistoryPointDTO,
+} from '../../dto/EvaluationReportDTO'
+import type { TeachingCheckpointDTO } from '../../dto/TeachingCheckpointDTO'
 import { resolveLearner } from '../../lib/Learner'
 import { EvaluationProcessing } from '../../features/evaluation/components/EvaluationProcessing'
 import { LetterFromLearner } from '../../features/evaluation/components/LetterFromLearner'
@@ -10,6 +15,8 @@ import { ContinueLearning } from '../../features/evaluation/components/ContinueL
 import { ScoreBreakdown } from '../../features/evaluation/components/ScoreBreakdown'
 import { EvaluatorNotes } from '../../features/evaluation/components/EvaluatorNotes'
 import { TranscriptReview } from '../../features/evaluation/components/TranscriptReview'
+import { SessionSnapshot } from '../../features/evaluation/components/SessionSnapshot'
+import { RoundPicker } from '../../features/evaluation/components/RoundPicker'
 import { useLocale, usePinnedLocale, useT } from '../../i18n/LanguageProvider'
 import { LanguageToggle } from '../../i18n/LanguageToggle'
 import styles from '../../styles/Evaluation.module.css'
@@ -29,6 +36,9 @@ export default function EvaluationPage() {
   const [loading, setLoading] = useState(true)
   const [resuming, setResuming] = useState(false)
   const [tab, setTab] = useState<ReportTab>('summary')
+  const [history, setHistory] = useState<ScoreHistoryPointDTO[]>([])
+  const [rounds, setRounds] = useState<EvaluationRoundSummaryDTO[]>([])
+  const [checkpoints, setCheckpoints] = useState<TeachingCheckpointDTO[] | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // The report is written in the language the session ran in, so the whole page
@@ -87,8 +97,68 @@ export default function EvaluationPage() {
     }
   }, [bridge, id, workspace?.state]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The trend only exists once a report does, and only the report's own screen
+  // needs it — fetched here rather than folded into the report so a session's
+  // trend keeps up as later sessions land behind it.
+  useEffect(() => {
+    if (!report) return
+    bridge.getScoreHistory().then(setHistory).catch(() => {})
+  }, [bridge, report])
+
+  // Which rounds this workspace has. Fetched once a report exists, because
+  // before that there is nothing to have rounds of.
+  useEffect(() => {
+    if (!id || !report) return
+    bridge.getEvaluationRounds(id).then(setRounds).catch(() => {})
+  }, [bridge, id, report])
+
+  /**
+   * Switch to another finished round.
+   *
+   * The report is replaced rather than merged: every section on this screen
+   * reads from one round, and showing a mix of two would be worse than showing
+   * either. Checkpoints are dropped for the same reason — the board images
+   * belong to whichever round is on screen.
+   */
+  async function handleSelectRound(round: number) {
+    if (!id || round === report?.round) return
+    try {
+      const next = await bridge.getEvaluationReport(id, round)
+      setReport(next)
+      setCheckpoints(null)
+    } catch (err) {
+      console.error('[Evaluation] could not load round', round, err)
+    }
+  }
+
+  // Checkpoints carry the board images and the timestamps, and they are heavy
+  // (a data URL per turn). Fetched only when the Detail tab is actually opened,
+  // so a reader who never leaves Summary never pays for them.
+  useEffect(() => {
+    if (tab !== 'detail' || !id || checkpoints) return
+    bridge.getCheckpoints(id).then(setCheckpoints).catch(() => setCheckpoints([]))
+  }, [bridge, id, tab, checkpoints])
+
   async function handleNewSession() {
     const ws = await bridge.createWorkspace(locale)
+    navigate(`/workspace/${ws.id}`)
+  }
+
+  /**
+   * Open a fresh session already pointed at one concept.
+   *
+   * The title is what SessionSetup prefills its topic field from, so the user
+   * lands in the setup step with the gap already filled in and can edit it
+   * before starting — rather than being dropped into a session they did not
+   * get to shape.
+   */
+  async function handlePracticeConcept(concept: string) {
+    const ws = await bridge.createWorkspace(locale)
+    try {
+      await bridge.updateWorkspaceMeta(ws.id, { title: concept })
+    } catch {
+      // A failed title write costs the prefill, not the session.
+    }
     navigate(`/workspace/${ws.id}`)
   }
 
@@ -145,11 +215,21 @@ export default function EvaluationPage() {
 
       {/* Sections */}
       <div className={styles.reportContent}>
+        {/* Above the score, because it decides which score is being read. */}
+        <RoundPicker
+          rounds={rounds}
+          selected={report!.round}
+          onSelect={handleSelectRound}
+        />
+
         <ScoreBreakdown
           score={report!.score}
           depthScore={report!.depthScore}
           findings={report!.findings}
           learner={learner}
+          history={history}
+          workspaceId={id!}
+          round={report!.round}
         />
 
         <div className={styles.tabBar} role="tablist" aria-label={t('evaluation.reportView')}>
@@ -187,7 +267,7 @@ export default function EvaluationPage() {
             {/* Assessment, then the learner's own words about it, then where
                 to go next. Continue Learning closes the tab because it is the
                 step out of this screen. */}
-            <EvaluatorNotes findings={report!.findings} />
+            <EvaluatorNotes findings={report!.findings} onPractice={handlePracticeConcept} />
             <LetterFromLearner learner={learner} letter={report!.letter} />
             <ContinueLearning
               topics={report!.continueLearning}
@@ -203,9 +283,16 @@ export default function EvaluationPage() {
             aria-labelledby="report-tab-detail"
             className={styles.tabPanel}
           >
+            {/* The shape of the session, then the session itself. */}
+            <SessionSnapshot
+              transcript={report!.transcript ?? []}
+              findings={report!.findings}
+              checkpoints={checkpoints}
+            />
             <TranscriptReview
               transcript={report!.transcript ?? []}
               findings={report!.findings}
+              checkpoints={checkpoints}
             />
           </div>
         )}

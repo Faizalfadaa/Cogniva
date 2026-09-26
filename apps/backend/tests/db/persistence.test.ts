@@ -263,8 +263,13 @@ describe("workspace persistence", () => {
     expect(read).toEqual(report);
 
     // And assert the columns themselves, so a mapper that happened to echo its
-    // input back would still fail here.
-    const row = await prisma.report.findUnique({ where: { id_workspace: ws.id } });
+    // input back would still fail here. findFirst, not findUnique: a workspace
+    // keeps one report per finished round now, so id_workspace alone no longer
+    // identifies a row.
+    const row = await prisma.report.findFirst({
+      where: { id_workspace: ws.id },
+      orderBy: { round: "desc" },
+    });
     expect(row?.score).toBe(78);
     expect(row?.depth_score).toBe(41);
     expect(row?.findings).toEqual(report.findings);

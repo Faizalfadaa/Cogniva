@@ -127,6 +127,20 @@ export const VISION_CONFIDENCE_THRESHOLD: number = num(
 export const EVALUATOR_MODEL: string =
   process.env.COGNIVA_EVALUATOR_MODEL ?? "gemini-2.5-flash";
 
+/**
+ * Sampling temperature for the Evaluator only.
+ *
+ * Near-zero on purpose. An assessment is supposed to be the same twice: the
+ * same transcript against the same reference should classify the same way, and
+ * at the model's default temperature it did not. Only this agent sets one —
+ * the Learner keeps its default, because a student whose replies never vary
+ * stops reading as a person.
+ */
+export const EVALUATOR_TEMPERATURE: number = num(
+  process.env.COGNIVA_EVALUATOR_TEMPERATURE,
+  0,
+);
+
 // --- Retrieval / RAG for the Evaluator (§3.7) ------------------------------
 
 /**

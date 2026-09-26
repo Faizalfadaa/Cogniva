@@ -4,7 +4,11 @@ import type { WorkspaceDTO } from '../dto/WorkspaceDTO';
 import type { Locale } from '../i18n/messages';
 import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
-import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
+import type {
+  EvaluationReportDTO,
+  EvaluationRoundSummaryDTO,
+  ScoreHistoryPointDTO,
+} from '../dto/EvaluationReportDTO';
 import type { TimelineDTO } from '../dto/TimelineDTO';
 import type {
   ReferenceSuggestionsDTO,
@@ -221,10 +225,21 @@ export class RealCognivaBridge implements CognivaBridge {
     }
   }
 
-  getEvaluationReport(workspaceId: string): Promise<EvaluationReportDTO> {
+  getEvaluationReport(workspaceId: string, round?: number): Promise<EvaluationReportDTO> {
     // 404 until the evaluation finishes — surfaced as a rejection, matching the
     // mock so the Evaluation screen keeps polling getWorkspace() until Completed.
-    return getJson<EvaluationReportDTO>(`/api/workspaces/${workspaceId}/report`);
+    const query = round === undefined ? '' : `?round=${round}`;
+    return getJson<EvaluationReportDTO>(`/api/workspaces/${workspaceId}/report${query}`);
+  }
+
+  getEvaluationRounds(workspaceId: string): Promise<EvaluationRoundSummaryDTO[]> {
+    return getJson<EvaluationRoundSummaryDTO[]>(
+      `/api/workspaces/${workspaceId}/report/rounds`,
+    );
+  }
+
+  getScoreHistory(): Promise<ScoreHistoryPointDTO[]> {
+    return getJson<ScoreHistoryPointDTO[]>('/api/reports/history');
   }
 
   // Resume a finished session back into teaching — transcript and the Learner's

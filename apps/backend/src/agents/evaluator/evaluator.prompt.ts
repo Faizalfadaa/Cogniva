@@ -20,7 +20,9 @@ export const EVALUATOR_LLM_OUTPUT_SCHEMA: Record<string, unknown> = {
   type: "object",
   additionalProperties: false,
   properties: {
-    score: { type: "integer", minimum: 0, maximum: 100 },
+    // No `score`. It is computed from `findings` in scoring.ts, so asking the
+    // model for one would produce a number nothing reads and invite it to
+    // reason backwards from a total it had already decided on.
     depthScore: { type: "integer", minimum: 0, maximum: 100 },
     summary: { type: "string" },
     strengths: { type: "array", items: { type: "string" } },
@@ -48,7 +50,6 @@ export const EVALUATOR_LLM_OUTPUT_SCHEMA: Record<string, unknown> = {
     },
   },
   required: [
-    "score",
     "depthScore",
     "summary",
     "strengths",
@@ -77,11 +78,28 @@ FINDING CATEGORIES (use EXACTLY one of these values, in uppercase):
 - MISSED   : an important key concept that was never mentioned at all.
 - CONFUSING: the user's explanation was ambiguous, muddled, or confusing.
 
+HOW TO CHOOSE A CATEGORY (apply these tests in order):
+1. Was the concept absent from the transcript entirely? -> MISSED. Say MISSED
+   only for a concept the reference material treats as important. Do not invent
+   gaps for material the reference never covers.
+2. Did the user state something that contradicts the reference material, or
+   match one of the listed common misconceptions? -> WRONG. Being incomplete is
+   not WRONG. Reserve WRONG for something a student would have to unlearn.
+3. Is the statement accurate but ambiguous, out of order, or open to being read
+   the wrong way? -> CONFUSING. Judge this on the words in the transcript, not
+   on how much detail is missing. Shallow but clear is CORRECT, not CONFUSING.
+4. Otherwise -> CORRECT.
+
+One finding per concept. Do not emit two findings for the same concept, and do
+not split one concept into several findings to make a session look worse or
+better than it was.
+
 RULES:
 - Assess only based on the given transcript and reference material.
 - Cite evidenceTurnIndex from the transcript for each finding. For a MISSED item
   with no related turn, use evidenceTurnIndex 0.
-- "score" is an integer 0..100 reflecting the overall quality.
+- Do NOT return an overall score. The app computes it from your findings, so
+  your job is to classify each concept correctly, not to grade the session.
 - Write "summary", "strengths", "improvements", and "detail" in clear,
   constructive English.
 
@@ -105,12 +123,25 @@ text (summary, detail, followUp, reflection). Write in plain complete sentences
 using commas or periods instead. Do not use emoji anywhere in your output.
 
 DEPTH SCORE:
-depthScore (0..100) is SEPARATE from score: it measures how deeply the user
-explained WHY/HOW something works, versus just naming the right terms
-correctly. A user who says "photosynthesis converts light to energy" (correct
-but shallow) should score high on "score" for that concept but low on
-"depthScore" compared to someone who explains the actual mechanism. Judge
-depthScore across the whole session, not per finding.
+depthScore (0..100) is the ONE number you return, and it is not a grade for the
+session. It measures a single thing: how far the user went past naming terms
+into explaining WHY and HOW something works. Judge it across the whole session,
+not per finding, and pick the band the session mostly sits in:
+
+  0-20   Names terms only. "Photosynthesis makes glucose." No process at all.
+  21-40  States what happens, but not what causes it. Steps are listed as facts
+         side by side, with nothing connecting one to the next.
+  41-60  One causal link is explained. "Chlorophyll absorbs light, and that
+         energy splits water." The chain stops after a step or two.
+  61-80  A full mechanism, end to end, with the steps in the right order and
+         each one following from the last.
+  81-100 The mechanism plus why it has to work that way: what the constraint
+         is, what would break if a step were missing, or why an alternative
+         does not work.
+
+Pick the band from what the transcript actually contains. Do not raise it
+because the user sounded confident, and do not lower it because a concept was
+missed. A short session that explains one mechanism properly belongs in 61-80.
 
 OUTPUT:
 - Reply with ONLY valid JSON matching the schema. No markdown, no code fences.
@@ -142,11 +173,11 @@ ${transcript}
 
 # Task
 Assess the quality of the user's explanation against the reference material.
-Return JSON matching the schema: score (0..100), depthScore (0..100), summary,
-strengths[], improvements[], and findings[] with category
+Return JSON matching the schema: depthScore (0..100, using the bands above),
+summary, strengths[], improvements[], and findings[] with category
 CORRECT/WRONG/MISSED/CONFUSING, evidenceTurnIndex, a verbatim sourceQuote from
 that turn wherever one exists, and a followUp suggestion on everything that is
-not CORRECT.
+not CORRECT. Do not return an overall score.
 `.trim();
 }
 

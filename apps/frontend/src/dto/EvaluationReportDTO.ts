@@ -36,6 +36,15 @@ export interface EvaluationTranscriptTurnDTO {
 }
 
 export interface EvaluationReportDTO {
+  /**
+   * Which finished round this debrief belongs to, counting from 1.
+   *
+   * A workspace keeps one report per round, so choosing "continue teaching"
+   * and finishing again adds a round instead of overwriting the last one.
+   */
+  round: number;
+  /** When this round's debrief was written. */
+  createdAt: string;
   /** A letter from the learner to the user */
   letter: string;
   notebook: EvaluationNotebookDTO;
@@ -51,4 +60,34 @@ export interface EvaluationReportDTO {
   findings: EvaluationFindingDTO[];
   /** The turns `findings` cite. Empty when the report was built without one. */
   transcript?: EvaluationTranscriptTurnDTO[];
+}
+
+/**
+ * One finished session's score, for the trend across sessions.
+ *
+ * Fetched apart from the report because a report describes one session and
+ * cannot know what came after it.
+ */
+export interface ScoreHistoryPointDTO {
+  workspaceId: string;
+  /** Which round of that workspace this score came from. */
+  round: number;
+  title: string | null;
+  score: number;
+  /** When the report was written, oldest first. */
+  completedAt: string;
+}
+
+/**
+ * One finished round of a workspace, as the round picker lists them.
+ *
+ * Only enough to label a round and show how it went — the full debrief is
+ * fetched when a round is actually opened.
+ */
+export interface EvaluationRoundSummaryDTO {
+  round: number;
+  score: number;
+  depthScore: number;
+  findingCount: number;
+  createdAt: string;
 }

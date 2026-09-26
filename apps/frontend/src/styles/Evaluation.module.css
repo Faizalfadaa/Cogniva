@@ -219,51 +219,53 @@
 /* ═══════════════════════════════════════════════════════════
    Letter from Learner
 ═══════════════════════════════════════════════════════════ */
-.letterSealed {
-  display: flex;
-  align-items: center;
+/* The character beside the letter, not just above it: a fixed portrait column
+   on a wide screen, stacked into a banner once the letter needs the full width. */
+.letterLayout {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
   gap: 16px;
-  padding: 20px 24px;
-  background: var(--cream);
-  border: 1.5px dashed var(--border-strong);
+  align-items: start;
+}
+
+.letterPortrait {
+  background: var(--forest-dark);
   border-radius: var(--radius-lg);
-  cursor: pointer;
-  transition: border-color var(--dur-fast), background var(--dur-fast);
-}
-.letterSealed:hover {
-  border-color: var(--lime);
-  background: var(--lime-tint);
-}
-
-.letterSealAvatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-  background: var(--parchment);
+  padding: 18px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
 }
 
-.letterSealText {
-  flex: 1;
+.letterChibi {
+  width: 100%;
+  max-width: 140px;
+  height: auto;
+  display: block;
 }
 
-.letterSealFrom {
+.letterPortraitName {
+  font-family: var(--font-display);
   font-size: 14px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--text-on-forest);
+  margin-top: 4px;
 }
 
-.letterSealHint {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
-.letterSealIcon {
-  font-size: 24px;
-  flex-shrink: 0;
-  opacity: 0.5;
+/* The temperament chip is the one gold thing in this section: it labels who is
+   speaking, which is not one of the four finding verdicts and must not borrow
+   their colours. */
+.letterPortraitTrait {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gold-text);
+  background: var(--gold-tint);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
 }
 
 /* Opened letter */
@@ -549,7 +551,19 @@
     gap: 32px;
   }
 
-  .letterSealed { padding: 16px; gap: 12px; }
+  /* The portrait becomes a banner above the letter: a 180px column beside a
+     narrow letter would leave both too tight to read. */
+  .letterLayout { grid-template-columns: minmax(0, 1fr); }
+  .letterPortrait {
+    flex-direction: row;
+    justify-content: flex-start;
+    text-align: left;
+    gap: 14px;
+    padding: 12px 16px;
+  }
+  .letterChibi { max-width: 72px; }
+  .letterPortraitName { margin-top: 0; }
+
   .letterHeader { padding: 14px 16px; }
   .letterBody { padding: 16px; }
 
@@ -608,6 +622,16 @@
   max-width: 46ch;
 }
 
+/* The arithmetic, set one step quieter than the sentence above it: there to be
+   checked when someone doubts the number, not read on the way past. */
+.scoreFormula {
+  flex-basis: 100%;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-on-forest-faint);
+  max-width: 52ch;
+}
+
 .axisGrid {
   display: grid;
   /* Two by two, not four across: the column is 616px here, so four would leave
@@ -625,6 +649,14 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+
+/* Pointing at either half of the pair lights the other, so the shape and the
+   number stop being two separate readings of the same four values. */
+.axisCardActive {
+  border-color: var(--lime);
+  background: rgba(216, 255, 41, 0.08);
 }
 
 .axisLabel {
@@ -972,7 +1004,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Evaluator notes slider
+   Evaluator notes: filter chips + findings board
 ═══════════════════════════════════════════════════════════ */
 .notesIntro {
   font-size: 13px;
@@ -980,6 +1012,56 @@
   color: var(--text-secondary);
   max-width: 64ch;
   margin-top: -6px;
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 7px 14px;
+  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+}
+.filterChip:hover {
+  border-color: var(--border-sand);
+}
+.filterChip[aria-pressed='true'] {
+  background: var(--forest-dark);
+  border-color: var(--forest-dark);
+  color: var(--text-on-dark);
+}
+.filterChip:focus-visible {
+  outline: 2px solid var(--green-accent);
+  outline-offset: 2px;
+}
+
+/* The chip's dot reuses the badge classes, so a category's colour is learned
+   once and holds across the chip, the badge and the turn rail. */
+.filterDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  /* The badge classes set a text colour this element has no text for; only the
+     background is wanted here. */
+  color: transparent;
+}
+
+.filterCount {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.7;
 }
 
 .notesSlider {
@@ -1028,6 +1110,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  align-items: flex-start;
   /* Off-centre cards recede so the one being read is unambiguous. */
   opacity: 0.55;
   transition: opacity var(--dur-base), border-color var(--dur-base);
@@ -1039,6 +1122,7 @@
 }
 
 .noteCardTop {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1089,6 +1173,325 @@
 .notesArrow:focus-visible {
   outline: 2px solid var(--green-accent);
   outline-offset: 2px;
+}
+
+/* The one action a finding can offer, so it carries the gold accent rather than
+   the lime every other button on the page uses. */
+.practiceButton {
+  align-self: flex-start;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--gold-text);
+  background: var(--gold-tint);
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-pill);
+  padding: 8px 16px;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.practiceButton:hover:not(:disabled) {
+  background: var(--gold);
+}
+.practiceButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.practiceButton:focus-visible {
+  outline: 2px solid var(--green-accent);
+  outline-offset: 2px;
+}
+
+/* Timing is context, never a grade, so it is set like a footnote rather than
+   like another number in the row above it. */
+.statCaveat {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: 68ch;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   The board behind a turn
+═══════════════════════════════════════════════════════════ */
+.turnBoard {
+  margin: 2px 0 10px;
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-md);
+  background: var(--parchment);
+  overflow: hidden;
+}
+
+.turnBoardImage {
+  display: block;
+  width: 100%;
+  /* Capped rather than free: a board is context for the words under it, and a
+     full-height screenshot would push the assessment itself off the screen. */
+  max-height: 280px;
+  object-fit: contain;
+  background: var(--card-bg);
+}
+
+.turnBoardCaption {
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-warm);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Round picker: which finished round is on screen
+═══════════════════════════════════════════════════════════ */
+.roundPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.roundPickerLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.roundTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.roundTab {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
+}
+.roundTab:hover {
+  border-color: var(--border-sand);
+}
+.roundTab:focus-visible {
+  outline: 2px solid var(--green-accent);
+  outline-offset: 2px;
+}
+
+.roundTabActive {
+  background: var(--forest-dark);
+  border-color: var(--forest-dark);
+  color: var(--text-on-dark);
+}
+
+.roundTabName {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* The number is the reason to switch tabs, so it is set apart from the label
+   rather than sharing its weight. */
+.roundTabScore {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+/* An older round is a perfectly good thing to be reading, so this says where
+   you are rather than warning you about it. */
+.roundNotice {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Score trend across sessions
+═══════════════════════════════════════════════════════════ */
+.trendCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trendTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.trendTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-on-forest-muted);
+}
+
+.trendDelta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-on-forest-muted);
+}
+.trendUp { color: var(--lime); }
+/* Not red. A dip is information, not a failure, and this screen has four
+   category colours already spoken for. */
+.trendDown { color: var(--text-on-forest-muted); }
+
+/* The wrapper is what gets measured; the svg is drawn at that exact pixel size
+   rather than scaled into it, so the strip spans the card at a height this
+   component chooses instead of one the aspect ratio imposes. */
+.trendChartWrap {
+  width: 100%;
+  min-width: 0;
+  /* Without this the svg's own width inflates the wrapper, the wrapper reports
+     that inflated width back, and the measurement can never come down again.
+     Clipping breaks the loop: the wrapper is sized by the card, and an
+     oversized first paint is hidden rather than load-bearing. */
+  overflow: hidden;
+}
+
+.trendChart {
+  display: block;
+}
+
+.trendLine {
+  fill: none;
+  stroke: var(--lime);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trendDot {
+  fill: var(--forest-dark);
+  stroke: var(--lime);
+  stroke-width: 2;
+}
+
+.trendDotCurrent {
+  fill: var(--lime);
+  stroke: var(--forest-dark);
+  stroke-width: 2;
+}
+
+.trendCaption {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-on-forest-muted);
+}
+
+/* Faint, because a gridline is a reading aid and must never compete with the
+   line whose height it exists to explain. */
+.trendGrid {
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+}
+
+/* Sizes are true pixels now that the svg is drawn at its measured width, so
+   they are set where they read rather than where they scale to. */
+.trendAxisTick {
+  fill: var(--text-on-forest-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  dominant-baseline: middle;
+}
+
+.trendAxisName {
+  fill: var(--text-on-forest-faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* The value sits on its own point, so the exact number never has to be
+   estimated against the axis. */
+.trendValue {
+  fill: var(--text-on-forest-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.trendValueCurrent {
+  fill: var(--lime);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.trendLegend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+}
+
+.trendLegendItem {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-on-forest-muted);
+  min-width: 0;
+}
+
+.trendLegendCurrent {
+  color: var(--text-on-forest);
+  font-weight: 600;
+}
+
+.trendLegendIndex {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  flex: none;
+}
+
+.trendLegendName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 24ch;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   The recording behind a turn
+═══════════════════════════════════════════════════════════ */
+.turnAudio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.turnAudioLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex: none;
+}
+
+.turnAudioPlayer {
+  flex: 1;
+  min-width: 200px;
+  max-width: 420px;
+  height: 32px;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1259,6 +1662,100 @@
 /* ═══════════════════════════════════════════════════════════
    Session highlights: the best thing, and the first fix
 ═══════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   Session snapshot: counts, then a rail into the transcript
+═══════════════════════════════════════════════════════════ */
+.snapshotCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.statRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 14px;
+}
+
+/* Baseline-aligned number and label rather than four boxed tiles: these are one
+   sentence about the session, not four separate readings. */
+.statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statValue {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.statLabel {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.turnRail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--divider-warm);
+}
+
+.turnChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 6px 12px;
+  transition: background var(--dur-fast), border-color var(--dur-fast);
+}
+.turnChip:hover {
+  background: var(--card-bg);
+  border-color: var(--border-sand);
+}
+.turnChip:focus-visible {
+  outline: 2px solid var(--green-accent);
+  outline-offset: 2px;
+}
+
+/* The dot carries the turn's worst verdict, in the same colours the badges use,
+   so the one turn worth re-reading is findable before reading any of them. */
+.turnChipDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  color: transparent;
+}
+
+.turnChipDotPlain {
+  background: var(--border-sand);
+}
+
+.turnChipStatus {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 .highlightRow {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1361,8 +1858,22 @@
   stroke-linejoin: round;
 }
 
+/* The vertices are the handle on the shape: pointing at one names the axis and
+   lights its card. `r` is set in the markup so the ring grows from its own
+   centre rather than scaling the whole SVG coordinate space. */
 .radarDot {
   fill: var(--lime);
+  cursor: pointer;
+  transition: r var(--dur-fast), stroke-width var(--dur-fast);
+}
+.radarDot:focus-visible {
+  outline: 2px solid var(--green-accent);
+  outline-offset: 2px;
+}
+
+.radarDotActive {
+  stroke: var(--forest-dark);
+  stroke-width: 2;
 }
 
 .radarLabel {
@@ -1371,6 +1882,11 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  cursor: pointer;
+}
+
+.radarLabelActive {
+  fill: var(--lime);
 }
 
 .axisIcon {
