@@ -27,6 +27,21 @@ import { endGuest, guestForWorkspace, guestStorage, rememberGuestWorkspace } fro
 import * as service from "../../modules/workspace/workspaceService.js";
 import { workspaces } from "../../modules/workspace/workspaceStore.js";
 
+/**
+ * A GET that answers with bytes rather than JSON: the reference PDF, the PDF the
+ * board is drawn on, and rendered speech. These are fetched by <img>/<audio>/
+ * pdf.js rather than by our fetch wrapper, so they carry no guest header and are
+ * authorized by the workspace itself.
+ */
+function isBinaryGet(method: string, path: string): boolean {
+  if (method !== "GET") return false;
+  return (
+    path.endsWith("/pdf") ||
+    path.endsWith("/board-pdf") ||
+    path.includes("/audio/")
+  );
+}
+
 export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
   const owners = new WeakMap<FastifyRequest, string>();
   app.addHook("onRequest", (req, reply, done) => {
@@ -34,7 +49,7 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     const guestId = typeof header === "string" ? header : undefined;
     const path = req.url.split("?")[0];
     const id = (req.params as { id?: string })?.id;
-    const binary = req.method === "GET" && (path.endsWith("/pdf") || path.includes("/audio/"));
+    const binary = isBinaryGet(req.method, path);
     const binaryGuest = binary && id ? guestForWorkspace(id) : undefined;
     if (binaryGuest) {
       reply.header("Cache-Control", "no-store");
@@ -84,7 +99,7 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     const id = (req.params as { id?: string })?.id;
     if (!id) return; // /workspaces collection
     const path = req.url.split("?")[0];
-    if (req.method === "GET" && (path.endsWith("/pdf") || path.includes("/audio/"))) return;
+    if (isBinaryGet(req.method, path)) return;
     if (!(await service.isOwner(id, await ownerOf(req)))) return notFound(reply);
   });
 
@@ -142,6 +157,20 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     return ws ?? notFound(reply);
   });
 
+  // The PDF the board is drawn on. Separate from the route above because it is
+  // a different thing with a different audience: teaching material the student
+  // is meant to see, not the answer key (§1.4).
+  app.post("/workspaces/:id/board-pdf", async (req, reply) => {
+    const parsed = uploadPdfSchema.safeParse(req.body);
+    if (!parsed.success) return badRequest(reply, "Invalid board pdf payload");
+    const ws = await service.setBoardPdf(
+      idOf(req.params),
+      Buffer.from(parsed.data.data, "base64"),
+      parsed.data.mime,
+    );
+    return ws ?? notFound(reply);
+  });
+
   // Reference material the user wrote or pasted. Unlike the two routes below it
   // spends no tokens, so it answers as fast as any other write.
   app.post("/workspaces/:id/reference-text", async (req, reply) => {
@@ -178,6 +207,12 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/workspaces/:id/pdf", async (req, reply) => {
     const blob = await workspaces.getPdf(idOf(req.params));
+    if (!blob) return notFound(reply);
+    return reply.type(blob.mime).send(blob.data);
+  });
+
+  app.get("/workspaces/:id/board-pdf", async (req, reply) => {
+    const blob = await workspaces.getBoardPdf(idOf(req.params));
     if (!blob) return notFound(reply);
     return reply.type(blob.mime).send(blob.data);
   });

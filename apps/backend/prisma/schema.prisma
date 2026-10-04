@@ -173,6 +173,12 @@ model workspace {
   /// The uploaded reference PDF, served back by GET /workspaces/:id/pdf.
   pdf_data            Bytes?
   pdf_mime            String?
+  /// The PDF the board is drawn on, served by GET /workspaces/:id/board-pdf.
+  /// Kept apart from pdf_data because the two have opposite audiences: this one
+  /// is teaching material the student is meant to see (one page per checkpoint),
+  /// pdf_data is the Evaluator's answer key and reaches no other agent (§1.4).
+  board_pdf_data      Bytes?
+  board_pdf_mime      String?
   /// Text extracted from that PDF — the Evaluator's answer key (§1.4, §3.7).
   reference_text      String?
   /// Where reference_text came from when it was not an upload: the web source

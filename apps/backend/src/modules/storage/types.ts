@@ -161,6 +161,12 @@ export interface WorkspaceStore {
   savePdf(workspaceId: string, blob: StoredBlob): Promise<void>;
   getPdf(workspaceId: string): Promise<StoredBlob | undefined>;
 
+  // --- Board PDF blob ----------------------------------------------------
+  // The pages the user draws on, kept apart from the reference PDF above:
+  // this one is teaching material and is meant to be seen.
+  saveBoardPdf(workspaceId: string, blob: StoredBlob): Promise<void>;
+  getBoardPdf(workspaceId: string): Promise<StoredBlob | undefined>;
+
   // --- Reference material (text extracted from the uploaded PDF) ---------
   // Read only by the Evaluator as the answer key (§1.4); never by the Learner.
   saveReference(workspaceId: string, text: string): Promise<void>;

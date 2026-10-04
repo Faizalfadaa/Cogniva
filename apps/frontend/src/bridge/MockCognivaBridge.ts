@@ -292,6 +292,21 @@ export class MockCognivaBridge implements CognivaBridge {
     return { ...updated };
   }
 
+  async uploadBoardPdf(workspaceId: string, file: File): Promise<WorkspaceDTO> {
+    await delay(500);
+    const ws = store.workspaces.get(workspaceId);
+    if (!ws) throw new Error(`[Mock] Workspace not found: ${workspaceId}`);
+    // A blob URL is enough for pdf.js, and it keeps the offline demo working
+    // without a server to serve the bytes back.
+    const updated: WorkspaceDTO = {
+      ...ws,
+      boardPdfUrl: URL.createObjectURL(file),
+      updatedAt: now(),
+    };
+    store.workspaces.set(workspaceId, updated);
+    return { ...updated };
+  }
+
   async saveReferenceText(
     workspaceId: string,
     text: string

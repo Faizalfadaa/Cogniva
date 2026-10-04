@@ -1,3 +1,5 @@
+import type { Locale } from "../../contracts/workspace.js";
+
 export type Misconception = {
   concept: string;
   belief: string;
@@ -85,6 +87,12 @@ export type LearnerAgentInput = {
    * and the prompt then falls back to its own name.
    */
   learnerName?: string;
+
+  /**
+   * The language the session runs in, so the student answers in it. Absent
+   * outside a workspace, and the prompt then follows the teacher's language.
+   */
+  locale?: Locale;
 
   /** Names of the tools allowed this turn (filled by the agent loop). */
   availableTools?: string[];

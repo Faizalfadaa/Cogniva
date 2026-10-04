@@ -18,6 +18,7 @@ import type { EvaluationResult } from "../../contracts/evaluation.js";
 import type { LearnerResponse, LearnerState, Misc } from "../../contracts/learner.js";
 import type { SpeechTranscript } from "../../contracts/speech.js";
 import type { Timeline } from "../../contracts/timeline.js";
+import type { Locale } from "../../contracts/workspace.js";
 import { narrate } from "./narration.js";
 import { runLearnerTurn } from "./learner.agent.js";
 import { EARLIER_BOARD_HEADING } from "./learner.depth.js";
@@ -43,6 +44,8 @@ export interface RespondArgs {
   timeline?: Timeline;
   /** The character's name, which the student answers to (see LearnerAgentInput). */
   learnerName?: string;
+  /** The session's language, which the student answers in (see LearnerAgentInput). */
+  locale?: Locale;
 }
 
 /**
@@ -204,11 +207,12 @@ export class LearnerAgent {
     onUsage,
     timeline,
     learnerName,
+    locale,
   }: RespondArgs): Promise<[LearnerResponse, LearnerState]> {
     const teachingText = composeTeachingText(interpretation, speech, timeline);
 
     const output = await runLearnerTurn(
-      { sessionId: state.sessionId, turnIndex, teachingText, currentState: state, learnerName },
+      { sessionId: state.sessionId, turnIndex, teachingText, currentState: state, learnerName, locale },
       { useMock: this.options.forceMock, tools, onUsage },
     );
 
