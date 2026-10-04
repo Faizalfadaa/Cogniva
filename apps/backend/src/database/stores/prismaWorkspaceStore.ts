@@ -418,6 +418,30 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
     return { data: Buffer.from(row.pdf_data), mime: row.pdf_mime ?? "application/pdf" };
   }
 
+  // --- Board PDF blob ----------------------------------------------------
+
+  async saveBoardPdf(workspaceId: string, blob: StoredBlob): Promise<void> {
+    await prisma.workspace.updateMany({
+      where: { id_workspace: workspaceId },
+      data: {
+        board_pdf_data: new Uint8Array(blob.data),
+        board_pdf_mime: blob.mime,
+      },
+    });
+  }
+
+  async getBoardPdf(workspaceId: string): Promise<StoredBlob | undefined> {
+    const row = await prisma.workspace.findUnique({
+      where: { id_workspace: workspaceId },
+      select: { board_pdf_data: true, board_pdf_mime: true },
+    });
+    if (!row?.board_pdf_data) return undefined;
+    return {
+      data: Buffer.from(row.board_pdf_data),
+      mime: row.board_pdf_mime ?? "application/pdf",
+    };
+  }
+
   // --- Reference material -----------------------------------------------
 
   async saveReference(workspaceId: string, text: string): Promise<void> {
@@ -529,6 +553,9 @@ function toWorkspace(row: WorkspaceRow): Workspace {
     description: row.description ?? undefined,
     // Rebuilt rather than stored: it is a route on this server, not data.
     pdfUrl: row.pdf_mime ? `/api/workspaces/${row.id_workspace}/pdf` : undefined,
+    boardPdfUrl: row.board_pdf_mime
+      ? `/api/workspaces/${row.id_workspace}/board-pdf`
+      : undefined,
     referenceSource: readReferenceSource(row.reference_source),
     state: row.state as WorkspaceState,
     currentWhiteboardSnapshot: row.whiteboard_snapshot ?? undefined,

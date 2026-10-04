@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useT } from '../../../i18n/LanguageProvider'
 import styles from '../../../styles/TeachingSession.module.css'
+import { resolveFileHref } from '../../../bridge/fileHref'
 
 interface ReferenceMenuProps {
   /** Uploaded reference file, if any. */
@@ -11,13 +12,6 @@ interface ReferenceMenuProps {
   onUpload: (file: File) => void
   /** Opens the Referencer dialog, where an agent looks material up. */
   onFindWithAgent: () => void
-}
-
-/** The backend returns a relative /api path; mock/blobs are already absolute. */
-function resolveFileHref(url: string): string {
-  if (/^(https?:|blob:|data:)/.test(url)) return url
-  const base = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
-  return `${base}${url}`
 }
 
 /** The menu's choices, in order, for arrow-key movement between them. */

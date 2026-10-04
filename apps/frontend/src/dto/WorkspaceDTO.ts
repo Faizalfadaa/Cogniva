@@ -9,6 +9,17 @@ export interface WorkspaceDTO {
   description?: string;
   pdfUrl?: string;
   /**
+   * A PDF uploaded to be WRITTEN ON: the board stands on its pages instead of
+   * being a blank whiteboard.
+   *
+   * Separate from `pdfUrl`, which is the reference the Evaluator grades against
+   * and which no other agent sees. These pages are teaching material: the page
+   * being explained goes into the checkpoint and is read like any other board. A
+   * user may point the board at their reference PDF instead of uploading a
+   * second copy - that choice is theirs, and only the page being taught is sent.
+   */
+  boardPdfUrl?: string;
+  /**
    * Set when the reference material came from a web source the Referencer found
    * instead of an uploaded PDF. The two are mutually exclusive — uploading a PDF
    * clears this.

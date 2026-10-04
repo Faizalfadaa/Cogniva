@@ -105,6 +105,51 @@ export const messages = {
   'header.recordAudio': { en: 'Start recording audio', id: 'Mulai merekam suara' },
   'header.stopRecordAudio': { en: 'Stop recording audio', id: 'Berhenti merekam suara' },
 
+  // --- the board's pages (a PDF the user writes on) -------------------------
+  'board.pageOf': { en: 'Page {label} of {count}', id: 'Halaman {label} dari {count}' },
+  'board.prevPage': { en: 'Previous page', id: 'Halaman sebelumnya' },
+  'board.nextPage': { en: 'Next page', id: 'Halaman berikutnya' },
+  'board.addBlank': { en: 'Add paper here', id: 'Tambah kertas di sini' },
+  'board.addBlankHint': {
+    en: 'Blank paper after this page, for working things out',
+    id: 'Kertas kosong setelah halaman ini, untuk coret-coret',
+  },
+  'board.removeBlank': { en: 'Remove this paper', id: 'Hapus kertas ini' },
+  'board.paper': { en: 'paper', id: 'kertas' },
+  'board.baseMenu': { en: 'Board base', id: 'Dasar papan' },
+  'board.attachPdf': { en: 'Teach on a PDF', id: 'Mengajar di atas PDF' },
+  'board.baseTitle': { en: 'What should the board stand on?', id: 'Papan ini mau pakai dasar apa?' },
+  'board.baseSubtitle': {
+    en: 'Teach on a PDF the way you would write in a book, or keep the blank whiteboard.',
+    id: 'Mengajar di atas PDF seperti menulis di buku, atau tetap pakai papan tulis kosong.',
+  },
+  'board.baseReference': { en: 'The PDF already attached', id: 'PDF yang sudah dilampirkan' },
+  'board.baseReferenceNote': {
+    en: 'Your reference material. Only the page you are explaining is shown to the student, like teaching out of a book.',
+    id: 'Materi referensi Anda. Hanya halaman yang sedang Anda jelaskan yang dilihat murid, seperti mengajar dari buku.',
+  },
+  'board.baseUpload': { en: 'Use another PDF', id: 'Pakai PDF lain' },
+  'board.baseUploadNote': {
+    en: 'Slides, a worksheet, a scan — whatever you want to write on.',
+    id: 'Slide, lembar kerja, hasil scan — apa pun yang mau Anda tulisi.',
+  },
+  'board.baseBoardPdf': { en: 'The PDF on this board', id: 'PDF di papan ini' },
+  'board.basePlain': { en: 'Blank whiteboard', id: 'Papan tulis kosong' },
+  'board.basePlainNote': {
+    en: 'One endless canvas. Your marks stay; the pages are set aside.',
+    id: 'Satu kanvas tanpa batas. Coretan Anda tetap ada; halamannya disimpan.',
+  },
+  'board.baseLoading': { en: 'Preparing the pages...', id: 'Menyiapkan halaman...' },
+  'board.baseFailed': {
+    en: 'That PDF could not be opened, so the board stays a whiteboard.',
+    id: 'PDF itu tidak bisa dibuka, jadi papannya tetap papan tulis.',
+  },
+  'board.basePageCapped': {
+    en: 'Showing the first {count} pages.',
+    id: 'Menampilkan {count} halaman pertama.',
+  },
+  'board.baseUploading': { en: 'Uploading the PDF...', id: 'Mengunggah PDF...' },
+
   // --- picking a student ----------------------------------------------------
   'sessionLang.dialog': { en: 'Choose the session language', id: 'Pilih bahasa sesi' },
   'sessionLang.title': { en: 'Which language is this session in?', id: 'Sesi ini pakai bahasa apa?' },
