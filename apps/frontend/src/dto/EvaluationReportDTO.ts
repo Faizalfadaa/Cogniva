@@ -82,6 +82,13 @@ export interface EvaluationReportDTO {
   findings: EvaluationFindingDTO[];
   /** The turns `findings` cite. Empty when the report was built without one. */
   transcript?: EvaluationTranscriptTurnDTO[];
+  /**
+   * Whether the session had reference material when it was graded. False means
+   * the score rests on general knowledge and nothing could be found missing,
+   * and the screen says so beside it. Absent on older reports: unknown, so
+   * nothing is shown.
+   */
+  hadReference?: boolean;
 }
 
 /**

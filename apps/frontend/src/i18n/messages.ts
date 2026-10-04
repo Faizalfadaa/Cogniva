@@ -258,6 +258,13 @@ export const messages = {
 
   // --- finding references ---------------------------------------------------
   'reference.title': { en: 'Find reference material', id: 'Cari referensi' },
+  'finish.noReferenceTitle': { en: 'Finish without a reference?', id: 'Selesai tanpa referensi?' },
+  'finish.noReferenceBody': {
+    en: 'Your evaluation checks what you taught against reference material, and this session has none yet. Without it, accuracy can only be judged from general knowledge, and parts you skipped cannot be noticed.',
+    id: 'Evaluasi mencocokkan isi pengajaranmu dengan materi referensi, dan sesi ini belum punya. Tanpa referensi, ketepatan hanya bisa dinilai dari pengetahuan umum, dan bagian yang terlewat tidak bisa terdeteksi.',
+  },
+  'finish.addReference': { en: 'Add a reference', id: 'Tambah referensi' },
+  'finish.finishAnyway': { en: 'Finish anyway', id: 'Tetap selesaikan' },
   'reference.subtitle': {
     en: 'No material of your own? Pick one source to grade your explanation against. The student never sees it — only the evaluator does.',
     id: 'Belum punya bahan sendiri? Pilih satu sumber untuk dipakai menilai penjelasanmu nanti. Materinya tidak pernah dilihat murid — hanya penilai.',
@@ -527,6 +534,10 @@ export const messages = {
   'evaluation.scoreFormula': {
     en: 'Counted from the findings below: 50% accuracy, 30% completeness, 20% clarity. Depth is judged separately and is not part of this number.',
     id: 'Dihitung dari temuan di bawah: 50% ketepatan, 30% kelengkapan, 20% kejelasan. Kedalaman dinilai terpisah dan tidak masuk ke angka ini.',
+  },
+  'evaluation.noReference': {
+    en: 'Graded without reference material. Accuracy was judged from general knowledge only, and parts you skipped could not be noticed.',
+    id: 'Dinilai tanpa materi referensi. Ketepatan hanya dinilai dari pengetahuan umum, dan bagian yang terlewat tidak bisa terdeteksi.',
   },
   'evaluation.notesTitle': { en: 'How This Session Went', id: 'Penilaian Sesi Ini' },
   'evaluation.nothingToAssess': { en: 'Nothing to assess yet.', id: 'Belum ada yang bisa dinilai.' },

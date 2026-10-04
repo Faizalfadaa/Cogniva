@@ -632,6 +632,20 @@
   max-width: 52ch;
 }
 
+/* Brighter than the formula above it: this one changes how far the number can
+   be trusted, so it should be read, not skimmed. Gold rule on the forest card,
+   the same accent the practice button uses for "worth your attention". */
+.scoreNoReference {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--gold);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-on-forest-muted);
+  max-width: 60ch;
+}
+
 .axisGrid {
   display: grid;
   /* Two by two, not four across: the column is 616px here, so four would leave

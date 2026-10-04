@@ -23,6 +23,8 @@ interface ScoreBreakdownProps {
   workspaceId: string
   /** Which round is on screen, so the trend can mark the right point. */
   round: number
+  /** False when this round was graded with no reference material (see the DTO). */
+  hadReference?: boolean
 }
 
 /**
@@ -45,6 +47,7 @@ export function ScoreBreakdown({
   history,
   workspaceId,
   round,
+  hadReference,
 }: ScoreBreakdownProps) {
   const t = useT()
   const axes = buildScoreAxes(findings, depthScore, t)
@@ -63,6 +66,14 @@ export function ScoreBreakdown({
           <span className={styles.scoreOutOf}>/ 100</span>
           <p className={styles.scoreCaption}>{t('evaluation.scoreCaption')}</p>
           <p className={styles.scoreFormula}>{t('evaluation.scoreFormula')}</p>
+          {/* Said beside the number it qualifies. Only for an explicit false:
+              an older report never recorded it, and calling that "no
+              reference" would be a guess about a past session. */}
+          {hadReference === false && (
+            <p className={styles.scoreNoReference} role="note">
+              {t('evaluation.noReference')}
+            </p>
+          )}
         </div>
 
         <ScoreTrend

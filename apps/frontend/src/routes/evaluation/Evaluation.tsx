@@ -230,6 +230,7 @@ export default function EvaluationPage() {
           history={history}
           workspaceId={id!}
           round={report!.round}
+          hadReference={report!.hadReference}
         />
 
         <div className={styles.tabBar} role="tablist" aria-label={t('evaluation.reportView')}>

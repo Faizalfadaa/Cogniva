@@ -29,6 +29,11 @@
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
 }
 
+/* A short question rather than a list to choose from (FinishWithoutReferenceDialog). */
+.panelNarrow {
+  max-width: 460px;
+}
+
 /* --- head ------------------------------------------------------------- */
 
 .head {

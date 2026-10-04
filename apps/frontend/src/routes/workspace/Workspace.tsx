@@ -15,6 +15,7 @@ import { ChatToasts } from '../../features/teaching-session/components/ChatToast
 import { ChatLauncher } from '../../features/teaching-session/components/ChatLauncher'
 import { ErrorBanner } from '../../features/teaching-session/components/ErrorBanner'
 import { ReferenceFinder } from '../../features/teaching-session/components/ReferenceFinder'
+import { FinishWithoutReferenceDialog } from '../../features/teaching-session/components/FinishWithoutReferenceDialog'
 import { SessionSetup } from '../../features/teaching-session/components/SessionSetup'
 import { ProductTour } from '../../features/tour/ProductTour'
 import { WORKSPACE_TOUR_STEPS } from '../../features/tour/tourSteps'
@@ -125,6 +126,7 @@ export default function WorkspacePage() {
   const [finishingSession, setFinishingSession] = useState(false)
   const [uploadingPdf, setUploadingPdf] = useState(false)
   const [findingReference, setFindingReference] = useState(false)
+  const [confirmingNoReference, setConfirmingNoReference] = useState(false)
 
   const handleFinishSession = useCallback(async () => {
     if (!id) return
@@ -137,6 +139,19 @@ export default function WorkspacePage() {
       setFinishingSession(false)
     }
   }, [bridge, id, navigate])
+
+  /**
+   * Finish, but ask first when there is no reference: without one the debrief
+   * has nothing to grade the teaching against, and this is the last moment the
+   * user can still add one (FinishWithoutReferenceDialog).
+   */
+  const requestFinish = useCallback(() => {
+    if (!workspace?.hasReference) {
+      setConfirmingNoReference(true)
+      return
+    }
+    void handleFinishSession()
+  }, [workspace?.hasReference, handleFinishSession])
 
   const handleUploadPdf = useCallback(
     async (file: File) => {
@@ -306,7 +321,7 @@ export default function WorkspacePage() {
         pending={session.pending}
         onTeach={session.teach}
         onContinueEditing={session.continueEditing}
-        onFinishSession={handleFinishSession}
+        onFinishSession={requestFinish}
         finishingSession={finishingSession}
         onUploadPdf={handleUploadPdf}
         pdfUrl={workspace?.pdfUrl}
@@ -314,6 +329,20 @@ export default function WorkspacePage() {
         onFindReference={() => setFindingReference(true)}
         referenceSource={workspace?.referenceSource}
       />
+
+      {confirmingNoReference && (
+        <FinishWithoutReferenceDialog
+          onFindReference={() => {
+            setConfirmingNoReference(false)
+            setFindingReference(true)
+          }}
+          onFinishAnyway={() => {
+            setConfirmingNoReference(false)
+            void handleFinishSession()
+          }}
+          onCancel={() => setConfirmingNoReference(false)}
+        />
+      )}
 
       {findingReference && (
         <ReferenceFinder

@@ -25,6 +25,12 @@ export interface WorkspaceDTO {
    * clears this.
    */
   referenceSource?: ReferenceSourceDTO;
+  /**
+   * Whether the session has reference material for the Evaluator, from any
+   * source. Pasted text leaves no `pdfUrl` or `referenceSource`, so this is the
+   * only way to tell. Finishing without one asks first.
+   */
+  hasReference?: boolean;
   state: WorkspaceState;
   /**
    * Snapshot di-autosave selama state Editing.
