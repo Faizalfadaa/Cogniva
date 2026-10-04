@@ -54,6 +54,14 @@ export interface Workspace {
    * (that one is `pdfUrl`) and when the session has no reference at all.
    */
   referenceSource?: ReferenceSource;
+  /**
+   * Whether the session has reference material for the Evaluator to check the
+   * teaching against, from a PDF, the Referencer, or text the user pasted.
+   * Pasted text leaves no `pdfUrl` or `referenceSource` behind, so without
+   * this the client could not tell a session with a reference from one
+   * without.
+   */
+  hasReference?: boolean;
   state: WorkspaceState;
   /** Latest autosaved Excalidraw scene, so the canvas restores on reopen. */
   currentWhiteboardSnapshot?: unknown;
@@ -238,6 +246,14 @@ export interface EvaluationReport {
    * transcript, and an empty debrief is better than no debrief (§10).
    */
   transcript?: EvaluationTranscriptTurn[];
+  /**
+   * Whether the session had reference material when it was evaluated. False
+   * means the Evaluator had nothing to check the teaching against: accuracy
+   * rests on the model's general knowledge, and a concept the teacher skipped
+   * cannot be noticed. Absent on reports written before this was recorded,
+   * which the screen treats as unknown rather than as false.
+   */
+  hadReference?: boolean;
 }
 
 /** One transcript turn as the debrief screen needs it (§6.6, projected). */

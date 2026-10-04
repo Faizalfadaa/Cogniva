@@ -130,7 +130,7 @@ describe("learner speech pipeline", () => {
     fakeVoiceService(renderedClip);
     const { service, workspaces } = await loadApp();
 
-    const ws = await service.createWorkspace();
+    const ws = await service.createWorkspace(undefined, "en");
     const checkpoint = await service.submitCheckpoint(ws.id, {
       snapshotImage: SNAPSHOT,
       snapshotMime: "image/png",
@@ -164,7 +164,7 @@ describe("learner speech pipeline", () => {
     fakeVoiceService(() => ({ ok: false, status: 503 }));
     const { service } = await loadApp();
 
-    const ws = await service.createWorkspace();
+    const ws = await service.createWorkspace(undefined, "en");
     await service.submitCheckpoint(ws.id, {
       snapshotImage: SNAPSHOT,
       snapshotMime: "image/png",
@@ -183,7 +183,7 @@ describe("learner speech pipeline", () => {
     const fetchMock = fakeVoiceService(renderedClip);
     const { service } = await loadApp();
 
-    const ws = await service.createWorkspace();
+    const ws = await service.createWorkspace(undefined, "en");
     await service.submitCheckpoint(ws.id, {
       snapshotImage: SNAPSHOT,
       snapshotMime: "image/png",
@@ -197,12 +197,38 @@ describe("learner speech pipeline", () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/synthesize"))).toBe(false);
   });
 
+  it("stays silent in an Indonesian session, as the language picker promises", async () => {
+    // The voices speak English only. Before this, nothing stopped an
+    // Indonesian reply being read out by an English voice.
+    vi.stubEnv("COGNIVA_TTS_ENABLED", "true");
+    const fetchMock = fakeVoiceService(renderedClip);
+    const { service } = await loadApp();
+
+    const ws = await service.createWorkspace(undefined, "id");
+    await service.submitCheckpoint(ws.id, {
+      snapshotImage: SNAPSHOT,
+      snapshotMime: "image/png",
+      whiteboardSnapshot: {},
+    });
+    await service.sendChatMessage(ws.id, "Oksigen berasal dari air, bukan dari udara.");
+
+    const reply = await waitFor(async () =>
+      (await service.getCheckpoints(ws.id))?.find((c) => c.learnerResponse),
+    );
+    const chatReply = await waitFor(async () =>
+      (await service.getChatMessages(ws.id))?.filter((m) => m.sender === "learner")[1],
+    );
+    expect(reply.speech).toBeUndefined();
+    expect(chatReply.speech).toBeUndefined();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/synthesize"))).toBe(false);
+  });
+
   it("voices a chat reply the same way", async () => {
     vi.stubEnv("COGNIVA_TTS_ENABLED", "true");
     fakeVoiceService(renderedClip);
     const { service } = await loadApp();
 
-    const ws = await service.createWorkspace();
+    const ws = await service.createWorkspace(undefined, "en");
     await service.sendChatMessage(ws.id, "The oxygen comes from the water, not the air.");
 
     const spoken = await waitFor(async () =>

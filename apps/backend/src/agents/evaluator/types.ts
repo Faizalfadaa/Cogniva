@@ -10,6 +10,7 @@
 
 import type { FindingCategory } from "../../contracts/enums.js";
 import type { EvaluationResult, Finding } from "../../contracts/evaluation.js";
+import type { Locale } from "../../contracts/workspace.js";
 
 export type { EvaluationResult, Finding, FindingCategory };
 
@@ -84,6 +85,11 @@ export interface ReferenceExcerpt {
  */
 export interface EvaluatorInput {
   sessionId: string;
+  /**
+   * The language the session runs in, which the debrief is written in. Absent
+   * outside a workspace, where the report stays English as it always was.
+   */
+  locale?: Locale;
   turns: TranscriptTurn[];
   referenceMaterial: string;
   keyConcepts: string[];

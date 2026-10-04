@@ -194,6 +194,7 @@ export async function setPdf(
   // Evaluator, never to the Learner (§1.4). Extraction failures (e.g. a
   // scanned/image-only PDF) are non-fatal: the session has no reference.
   const text = await extractPdfText(data);
+  ws.hasReference = Boolean(text);
   if (text) {
     await workspaces.saveReference(id, text);
     // Chunk + embed in the background so the upload response stays fast, the
@@ -225,6 +226,7 @@ export async function setReferenceText(
     .trim()
     .slice(0, config.RAG_MAX_REFERENCE_CHARS);
   await workspaces.saveReference(id, text);
+  ws.hasReference = text.length > 0;
 
   // Pasted text has no provenance to show, and any previous chip would now be
   // pointing at material that is no longer in use.
@@ -315,6 +317,7 @@ export async function useReference(
 
   const text = fetched.text.slice(0, config.RAG_MAX_REFERENCE_CHARS);
   await workspaces.saveReference(id, text);
+  ws.hasReference = text.trim().length > 0;
 
   const provenance: ReferenceSource = {
     url: choice.url,
@@ -426,15 +429,13 @@ export async function submitCheckpoint(
       // and can explain, not for "something broke". The client surfaces those
       // from the failed request itself.
       console.error("[workspace] teaching turn failed:", err);
-      reply = {
-        text: "Hmm, I'm a little confused about this one... could you walk me through it again slowly?",
-      };
+      reply = { text: FAILED_TURN_REPLY[ws.locale] };
     }
     if (!(await stillExists(id))) return;
     // A tagged turn is a system message, not something the student said —
     // speaking "you are out of budget" in the learner's voice would be odd, and
     // it would spend GPU time on a session that just hit its ceiling.
-    const speech = reply.errorKind ? undefined : planSpeech(reply.text);
+    const speech = reply.errorKind ? undefined : planSpeech(reply.text, ws.locale);
 
     // The text and the plan for speaking it land in the same write. With the
     // voice on, the UI holds the words and reveals each sentence as its clip
@@ -499,12 +500,12 @@ export async function sendChatMessage(
       reply = await runChatReply(ws, content);
     } catch (err) {
       console.error("[workspace] chat reply failed:", err);
-      reply = "Oh, sorry, I blanked for a second there... could you say that again?";
+      reply = FAILED_CHAT_REPLY[ws.locale];
     }
     if (!(await stillExists(id))) return;
     // Same as the checkpoint path: text and speech plan in one write, then the
     // sentences are voiced one at a time.
-    const speech = planSpeech(reply);
+    const speech = planSpeech(reply, ws.locale);
     const message = await workspaces.addMessage(id, learnerMessage(reply, speech));
     await bump(id);
 
@@ -554,6 +555,8 @@ export async function finishSession(id: string): Promise<boolean> {
           turnCount: session.turnCount,
           learnerState: await sessions.getLearnerState(session.sessionId),
           meaningfulScore: false,
+          locale: ws.locale,
+          hadReference: await hasReference(ws),
         }),
       );
     }
@@ -626,6 +629,28 @@ export async function resumeSession(id: string): Promise<Workspace | undefined> 
 }
 
 // --- Internals -------------------------------------------------------------
+
+/**
+ * Whether the workspace has reference material to evaluate against. Text only:
+ * a PDF whose text could not be extracted gives the Evaluator nothing to read.
+ */
+async function hasReference(ws: Workspace): Promise<boolean> {
+  return Boolean((await workspaces.getReference(ws.id))?.trim());
+}
+
+/**
+ * What the student says when a turn or a chat reply fails outright, in the
+ * session's language like everything else it says.
+ */
+const FAILED_TURN_REPLY: Record<Locale, string> = {
+  en: "Hmm, I'm a little confused about this one... could you walk me through it again slowly?",
+  id: "Hmm, aku agak bingung sama yang ini... bisa jelasin lagi pelan-pelan?",
+};
+
+const FAILED_CHAT_REPLY: Record<Locale, string> = {
+  en: "Oh, sorry, I blanked for a second there... could you say that again?",
+  id: "Eh, maaf, aku tadi bengong sebentar... bisa diulang lagi?",
+};
 
 /** End-of-session copy in the selected character's voice and session language. */
 const BUDGET_EXCEEDED_REPLIES = {
@@ -758,6 +783,7 @@ async function runEvaluation(ws: Workspace): Promise<void> {
   const result = await getEvaluator().evaluate(
     {
       sessionId: session.sessionId,
+      locale: ws.locale,
       turns: transcript,
       // Only sent when retrieval produced nothing; excerpts take precedence.
       referenceMaterial: referenceExcerpts.length ? "" : topic.referenceMaterial,
@@ -787,6 +813,10 @@ async function runEvaluation(ws: Workspace): Promise<void> {
       turnCount: session.turnCount,
       learnerState: await sessions.getLearnerState(session.sessionId),
       meaningfulScore: !usedMock,
+      locale: ws.locale,
+      // What the Evaluator actually had to check against: retrieved passages,
+      // or the reference text itself when there was no index.
+      hadReference: referenceExcerpts.length > 0 || Boolean(topic.referenceMaterial.trim()),
       // The same turns the Evaluator read, minus the student's own replies:
       // the debrief highlights what the user taught, not what it answered.
       // The chat survives that cut whole, both sides, because a reply with the
@@ -940,9 +970,15 @@ function learnerMessage(content: string, speech?: LearnerSpeech): ChatMessage {
  *
  * Undefined when speech is switched off, which is the signal the UI uses to show
  * the text immediately instead of waiting for audio that is not coming.
+ *
+ * Also undefined when the session is not in the voice's language. The voices
+ * speak English only (config TTS_LANGUAGE), and the language picker tells the
+ * user so: "an Indonesian session is silent". Nothing enforced it, and once the
+ * student answered in Indonesian an English voice would have read it aloud.
  */
-function planSpeech(text: string): LearnerSpeech | undefined {
+function planSpeech(text: string, locale: Locale): LearnerSpeech | undefined {
   if (!config.TTS_ENABLED) return undefined;
+  if (!config.TTS_LANGUAGE.toLowerCase().startsWith(locale)) return undefined;
   const segments = speechSegments(text);
   if (segments.length === 0) return undefined;
   return {

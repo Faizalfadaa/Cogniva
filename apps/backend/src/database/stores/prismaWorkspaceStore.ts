@@ -295,6 +295,7 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
           // change (§6.9).
           findings: report.findings as Prisma.InputJsonValue,
           transcript: (report.transcript ?? []) as unknown as Prisma.InputJsonValue,
+          had_reference: report.hadReference ?? null,
           learned: {
             create: report.notebook.learned.map((content, seq) => ({
               id_learned: `lrn_${idReport}_${seq}`,
@@ -348,6 +349,9 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
       depthScore: row.depth_score ?? 0,
       findings: (row.findings as Finding[] | null) ?? [],
       transcript: (row.transcript as EvaluationTranscriptTurn[] | null) ?? [],
+      // Null on reports from before this was recorded: left out, not false, so
+      // an old debrief is not suddenly labelled as graded without a reference.
+      ...(row.had_reference === null ? {} : { hadReference: row.had_reference }),
     };
   }
 
@@ -557,6 +561,9 @@ function toWorkspace(row: WorkspaceRow): Workspace {
       ? `/api/workspaces/${row.id_workspace}/board-pdf`
       : undefined,
     referenceSource: readReferenceSource(row.reference_source),
+    // Derived, not stored: the reference text is what the Evaluator reads, so
+    // its presence is the whole answer.
+    hasReference: Boolean(row.reference_text?.trim()),
     state: row.state as WorkspaceState,
     currentWhiteboardSnapshot: row.whiteboard_snapshot ?? undefined,
     thumbnailUrl: row.thumbnail_url ?? undefined,

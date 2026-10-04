@@ -297,6 +297,9 @@ model report {
   findings          Json?
   /// EvaluationTranscriptTurn[] — the turns those findings cite.
   transcript        Json?
+  /// Whether the session had reference material when it was evaluated. Null on
+  /// reports written before this was recorded, read as unknown.
+  had_reference     Boolean?
 
   workspace workspace  @relation(fields: [id_workspace], references: [id_workspace], onDelete: Cascade)
   learned   learned[]

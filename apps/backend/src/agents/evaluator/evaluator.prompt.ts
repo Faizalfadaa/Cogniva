@@ -4,8 +4,8 @@
  * The Evaluator grades the QUALITY OF THE USER'S EXPLANATION (not the AI) against
  * the topic's reference material, turn by turn (§3.7). Categories are the
  * canonical English enum; the natural-language fields (summary, detail,
- * strengths, improvements) are written in English and rendered directly on the
- * debrief screen.
+ * strengths, improvements, followUp) are written in the session's language and
+ * rendered directly on the debrief screen.
  */
 
 import type { EvaluatorInput } from "./types.js";
@@ -100,8 +100,13 @@ RULES:
   with no related turn, use evidenceTurnIndex 0.
 - Do NOT return an overall score. The app computes it from your findings, so
   your job is to classify each concept correctly, not to grade the session.
-- Write "summary", "strengths", "improvements", and "detail" in clear,
-  constructive English.
+- Write "summary", "strengths", "improvements", "detail" and "followUp" in
+  clear, constructive prose, in the language named under "Response Language" at
+  the end of the request. Category names stay in English exactly as listed.
+- Speak to the teacher directly: "you" in English, and the casual "kamu" in
+  Indonesian, not the formal "Anda". Never call them "the user": these lines
+  are shown to the teacher, and some are quoted back to them in a casual
+  letter from their student.
 
 SOURCE QUOTES:
 For each finding (except MISSED with no related turn), quote the EXACT sentence
@@ -157,6 +162,18 @@ export function buildEvaluatorMessages(input: EvaluatorInput): AIMessage[] {
   ];
 }
 
+/**
+ * The language the debrief is written in. The language picker promises "the
+ * report comes back in it"; this prompt used to ask for English regardless, so
+ * an Indonesian session got an Indonesian screen around an English report.
+ * Quotes are exempt: sourceQuote has to match the transcript word for word.
+ */
+function responseLanguage(input: EvaluatorInput): string {
+  return input.locale === "id"
+    ? "Write every text field in Bahasa Indonesia. Keep sourceQuote exactly as it appears in the transcript, in whatever language that is."
+    : "Write every text field in English. Keep sourceQuote exactly as it appears in the transcript, in whatever language that is.";
+}
+
 function buildEvaluatorUserPrompt(input: EvaluatorInput): string {
   const transcript = input.turns.length
     ? input.turns.map(renderTurn).join("\n\n")
@@ -191,6 +208,9 @@ summary, strengths[], improvements[], and findings[] with category
 CORRECT/WRONG/MISSED/CONFUSING, evidenceTurnIndex, a verbatim sourceQuote from
 that turn wherever one exists, and a followUp suggestion on everything that is
 not CORRECT. Do not return an overall score.
+
+# Response Language
+${responseLanguage(input)}
 `.trim();
 }
 

@@ -19,7 +19,46 @@ const STOPWORDS = new Set([
   "itu", "tidak", "akan", "oleh", "sebagai", "dalam", "menjadi",
 ]);
 
+/**
+ * Every sentence this path writes, in both languages a session runs in. It is
+ * also the fallback when a real evaluation fails, so an Indonesian session
+ * that hit an error used to get its whole report in English.
+ */
+const COPY = {
+  en: {
+    covered: "This concept appears to be conveyed in your explanation.",
+    missed: "This key concept wasn't touched on at all during the session.",
+    missedFollowUp: (c: string) => `Next session, open with ${c} and walk through how it works before moving on.`,
+    misconception: "Common misconception",
+    misconceptionDetail: (b: string) => `Your explanation brushed against a common misconception: "${b}".`,
+    misconceptionFollowUp: (b: string) =>
+      `Check what the reference says about "${b}", then say the correct version out loud before you teach it again.`,
+    nothing: "No teaching turns were recorded yet, so there's nothing to assess.",
+    conveyed: (n: number, of: number) => `You conveyed ${n} of ${of} key concepts. `,
+    someMissed: "A few important parts were still missed.",
+    allCovered: "Concept coverage is complete, nice work!",
+    strength: (c: string) => `Explained: ${c}`,
+    improvement: (c: string) => `Add an explanation of: ${c}`,
+  },
+  id: {
+    covered: "Konsep ini tampaknya sudah tersampaikan dalam penjelasanmu.",
+    missed: "Konsep kunci ini sama sekali belum disentuh selama sesi.",
+    missedFollowUp: (c: string) => `Di sesi berikutnya, buka dengan ${c} dan jelaskan cara kerjanya sebelum lanjut.`,
+    misconception: "Miskonsepsi umum",
+    misconceptionDetail: (b: string) => `Penjelasanmu menyinggung miskonsepsi yang umum: "${b}".`,
+    misconceptionFollowUp: (b: string) =>
+      `Cek apa kata referensi tentang "${b}", lalu ucapkan versi yang benar sebelum mengajarkannya lagi.`,
+    nothing: "Belum ada giliran mengajar yang tercatat, jadi belum ada yang bisa dinilai.",
+    conveyed: (n: number, of: number) => `Kamu menyampaikan ${n} dari ${of} konsep kunci. `,
+    someMissed: "Masih ada beberapa bagian penting yang terlewat.",
+    allCovered: "Semua konsep sudah tercakup, kerja bagus!",
+    strength: (c: string) => `Sudah dijelaskan: ${c}`,
+    improvement: (c: string) => `Tambahkan penjelasan tentang: ${c}`,
+  },
+};
+
 export function mockEvaluator(input: EvaluatorInput, evaluationId: string): EvaluationResult {
+  const copy = COPY[input.locale === "id" ? "id" : "en"];
   const findings: Finding[] = [];
   const covered: string[] = [];
   const missed: string[] = [];
@@ -31,7 +70,7 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
       findings.push({
         category: "CORRECT",
         concept,
-        detail: "This concept appears to be conveyed in your explanation.",
+        detail: copy.covered,
         evidenceTurnIndex,
       });
     } else {
@@ -39,9 +78,9 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
       findings.push({
         category: "MISSED",
         concept,
-        detail: "This key concept wasn't touched on at all during the session.",
+        detail: copy.missed,
         evidenceTurnIndex: null,
-        followUp: `Next session, open with ${concept} and walk through how it works before moving on.`,
+        followUp: copy.missedFollowUp(concept),
       });
     }
   }
@@ -63,10 +102,10 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
     if (idx !== null) {
       findings.push({
         category: "WRONG",
-        concept: "Common misconception",
-        detail: `Your explanation brushed against a common misconception: "${belief}".`,
+        concept: copy.misconception,
+        detail: copy.misconceptionDetail(belief),
         evidenceTurnIndex: idx,
-        followUp: `Check what the reference says about "${belief}", then say the correct version out loud before you teach it again.`,
+        followUp: copy.misconceptionFollowUp(belief),
       });
     }
   }
@@ -85,13 +124,11 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
     findings,
     summary:
       input.turns.length === 0
-        ? "No teaching turns were recorded yet, so there's nothing to assess."
-        : `You conveyed ${covered.length} of ${input.keyConcepts.length} key concepts. ` +
-          (missed.length
-            ? "A few important parts were still missed."
-            : "Concept coverage is complete, nice work!"),
-    strengths: covered.slice(0, 3).map((c) => `Explained: ${c}`),
-    improvements: missed.slice(0, 3).map((c) => `Add an explanation of: ${c}`),
+        ? copy.nothing
+        : copy.conveyed(covered.length, input.keyConcepts.length) +
+          (missed.length ? copy.someMissed : copy.allCovered),
+    strengths: covered.slice(0, 3).map(copy.strength),
+    improvements: missed.slice(0, 3).map(copy.improvement),
     generatedAt: utcNowIso(),
   };
 }

@@ -445,6 +445,9 @@ Work through these in order:
 3. `COGNIVA_TTS_ENABLED=true` must be in `apps/backend/.env`, and the backend
    restarted since you set it. It defaults to `false`.
 4. Check the mute toggle in the workspace header — it is remembered per browser.
+5. Check the session's language. The voices speak English only, so a session
+   started in Bahasa Indonesia is silent by design, as the language picker
+   says when the session is created. Only English sessions are voiced.
 
 Silence is the designed failure mode: the backend never lets a voice problem
 cost you the reply, so nothing here shows up as an error in the UI. The backend
