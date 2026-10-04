@@ -146,6 +146,28 @@ export async function saveDraft(
   return touch(ws);
 }
 
+/**
+ * Attach a PDF for the board to be drawn on — the base that replaces the blank
+ * whiteboard, with the user's marks on top of its pages.
+ *
+ * Unlike setPdf this extracts nothing and touches no reference material: these
+ * pages are what the user teaches FROM, not the key they are graded against. It
+ * is also why the two are stored apart — the board is captured into the
+ * checkpoint image and read by Vision, one page at a time, which is exactly
+ * what must never happen to the answer key (§1.4).
+ */
+export async function setBoardPdf(
+  id: string,
+  data: Buffer,
+  mime: string,
+): Promise<Workspace | undefined> {
+  const ws = await workspaces.get(id);
+  if (!ws) return undefined;
+  await workspaces.saveBoardPdf(id, { data, mime });
+  ws.boardPdfUrl = `/api/workspaces/${id}/board-pdf`;
+  return touch(ws);
+}
+
 export async function setPdf(
   id: string,
   data: Buffer,

@@ -3,6 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useBridge } from '../../bridge/BridgeProvider'
 import type { WorkspaceDTO } from '../../dto/WorkspaceDTO'
 import { Whiteboard, type WhiteboardHandle } from '../../features/teaching-session/components/Whiteboard'
+import { BoardPageBar } from '../../features/teaching-session/components/BoardPageBar'
+import { BoardBaseMenu } from '../../features/teaching-session/components/BoardBaseMenu'
+import { useBoardBase } from '../../features/teaching-session/hooks/useBoardBase'
+import { MAX_PDF_PAGES } from '../../features/teaching-session/board/boardPages'
 import { WorkspaceHeader } from '../../features/teaching-session/components/WorkspaceHeader'
 import { LearnerResponseBubble } from '../../features/teaching-session/components/LearnerResponseBubble'
 import { LearnerIntro } from '../../features/teaching-session/components/LearnerIntro'
@@ -104,6 +108,16 @@ export default function WorkspacePage() {
   const introDone = intro.seen || firstSession === false
   const setup = useSessionSetup(id ?? '')
   const language = useSessionLanguage(id ?? '')
+  /**
+   * What the board stands on: a blank whiteboard as before, or the pages of a
+   * PDF with the user's marks on top of them.
+   */
+  const board = useBoardBase({
+    workspace: workspace ?? undefined,
+    bridge,
+    onWorkspaceChange: setWorkspace,
+    boardRef: whiteboardRef,
+  })
   const [savingLanguage, setSavingLanguage] = useState(false)
   const tour = useAppTour('workspace')
   const { userName } = useUserStore()
@@ -321,7 +335,56 @@ export default function WorkspacePage() {
             initialSnapshot={workspace?.currentWhiteboardSnapshot}
             onAutosave={handleAutosave}
             readOnly={session.mode === 'locked'}
+            base={board.base}
+            pageImages={board.pageImages}
+            onBaseChange={board.onBaseChange}
+            onActivePageChange={board.onActivePageChange}
           />
+
+          {/* The page bar only exists on a PDF-backed board; a plain whiteboard
+              has no pages, and nothing about it changes. Hidden while the
+              checkpoint is locked, when the canvas is read-only anyway. */}
+          {board.base && board.base.pages.length > 0 && session.mode !== 'locked' && (
+            <BoardPageBar
+              base={board.base}
+              activePage={board.activePage}
+              onGoToPage={board.goToPage}
+              onAddBlank={board.addBlank}
+              onRemoveBlank={board.removeBlank}
+              onOpenBase={board.openMenu}
+              busy={board.busy}
+            />
+          )}
+
+          {/* With no base there is no page bar, so the way in sits in the same
+              spot: one quiet pill that disappears once a PDF is attached. */}
+          {!board.base && session.mode !== 'locked' && !needsSetup && !needsLearnerPick && (
+            <div className={styles.pageBar}>
+              <button type="button" className={styles.pageBarAction} onClick={board.openMenu}>
+                {board.busy ? t('board.baseLoading') : `+ ${t('board.attachPdf')}`}
+              </button>
+            </div>
+          )}
+
+          {board.cappedAt !== undefined && board.base && session.mode !== 'locked' && (
+            <p className={styles.pageCapNote} role="status">
+              {t('board.basePageCapped', { count: MAX_PDF_PAGES })}
+            </p>
+          )}
+
+          {board.menuOpen && (
+            <BoardBaseMenu
+              current={board.base?.source}
+              hasReferencePdf={Boolean(workspace?.pdfUrl)}
+              hasBoardPdf={Boolean(workspace?.boardPdfUrl)}
+              onChoose={board.chooseSource}
+              onUpload={(file) => void board.uploadPdf(file)}
+              onClearBase={board.clearBase}
+              onClose={board.closeMenu}
+              busy={board.busy}
+              problem={board.problem ? t('board.baseFailed') : undefined}
+            />
+          )}
 
           {/* Top-centre: the bottom-right corner already holds the toast stack,
               the response bubble and the chat launcher. See .errorBanner. */}

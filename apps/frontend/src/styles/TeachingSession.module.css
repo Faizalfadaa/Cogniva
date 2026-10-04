@@ -1801,3 +1801,199 @@
   color: var(--text-on-forest-muted);
   text-align: center;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   The board's pages  (a PDF the user writes on)
+   ═══════════════════════════════════════════════════════════
+   The page bar sits bottom-centre of the canvas: Excalidraw owns the top edge
+   (toolbar), the bottom-left (zoom) and the left (style panel), and the
+   bottom-right belongs to the chat launcher and the notification stack. */
+.pageBar {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  max-width: calc(100% - 32px);
+  flex-wrap: wrap;
+  justify-content: center;
+  background: var(--forest-dark);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.pageBarBtn,
+.pageBarAction {
+  border: 0;
+  background: transparent;
+  color: var(--text-on-dark);
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background var(--dur-fast), opacity var(--dur-fast);
+}
+
+.pageBarBtn {
+  width: 30px;
+  height: 30px;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.pageBarAction {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.pageBarBtn:hover:not(:disabled),
+.pageBarAction:hover:not(:disabled) {
+  background: var(--forest-mid);
+}
+
+.pageBarBtn:focus-visible,
+.pageBarAction:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+.pageBarBtn:disabled,
+.pageBarAction:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pageBarLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  font-size: 13px;
+  color: var(--text-on-dark);
+  white-space: nowrap;
+}
+
+/* Paper carries a quiet tag, so a blank sheet is never mistaken for a page of
+   the document it sits between. */
+.pageBarPaper {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--forest-mid);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-on-forest-muted);
+}
+
+.pageBarDivider {
+  width: 1px;
+  height: 18px;
+  background: var(--forest-mid);
+}
+
+/* The base picker reuses the language dialog's panel; only its cards differ. */
+.baseGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  width: 100%;
+  margin-top: 4px;
+  text-align: left;
+}
+
+.baseCard,
+.baseCardCurrent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px 20px;
+  background: var(--forest-mid);
+  border: 2px solid transparent;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.baseCardCurrent {
+  border-color: var(--lime);
+}
+
+.baseCard:hover,
+.baseCardCurrent:hover {
+  transform: translateY(-2px);
+  border-color: var(--lime);
+}
+
+.baseCard:focus-visible,
+.baseCardCurrent:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+}
+
+.baseCard:disabled,
+.baseCardCurrent:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}
+
+.baseCardTitle {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-on-forest);
+}
+
+.baseCardNote {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-on-forest-muted);
+}
+
+.selectCancel {
+  margin-top: 18px;
+  padding: 8px 18px;
+  background: transparent;
+  color: var(--text-on-dark-muted);
+  border: 1px solid var(--forest-mid);
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color var(--dur-fast), border-color var(--dur-fast);
+}
+
+.selectCancel:hover:not(:disabled) {
+  color: var(--text-on-dark);
+  border-color: var(--lime);
+}
+
+.selectCancel:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+.selectCancel:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Sits just above the page bar, for the one case where a file is longer than
+   the board renders. */
+.pageCapNote {
+  position: absolute;
+  bottom: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--forest-dark);
+  color: var(--text-on-dark-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}

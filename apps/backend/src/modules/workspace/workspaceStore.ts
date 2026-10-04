@@ -40,6 +40,7 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
   /** Rounds in finishing order, so the last entry is the current debrief. */
   private reports = new Map<string, EvaluationReport[]>();
   private pdfs = new Map<string, StoredBlob>();
+  private boardPdfs = new Map<string, StoredBlob>();
   private references = new Map<string, string>();
   private referenceSources = new Map<string, ReferenceSource>();
   private referenceIndexes = new Map<string, ReferenceIndex>();
@@ -229,6 +230,16 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
 
   async getPdf(workspaceId: string): Promise<StoredBlob | undefined> {
     return this.pdfs.get(workspaceId);
+  }
+
+  // --- Board PDF blob ----------------------------------------------------
+
+  async saveBoardPdf(workspaceId: string, blob: StoredBlob): Promise<void> {
+    this.boardPdfs.set(workspaceId, blob);
+  }
+
+  async getBoardPdf(workspaceId: string): Promise<StoredBlob | undefined> {
+    return this.boardPdfs.get(workspaceId);
   }
 
   // --- Reference material -----------------------------------------------

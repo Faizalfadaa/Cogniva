@@ -30,6 +30,12 @@ export interface CognivaBridge {
     meta: { title?: string; description?: string; learnerId?: string; locale?: Locale }
   ): Promise<WorkspaceDTO>;
   uploadWorkspacePdf(workspaceId: string, file: File): Promise<WorkspaceDTO>;
+  /**
+   * Attach a PDF for the board to stand on. Stored apart from the reference
+   * upload above, because this one is meant to be seen: the page the user is
+   * explaining is captured into each checkpoint.
+   */
+  uploadBoardPdf(workspaceId: string, file: File): Promise<WorkspaceDTO>;
 
   // Reference material the user writes or pastes in — the third way in, beside
   // an uploaded PDF and a source the agent found. Replaces whatever was there.

@@ -37,6 +37,18 @@ export interface Workspace {
   /** Endpoint URL for an uploaded reference PDF, if any. */
   pdfUrl?: string;
   /**
+   * Endpoint URL for a PDF uploaded to be WRITTEN ON — the board's base, in
+   * place of a blank whiteboard.
+   *
+   * Separate from `pdfUrl` on purpose. The reference PDF is the Evaluator's
+   * answer key and reaches no other agent (§1.4); the board PDF is teaching
+   * material, so the page the user is explaining is captured into the
+   * checkpoint image and read by Vision like any other board. A user may point
+   * the board at their reference PDF instead of uploading a second file — that
+   * is their call, and only the page being taught is ever captured.
+   */
+  boardPdfUrl?: string;
+  /**
    * Where the reference material came from when it was not an upload — a web
    * source the Referencer found and the user chose. Absent for an uploaded PDF
    * (that one is `pdfUrl`) and when the session has no reference at all.
