@@ -676,6 +676,7 @@ async function runTeachingTurn(
     newImage: input.newImage,
     timeline: input.timeline,
     learnerName: learnerNameForWorkspace(ws.learnerId, ws.id),
+    locale: ws.locale,
   });
 
   // Only one orchestrator call now (the planner absorbed the retry), so one
@@ -717,6 +718,7 @@ async function runChatReply(ws: Workspace, content: string): Promise<string> {
     state,
     turnIndex: session.turnCount,
     learnerName: learnerNameForWorkspace(ws.learnerId, ws.id),
+    locale: ws.locale,
   });
   await sessions.saveLearnerState(nextState);
   return response.text;

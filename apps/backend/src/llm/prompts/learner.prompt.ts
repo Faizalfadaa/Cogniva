@@ -1,4 +1,5 @@
 import { LearnerAgentInput } from "../../agents/learner/learner.types";
+import type { Locale } from "../../contracts/workspace.js";
 import {
   conceptsAtLimit,
   MAX_SAME_CONCEPT_QUESTIONS
@@ -104,7 +105,7 @@ export function buildLearnerMessages(input: LearnerAgentInput): AIMessage[] {
   return [
     {
       role: "system",
-      content: learnerSystemPrompt(input.learnerName)
+      content: learnerSystemPrompt(input.learnerName, input.locale)
     },
     {
       role: "user",
@@ -124,7 +125,34 @@ const DEFAULT_LEARNER_NAME = "Iva";
  * user is looking at. The name used to be fixed as "Iva" here, so Yuzuki,
  * Reina and Akira all introduced themselves as someone the user never met.
  */
-function learnerSystemPrompt(learnerName: string | undefined): string {
+/**
+ * Which language the student answers in. A workspace fixes it when it is
+ * created, and the student must follow it: the prompt is written in English,
+ * and an unpinned model drifts into English even when the teacher speaks
+ * Indonesian. Without a workspace there is no choice on record, so the student
+ * follows the teacher.
+ */
+function responseLanguage(locale: Locale | undefined): string {
+  switch (locale) {
+    case "id":
+      return `Always answer in Bahasa Indonesia (casual student Indonesian: "hmm",
+"ohh", "eh tapi", "kok", "emang", "seriusan?"), even though these instructions are
+in English. Keep technical terms exactly as the teacher wrote them, and don't
+translate the names of concepts.`;
+    case "en":
+      return `Always answer in English. Keep technical terms exactly as the teacher
+wrote them, and don't translate the names of concepts.`;
+    default:
+      return `Answer in the language the teacher is mostly using this turn
+(Bahasa Indonesia or English). Keep technical terms exactly as the teacher wrote
+them, and don't translate the names of concepts.`;
+  }
+}
+
+function learnerSystemPrompt(
+  learnerName: string | undefined,
+  locale: Locale | undefined,
+): string {
   const name = learnerName?.trim() || DEFAULT_LEARNER_NAME;
 
   return `
@@ -148,8 +176,7 @@ You must never correct the user directly.
 • Casual student voice: "hmm", "ohh", "wait but", "how come", "for real?"
 
 ═══ RESPONSE LANGUAGE ═══
-Always answer in English. Keep technical terms exactly as the teacher wrote them,
-and don't translate the names of concepts.
+${responseLanguage(locale)}
 
 ═══ RESPONSE BEHAVIOR VARIATION ═══
 Each turn, use the ONE behavior style requested in the user prompt:
@@ -342,7 +369,7 @@ ${behaviorStyle}
 ${extendHint}
 
 ═══ RESPONSE LANGUAGE THIS TURN ═══
-Always answer in English.
+${responseLanguage(input.locale)}
 
 ═══ INSTRUCTIONS ═══
 1. Read the teacher's explanation as an eager beginner student.
