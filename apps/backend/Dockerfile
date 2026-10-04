@@ -11,7 +11,7 @@
 # not: all storage is Postgres, and the entrypoint applies pending migrations
 # before the server starts.
 
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Small init so PID 1 reaps children and forwards signals (clean Ctrl-C / stop).
 RUN apk add --no-cache tini
@@ -23,6 +23,8 @@ WORKDIR /app
 # lives in devDependencies. NODE_ENV=production is set *after* the install so it
 # can't cause npm to omit dev deps and drop tsx.
 COPY package.json package-lock.json ./
+COPY prisma ./prisma
+COPY prisma.config.ts ./
 RUN npm ci --include=dev
 
 ENV NODE_ENV=production
@@ -34,7 +36,7 @@ COPY . .
 # so the first request doesn't race a code generator.
 RUN npx prisma generate
 
-RUN chmod +x ./docker-entrypoint.sh
+RUN sed -i 's/\r$//' ./docker-entrypoint.sh && chmod +x ./docker-entrypoint.sh
 
 # Run as the built-in non-root user shipped with the node image.
 USER node

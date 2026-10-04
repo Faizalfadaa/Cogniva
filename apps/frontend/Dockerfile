@@ -10,7 +10,7 @@
 # serve the backend on a different origin.
 
 # ---- Stage 1: build the static bundle -------------------------------------
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
@@ -27,7 +27,10 @@ RUN npm run build
 # ---- Stage 2: serve with nginx --------------------------------------------
 FROM nginx:1.27-alpine
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# nginx expands this variable when the container starts. Docker Compose uses
+# backend:8000; containers in one Azure Container App use 127.0.0.1:8000.
+ENV BACKEND_UPSTREAM=backend:8000
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80

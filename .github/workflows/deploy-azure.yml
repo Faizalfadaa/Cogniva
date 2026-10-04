@@ -1,0 +1,81 @@
+name: Deploy Cogniva to Azure
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+# Do not interrupt a running deployment or its database migration.
+concurrency:
+  group: cogniva-production
+  cancel-in-progress: false
+
+env:
+  ACR_NAME: cogniva
+  ACR_SERVER: cogniva.azurecr.io
+  AZURE_RESOURCE_GROUP: rg-cogniva
+  AZURE_CONTAINER_APP: cogniva
+  AZURE_CORE_OUTPUT: none
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate deployment script
+        run: node --test scripts/azure/deploy.test.mjs
+
+      - name: Set image tags
+        run: |
+          tag="${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "BACKEND_IMAGE=${ACR_SERVER}/cogniva-backend:${tag}" >> "$GITHUB_ENV"
+          echo "FRONTEND_IMAGE=${ACR_SERVER}/cogniva-frontend:${tag}" >> "$GITHUB_ENV"
+          echo "REVISION_SUFFIX=gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+
+      - name: Build backend
+        run: docker build --platform linux/amd64 --tag "$BACKEND_IMAGE" ./apps/backend
+
+      - name: Check backend types and unit tests
+        run: |
+          docker run --rm --entrypoint npm "$BACKEND_IMAGE" run typecheck
+          docker run --rm --entrypoint npm "$BACKEND_IMAGE" test
+
+      - name: Build frontend
+        run: docker build --platform linux/amd64 --build-arg VITE_API_BASE= --tag "$FRONTEND_IMAGE" ./apps/frontend
+
+      - name: Check nginx configuration
+        run: docker run --rm -e BACKEND_UPSTREAM=127.0.0.1:8000 "$FRONTEND_IMAGE" nginx -t
+
+      # No GitHub environment is set: federation trusts the main branch subject.
+      - name: Log in to Azure using GitHub OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to container registry
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Upload both images
+        run: |
+          docker push "$BACKEND_IMAGE"
+          docker push "$FRONTEND_IMAGE"
+
+      - name: Deploy both containers and check health
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: node scripts/azure/deploy.mjs
