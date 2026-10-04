@@ -18,6 +18,7 @@
  * this module is what makes it true either way.
  */
 
+import type { Locale } from "../../contracts/workspace.js";
 import {
   AskedConcept,
   AskedConceptKind,
@@ -209,28 +210,42 @@ export function conceptsAtLimit(state: LearnerState): string[] {
  * explanation as given and hands the floor back for the next material.
  *
  * Still the student's voice — accepting an explanation, not judging it — and
- * varied by turn so a long session doesn't repeat one sentence. English, like
- * every other line the Learner produces.
+ * varied by the reply's position (learner.extend.ts replyIndex) so a long
+ * session doesn't repeat one sentence. In the session's language; English
+ * without one, as every line was before sessions had a language.
  */
 export function moveOnText(
   targetConcept: string | undefined,
-  turnIndex: number
+  seed: number,
+  locale?: Locale
 ): string {
   const concept = (targetConcept ?? "").trim();
 
-  const withConcept = [
-    `Okay, I think I get ${concept} now from how you explained it. Can we move on to the next part?`,
-    `Ohh, alright — ${concept} makes enough sense to me now. What comes next?`,
-    `Got it, I'll go with your explanation of ${concept}. Let's keep going to the next material.`
-  ];
+  const withConcept = locale === "id"
+    ? [
+        `Oke, kayaknya aku udah ngerti ${concept} dari penjelasanmu. Lanjut ke bagian berikutnya yuk?`,
+        `Ohh, oke, ${concept} udah cukup masuk akal buatku. Habis ini apa?`,
+        `Sip, aku pegang penjelasanmu soal ${concept}. Lanjut ke materi berikutnya ya.`
+      ]
+    : [
+        `Okay, I think I get ${concept} now from how you explained it. Can we move on to the next part?`,
+        `Ohh, alright — ${concept} makes enough sense to me now. What comes next?`,
+        `Got it, I'll go with your explanation of ${concept}. Let's keep going to the next material.`
+      ];
 
-  const withoutConcept = [
-    "Okay, I think I get that now from how you explained it. Can we move on to the next part?",
-    "Ohh, alright — that makes enough sense to me now. What comes next?",
-    "Got it, I'll go with your explanation. Let's keep going to the next material.",
-  ];
+  const withoutConcept = locale === "id"
+    ? [
+        "Oke, kayaknya aku udah ngerti dari penjelasanmu. Lanjut ke bagian berikutnya yuk?",
+        "Ohh, oke, itu udah cukup masuk akal buatku. Habis ini apa?",
+        "Sip, aku pegang penjelasanmu. Lanjut ke materi berikutnya ya."
+      ]
+    : [
+        "Okay, I think I get that now from how you explained it. Can we move on to the next part?",
+        "Ohh, alright — that makes enough sense to me now. What comes next?",
+        "Got it, I'll go with your explanation. Let's keep going to the next material.",
+      ];
 
   const variants = concept ? withConcept : withoutConcept;
 
-  return variants[Math.abs(turnIndex) % variants.length];
+  return variants[Math.abs(seed) % variants.length];
 }

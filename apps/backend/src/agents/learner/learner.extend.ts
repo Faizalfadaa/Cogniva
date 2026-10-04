@@ -14,23 +14,44 @@
  * nothing is solid enough yet to build on.
  */
 
+import { isDrillExhausted } from "./learner.depth";
 import { LearnerAgentInput } from "./learner.types";
 
-/** One in this many turns invites an extending question. */
+/** One in this many replies invites an extending question. */
 export const EXTEND_EVERY_TURNS = 3;
 
 /**
- * Whether this turn is one where the student should try to stretch the idea.
+ * Where this reply falls in the conversation, counting board turns and chat
+ * replies alike.
  *
- * Not on the opening turn (nothing has been taught yet) and not while the
- * student understands nothing (there is nothing to extend — it should be asking
- * plain questions instead).
+ * This used to be the board's turn index, which only moves when the teacher
+ * presses Teach. Every chat reply in between shared it, so whatever was paced
+ * by it stuck: after the third board turn, every chat reply got the same
+ * behavior style and was nudged to "push the idea further", and one session
+ * ended in three what-if questions in a row, each in the same voice.
+ *
+ * A state written before the counter existed falls back to the turn index, so
+ * a session in progress keeps its old cadence until the guard writes a count.
+ */
+export function replyIndex(input: LearnerAgentInput): number {
+  return input.currentState.exchangeCount ?? input.turnIndex;
+}
+
+/**
+ * Whether this reply is one where the student should try to stretch the idea.
+ *
+ * Not on the opening reply (nothing has been taught yet), not while the
+ * student understands nothing (there is nothing to extend — it should be
+ * asking plain questions instead), and not when the last reply already led
+ * away from the lesson (learner.depth.ts would hold the question back anyway).
  */
 export function shouldExtendThisTurn(input: LearnerAgentInput): boolean {
-  if (input.turnIndex <= 0) return false;
+  const index = replyIndex(input);
+  if (index <= 0) return false;
   if (input.currentState.understoodConcepts.length === 0) return false;
+  if (isDrillExhausted(input.currentState)) return false;
 
-  return input.turnIndex % EXTEND_EVERY_TURNS === 0;
+  return index % EXTEND_EVERY_TURNS === 0;
 }
 
 /** A harder case derived from the teacher's own example. */

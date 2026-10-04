@@ -3,7 +3,7 @@ import {
   LearnerLLMOutput,
   LearnerState
 } from "./learner.types";
-import { harderCase, shouldExtendThisTurn } from "./learner.extend";
+import { harderCase, replyIndex, shouldExtendThisTurn } from "./learner.extend";
 
 export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
   const text = input.teachingText.trim();
@@ -54,7 +54,7 @@ export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
   const harder = shouldExtendThisTurn(input) ? harderCase(text) : null;
 
   if (harder) {
-    const question = createExtendingQuestion(harder, input.turnIndex);
+    const question = createExtendingQuestion(harder, replyIndex(input));
 
     addUnique(nextState.questionsAsked, question);
 
@@ -70,7 +70,7 @@ export function mockLearnerAI(input: LearnerAgentInput): LearnerLLMOutput {
     };
   }
 
-  const responseText = createMockResponse(concept, unclearTerm, input.turnIndex);
+  const responseText = createMockResponse(concept, unclearTerm, replyIndex(input));
   if (unclearTerm) {
     addUnique(nextState.questionsAsked, responseText);
   }

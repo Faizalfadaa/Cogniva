@@ -21,7 +21,7 @@ import type { Timeline } from "../../contracts/timeline.js";
 import type { Locale } from "../../contracts/workspace.js";
 import { narrate } from "./narration.js";
 import { runLearnerTurn } from "./learner.agent.js";
-import { EARLIER_BOARD_HEADING } from "./learner.depth.js";
+import { EARLIER_BOARD_HEADING, THIS_TURN_HEADINGS } from "./learner.depth.js";
 import type { LearnerTools } from "./learner.types";
 
 export type { LearnerTools } from "./learner.types";
@@ -168,8 +168,11 @@ export function composeTeachingText(
   const board = interpretation.transcribedText.trim();
   const said = speech?.transcript?.trim() ?? "";
   const lines = narrate(timeline?.events, speech?.segments);
+  // The headings are shared with learner.depth.ts, which drops them before
+  // reading the teacher's words for a boundary.
+  const [ADDED, SAID, LINED, NOTHING_NEW] = THIS_TURN_HEADINGS;
   const lined = lines.length
-    ? `How the drawing and the talking lined up:\n${lines.map((l) => `- ${l}`).join("\n")}`
+    ? `${LINED}\n${lines.map((l) => `- ${l}`).join("\n")}`
     : "";
 
   if (interpretation.newText === undefined) {
@@ -177,10 +180,8 @@ export function composeTeachingText(
   }
 
   const fresh = interpretation.newText.trim();
-  const sections = [
-    `Just added to the board this turn:\n${fresh || "(nothing new was drawn on the board this turn)"}`,
-  ];
-  if (said) sections.push(`Said out loud this turn:\n${said}`);
+  const sections = [`${ADDED}\n${fresh || NOTHING_NEW}`];
+  if (said) sections.push(`${SAID}\n${said}`);
   if (lined) sections.push(lined);
   if (board) {
     sections.push(

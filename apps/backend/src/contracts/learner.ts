@@ -47,6 +47,10 @@ export const learnerStateSchema = z.object({
    * (agents/learner/learner.depth.ts). Optional: older states carry none.
    */
   followUpDepth: z.number().int().optional(),
+  /** Replies given this session, board and chat (agents/learner/learner.extend.ts). */
+  exchangeCount: z.number().int().optional(),
+  /** Names the teacher has used (agents/learner/learner.terms.ts). */
+  teacherTerms: z.array(z.string()).optional(),
   updatedAtTurn: z.number().int().default(0),
 });
 export type LearnerState = z.infer<typeof learnerStateSchema>;

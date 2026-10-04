@@ -25,8 +25,11 @@ import {
   boundaryText,
   isDrillExhausted,
   nextFollowUpDepth,
-  teacherSetBoundary
+  partialBoundaryText,
+  readBoundary
 } from "./learner.depth";
+import { replyIndex } from "./learner.extend";
+import { nextTeacherTerms } from "./learner.terms";
 
 const allowedResponseTypes: LearnerResponseType[] = [
   "question",
@@ -118,17 +121,18 @@ export function normalizeLearnerOutput(
       ? "extend"
       : "probe";
 
-  // Whether this question asks how the teacher's own answer works. The model
-  // says so; learner.depth.ts counts it.
-  const followsUp = raw.response?.followsUp === true;
+  // Whether this question leads away from the lesson: it asks how the
+  // teacher's own answer works (the model says so), or it pushes the idea to a
+  // bigger "what if" case. learner.depth.ts counts both in one chain.
+  const leadsAway = raw.response?.followsUp === true || kind === "extend";
 
   // The response is settled first: the repeat limit can turn a third question
   // into "I get it, let's move on", and the state has to count what was
   // actually said, not what the model proposed.
-  const response = normalizeResponse(raw.response, input, kind, followsUp);
+  const response = normalizeResponse(raw.response, input, kind, leadsAway);
 
   return {
-    nextState: normalizeState(raw.nextState, input, response, kind, followsUp),
+    nextState: normalizeState(raw.nextState, input, response, kind, leadsAway),
     response
   };
 }
@@ -138,7 +142,7 @@ function normalizeState(
   input: LearnerAgentInput,
   response: LearnerResponse,
   kind: AskedConceptKind,
-  followsUp = false
+  leadsAway = false
 ): LearnerState {
   return {
     sessionId: input.sessionId,
@@ -159,8 +163,21 @@ function normalizeState(
       input.currentState.questionsAsked
     ),
     askedConcepts: nextAskedConcepts(input, response, kind),
-    followUpDepth: nextFollowUpDepth(input.currentState, response, followsUp),
+    followUpDepth: nextFollowUpDepth(input.currentState, response, leadsAway),
+    ...nextCounters(input),
     updatedAtTurn: input.turnIndex
+  };
+}
+
+/**
+ * What every reply moves forward, whatever it said: its position in the
+ * conversation (learner.extend.ts) and the names the teacher used in it
+ * (learner.terms.ts). The model fills in neither; the guard does.
+ */
+function nextCounters(input: LearnerAgentInput): Pick<LearnerState, "exchangeCount" | "teacherTerms"> {
+  return {
+    exchangeCount: replyIndex(input) + 1,
+    teacherTerms: nextTeacherTerms(input.currentState.teacherTerms, input.teachingText)
   };
 }
 
@@ -192,7 +209,7 @@ function normalizeResponse(
   response: LearnerLLMOutput["response"] | undefined,
   input: LearnerAgentInput,
   kind: AskedConceptKind = "probe",
-  followsUp = false
+  leadsAway = false
 ): LearnerResponse {
   const safeType = getSafeResponseType(response?.type);
   const safeDerivedFrom = getSafeDerivedFrom(response?.derivedFrom);
@@ -211,16 +228,30 @@ function normalizeResponse(
       ? response.targetConcept.trim()
       : undefined;
 
-  // The teacher just said they can't take this further. Another question,
-  // however it is worded, would be the student ignoring that (learner.depth.ts).
-  if (isProbingType(safeType) && teacherSetBoundary(input.teachingText)) {
-    return acknowledgment(input, boundaryText(input.teachingText), targetConcept);
+  const boundary = readBoundary(input.teachingText);
+
+  // The teacher's whole message was "I can't take this further". Another
+  // question, however it is worded, would be the student ignoring that
+  // (learner.depth.ts).
+  if (isProbingType(safeType) && boundary.extent === "full") {
+    return acknowledgment(
+      input,
+      boundaryText(input.teachingText, boundary.reason, input.locale),
+      targetConcept
+    );
   }
 
-  // The last reply already asked how the teacher's own answer works. A second
-  // one in a row walks the lesson away from the material (learner.depth.ts).
-  if (isProbingType(safeType) && followsUp && isDrillExhausted(input.currentState)) {
-    return acknowledgment(input, backToLessonText(input.teachingText), targetConcept);
+  // The teacher answered and admitted a gap in part of it. A question about the
+  // lesson is still fine; one that digs into the part they just said they
+  // don't know is not, so the student takes the answer and moves on.
+  if (isProbingType(safeType) && boundary.extent === "partial" && leadsAway) {
+    return acknowledgment(input, partialBoundaryText(input.teachingText, input.locale), targetConcept);
+  }
+
+  // The last reply already led away from the lesson. A second one in a row
+  // walks the lesson out of the material (learner.depth.ts).
+  if (isProbingType(safeType) && leadsAway && isDrillExhausted(input.currentState)) {
+    return acknowledgment(input, backToLessonText(input.teachingText, input.locale), targetConcept);
   }
 
   // Two questions on this concept have already been answered. Asking a third
@@ -234,7 +265,7 @@ function normalizeResponse(
       responseId: createId("lr"),
       turnIndex: input.turnIndex,
       type: "acknowledgment",
-      text: moveOnText(targetConcept, input.turnIndex),
+      text: moveOnText(targetConcept, replyIndex(input), input.locale),
       targetConcept,
       derivedFrom: "new_info"
     };
@@ -260,12 +291,12 @@ export function createFallbackOutput(
   // otherwise read as the student asking the same thing three times.
   if (isRepeatExhausted(input.currentState, key)) {
     return {
-      nextState: { ...input.currentState, updatedAtTurn: input.turnIndex },
+      nextState: { ...input.currentState, ...nextCounters(input), updatedAtTurn: input.turnIndex },
       response: {
         responseId: createId("lr"),
         turnIndex: input.turnIndex,
         type: "acknowledgment",
-        text: moveOnText(undefined, input.turnIndex),
+        text: moveOnText(undefined, replyIndex(input), input.locale),
         targetConcept,
         derivedFrom: "new_info"
       }
@@ -282,6 +313,7 @@ export function createFallbackOutput(
         fallbackText
       ],
       askedConcepts: recordProbe(input.currentState, key, targetConcept),
+      ...nextCounters(input),
       updatedAtTurn: input.turnIndex
     },
     response: {
@@ -394,12 +426,19 @@ function acknowledgment(
   };
 }
 
+/** In the session's language; English without one, as before sessions had a language. */
 function createDefaultQuestion(input: LearnerAgentInput): string {
+  const indonesian = input.locale === "id";
+
   if (!input.teachingText.trim()) {
-    return "I haven't caught the explanation yet. Could you start from the most basic part?";
+    return indonesian
+      ? "Aku belum nangkep penjelasannya nih. Bisa mulai dari bagian yang paling dasar?"
+      : "I haven't caught the explanation yet. Could you start from the most basic part?";
   }
 
-  return "I'm still a bit confused. Could you explain that part with a simpler example?";
+  return indonesian
+    ? "Aku masih agak bingung. Bisa jelasin bagian itu pakai contoh yang lebih sederhana?"
+    : "I'm still a bit confused. Could you explain that part with a simpler example?";
 }
 
 function createId(prefix: string): string {

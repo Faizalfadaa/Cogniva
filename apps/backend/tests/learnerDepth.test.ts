@@ -206,7 +206,7 @@ describe("learner prompt", () => {
     const fresh = buildLearnerMessages(input(ANSWER_VALVE, freshState(0)));
 
     const user = (messages: typeof spent) => messages.find((m) => m.role === "user")!.content;
-    expect(user(spent)).toMatch(/already followed up/);
-    expect(user(fresh)).not.toMatch(/already followed up/);
+    expect(user(spent)).toMatch(/already led away from the lesson/);
+    expect(user(fresh)).not.toMatch(/already led away from the lesson/);
   });
 });

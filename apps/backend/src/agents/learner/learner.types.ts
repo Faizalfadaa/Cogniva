@@ -43,6 +43,19 @@ export type LearnerState = {
    * model.
    */
   followUpDepth?: number;
+  /**
+   * How many replies the student has given this session, board and chat
+   * alike. The board's turn index only moves when the teacher presses Teach,
+   * so anything paced by it (the behavior style, the occasional "push it
+   * further" question) froze for the whole of a chat. Kept by the guard.
+   */
+  exchangeCount?: number;
+  /**
+   * Names the teacher has used for people, places and things, so the student
+   * calls them by those names instead of ones it knows from elsewhere (see
+   * learner.terms.ts). Kept by the guard, newest last.
+   */
+  teacherTerms?: string[];
   updatedAtTurn: number;
 };
 

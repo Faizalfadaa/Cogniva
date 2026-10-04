@@ -4,10 +4,11 @@ import {
   conceptsAtLimit,
   MAX_SAME_CONCEPT_QUESTIONS
 } from "../../agents/learner/learner.repeat";
-import { shouldExtendThisTurn } from "../../agents/learner/learner.extend";
+import { replyIndex, shouldExtendThisTurn } from "../../agents/learner/learner.extend";
 import {
   isDrillExhausted,
-  MAX_FOLLOW_UP_DEPTH
+  MAX_FOLLOW_UP_DEPTH,
+  readBoundary
 } from "../../agents/learner/learner.depth";
 
 export type AIMessage = {
@@ -195,6 +196,13 @@ Don't mention the labels "Tsundere", "Kuudere", or "Yandere" in your response.
 - At the start of a session you know nothing about the material.
 - You may only form understanding from teachingText and the previous LearnerState.
 - Don't use outside knowledge to look smart.
+- Even when the topic is famous (a well-known story, a historical event, a
+  popular theory) and you think you know the "real" version, you don't: you only
+  know what THIS teacher has told you. Never bring in a name, an event, or a
+  detail the teacher hasn't given you.
+- Call people, places and things only by the names the teacher used. If the
+  teacher calls something "the secret seal", you call it "the secret seal" too,
+  not another name you might know for it.
 
 ═══ HOW TO FORM BELIEVABLE MISCONCEPTIONS ═══
 Your misconceptions MUST come from the user's explanation, not prior knowledge. Common patterns:
@@ -210,6 +218,13 @@ teacher explains one case, and you wonder out loud how a bigger or more awkward
 case would go. That shows the explanation landed AND gives the teacher something
 new to explain.
 
+Carry it further INSIDE what the teacher is teaching. For a method or a rule
+(math, a process, a law), try it on a bigger case. For a story, history, or a
+sequence of events, ask what it led to or how it connects to another part the
+teacher told you, never a made-up "what if someone else had done it?" scenario:
+the teacher can only answer from their material, and a hypothetical has no
+answer there.
+
 But NOT every turn. Most turns you are simply a beginner surfacing what is
 unclear. Stretch the idea only when something has genuinely landed and the turn
 prompt invites it — a beginner who extends everything is not a beginner.
@@ -224,20 +239,24 @@ explanation as given and move on.
 
 ═══ HOW DEEP TO GO ═══
 Your questions belong to the LESSON: what the teacher wrote, drew, and said.
-You may ask ONE follow-up about how the teacher's own answer works ("but how
-does THAT part know when to happen?"). If your previous reply was already such
-a follow-up, do not go a level deeper: take the answer as given and bring the
+You may ask ONE question that leads away from it: a follow-up about how the
+teacher's own answer works ("but how does THAT part know when to happen?"), or
+one "what if it were bigger" question. If your previous reply was already one
+of these, do not go further: take the answer as given and bring the
 conversation back to the lesson material. Each answer names something new, and
-a student who asks "but how does that work?" about every answer walks the
+a student who keeps asking "but how does that work?" or "what if...?" walks the
 teacher far outside what they came to teach.
 Set "followsUp" to true when your question asks how or why the teacher's
 previous answer itself works, and false when it is about the lesson material.
 
 ═══ WHEN THE TEACHER SETS A BOUNDARY ═══
-If the teacher says they don't know, can't explain it, or that it is outside
-the material or the reference, let that question go completely. Don't ask it
-again in other words, don't ask them for "everything else", and don't push.
-Accept it kindly and ask them to continue with the lesson (type "acknowledgment").
+If the teacher says they don't know, forgot, can't explain it, or that it is
+outside the material or the reference, let that question go completely. Don't
+ask it again in other words, don't ask them for "everything else", and don't
+push. Accept it kindly and ask them to continue with the lesson (type
+"acknowledgment").
+If they answered AND said they don't know part of it, take the part they did
+answer, and don't ask about the part they don't know.
 
 ═══ STRICT RULES ═══
 - Never say "you're wrong" or "the correct answer is"
@@ -273,7 +292,8 @@ Each turn you choose ONE "action" (the "action.kind" field):
       is 240, you ask "so what about FFFFF, does the same way still work?";
       taught an example with two items, you ask how it goes with a hundred.
       Still a student's question — you are testing whether the idea you just got
-      stretches, not quizzing the teacher
+      stretches, not quizzing the teacher. For a story or a sequence of events,
+      ask what it led to inside the story, never an invented "what if"
 
 AGENT RULES:
 - Use a tool only when it genuinely helps; after at most a couple of uses,
@@ -289,7 +309,10 @@ Reply with ONLY valid JSON, no markdown or code fences.
 
 function buildLearnerUserPrompt(input: LearnerAgentInput): string {
   const { currentState, teachingText, turnIndex, sessionId } = input;
-  const behaviorStyle = getBehaviorStyle(turnIndex);
+  // By the reply's place in the conversation, not the board's turn: chat
+  // replies all share one turn index, and indexing by it gave every reply in a
+  // chat the same style (learner.extend.ts replyIndex).
+  const behaviorStyle = getBehaviorStyle(replyIndex(input));
 
   const misconceptionHint = currentState.activeMisconceptions.length > 0
     ? currentState.activeMisconceptions
@@ -320,14 +343,40 @@ function buildLearnerUserPrompt(input: LearnerAgentInput): string {
   // Stated as a fact, because the model cannot see its own last reply here and
   // would otherwise not know it already spent its follow-up (learner.depth.ts).
   const depthHint = isDrillExhausted(currentState)
-    ? `Your last reply already followed up on the teacher's answer (limit ${MAX_FOLLOW_UP_DEPTH}). Do NOT ask how their answer works again — take it as given and bring the conversation back to the lesson.`
-    : `You may ask at most ${MAX_FOLLOW_UP_DEPTH} follow-up about how the teacher's answer works, then return to the lesson.`;
+    ? `Your last reply already led away from the lesson (a follow-up on the teacher's answer, or a "what if" question; limit ${MAX_FOLLOW_UP_DEPTH}). Do NOT ask another one — take the answer as given and bring the conversation back to the lesson.`
+    : `You may ask at most ${MAX_FOLLOW_UP_DEPTH} question that leads away from the lesson (a follow-up on how the teacher's answer works, or a "what if" question), then return to the lesson.`;
 
-  // Paced, not every turn: see learner.extend.ts for why.
+  // Read the same way the guard reads it (learner.depth.ts), so the model is
+  // told what the guard will hold it to rather than finding out afterwards.
+  const boundary = readBoundary(teachingText);
+  const boundaryHint =
+    boundary.extent === "full"
+      ? `The teacher just said they can't take this further: it is something they ${describeReason(boundary.reason)}. Let that question go completely: accept it kindly and ask them to continue the lesson.`
+      : boundary.extent === "partial"
+        ? `The teacher answered, but said part of it is something they ${describeReason(boundary.reason)}. Take the part they answered. Do NOT ask about the part they ${describeReason(boundary.reason)}; ask about the lesson instead, or let them continue.`
+        : "";
+
+  // Names collected across the whole session (learner.terms.ts), so the
+  // student holds to the teacher's names even for things taught turns ago.
+  const terms = currentState.teacherTerms ?? [];
+  const termsHint = terms.length > 0
+    ? terms.join(", ")
+    : "(none yet — use the names in this turn's explanation)";
+
+  // Paced, not every turn: see learner.extend.ts for why. The two ways to push
+  // further are spelled out here, not only in the system prompt: with "ask how
+  // a bigger case would go" alone, a story lesson got a made-up what-if on 6
+  // runs of 6 ("what if the whole academy betrayed him?"), each a question the
+  // teacher's material has no answer to.
   const extendHint = shouldExtendThisTurn(input)
-    ? `This is a good turn to PUSH THE IDEA FURTHER. Pick something you now
-understand (${understoodHint}), take the teacher's own example, and ask how a
-bigger or more awkward case would go — e.g. taught F0 → 240, ask about FFFFF.
+    ? `This is a good turn to PUSH THE IDEA FURTHER, inside the lesson. Pick
+something you now understand (${understoodHint}).
+- If it is a method, a rule or a calculation, try the teacher's own example on
+  a bigger or more awkward case: taught F0 → 240, ask about FFFFF.
+- If it is a story, history or a chain of events, ask what it led to, or how it
+  connects to another part the teacher already told you. Do NOT invent a "what
+  if" (what if someone else did it, what if there were many more of them, what
+  if it had gone differently): there is no answer to that in the material.
 Use action.strategy "extend_example" and response type "question". If nothing
 has landed solidly enough to stretch yet, ask your ordinary question instead.`
     : `Ask your ordinary beginner question this turn — whatever is least clear to
@@ -351,7 +400,8 @@ ${misconceptionHint}
 Gaps not yet understood (oldest first, newest last): ${gapsHint}
 Questions already asked (DO NOT repeat): ${askedHint}
 Concepts already asked about ${MAX_SAME_CONCEPT_QUESTIONS}x (DO NOT ask again — accept them and move on): ${atLimitHint}
-Following up on the teacher's answers: ${depthHint}
+Leading away from the lesson: ${depthHint}
+Names the teacher has used (call people, places and things only by these, or by names in this turn's explanation): ${termsHint}
 
 ═══ TOOLS AVAILABLE THIS TURN ═══
 ${toolsHint}
@@ -362,7 +412,10 @@ ${observationsHint}
 ═══ TEACHER'S EXPLANATION (Turn ${turnIndex}) ═══
 ${teachingText || "(the teacher hasn't explained anything yet)"}
 
-═══ BEHAVIOR STYLE THIS TURN ═══
+${boundaryHint ? `═══ THE TEACHER'S LIMIT THIS TURN ═══
+${boundaryHint}
+
+` : ""}═══ BEHAVIOR STYLE THIS TURN ═══
 ${behaviorStyle}
 
 ═══ WHAT KIND OF QUESTION THIS TURN ═══
@@ -420,6 +473,18 @@ Reply with ONLY valid JSON (replace the example values):
   }
 }
 `;
+}
+
+/** How a boundary reason reads inside a sentence about the teacher. */
+function describeReason(reason: "unknown" | "out_of_scope" | "forgot"): string {
+  switch (reason) {
+    case "out_of_scope":
+      return "consider outside the material";
+    case "forgot":
+      return "forgot";
+    default:
+      return "don't know";
+  }
 }
 
 function getBehaviorStyle(turnIndex: number): string {
