@@ -64,6 +64,7 @@ import type { SpeechTranscript } from "../contracts/speech.js";
 import type { TeachingTurn } from "../contracts/teaching.js";
 import type { Timeline } from "../contracts/timeline.js";
 import type { Topic } from "../contracts/topic.js";
+import type { Locale } from "../contracts/workspace.js";
 import { newId, sessions } from "../modules/storage/sessionStore.js";
 
 /** A learner the orchestrator can drive (real agent or a test fake). */
@@ -145,6 +146,8 @@ export interface TeachingInput {
    * Absent on the bare session API, which has no character.
    */
   learnerName?: string;
+  /** The workspace's language, so the student answers in it. */
+  locale?: Locale;
 }
 
 /** Stand-in board text when the reading is empty and we must proceed anyway. */
@@ -176,6 +179,8 @@ interface StepArgs {
   timeline: Timeline | undefined;
   /** See TeachingInput.learnerName. */
   learnerName: string | undefined;
+  /** See TeachingInput.locale. */
+  locale: Locale | undefined;
   turnIndex: number;
   previousTurn: TeachingTurn | undefined;
   /**
@@ -220,7 +225,7 @@ export class Orchestrator {
   async runTeachingTurn(
     session: Session,
     topic: Topic,
-    { image, audio, typedText, allowConfirmation = true, newImage, timeline, learnerName }: TeachingInput,
+    { image, audio, typedText, allowConfirmation = true, newImage, timeline, learnerName, locale }: TeachingInput,
   ): Promise<TurnResult> {
     // Budget gate (§7.3), before anything else: once a session is out of
     // tokens we refuse the turn without calling Vision, ASR or the Learner.
@@ -271,6 +276,7 @@ export class Orchestrator {
       newImage,
       timeline,
       learnerName,
+      locale,
       turnIndex,
       previousTurn,
       previousImage,
@@ -497,6 +503,7 @@ export class Orchestrator {
     recordUsage,
     timeline,
     learnerName,
+    locale,
   }: StepArgs): Promise<TurnResult> {
     const speech = ctx.speech;
     const interpretation: VisionInterpretation = {
@@ -538,6 +545,7 @@ export class Orchestrator {
       onUsage,
       timeline,
       learnerName,
+      locale,
     });
 
     // The response is written before the turn that references it, so the
