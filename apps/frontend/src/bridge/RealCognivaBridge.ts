@@ -124,6 +124,14 @@ export class RealCognivaBridge implements CognivaBridge {
     });
   }
 
+  async uploadBoardPdf(workspaceId: string, file: File): Promise<WorkspaceDTO> {
+    const { data, mime } = await blobToBase64(file);
+    return sendJson<WorkspaceDTO>(`/api/workspaces/${workspaceId}/board-pdf`, 'POST', {
+      data,
+      mime: mime === 'application/octet-stream' ? 'application/pdf' : mime,
+    });
+  }
+
   saveReferenceText(workspaceId: string, text: string): Promise<SaveReferenceTextResultDTO> {
     return sendJson<SaveReferenceTextResultDTO>(
       `/api/workspaces/${workspaceId}/reference-text`,
