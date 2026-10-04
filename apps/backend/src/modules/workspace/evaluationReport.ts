@@ -8,11 +8,19 @@
  * this mapper layers fallbacks: prefer the Evaluator's findings/strengths, then
  * the Learner's own mental model (open gaps, questions), then generic but
  * relevant lines. The debrief always renders something meaningful (§10).
+ *
+ * The narrative is a summary of the evaluation, not a replacement for it. The
+ * scores, the categorized findings and the cited turns are passed through
+ * untouched alongside it, so the screen can show the breakdown the letter
+ * necessarily glosses over.
  */
 
 import type { EvaluationResult } from "../../contracts/evaluation.js";
 import type { LearnerState } from "../../contracts/learner.js";
-import type { EvaluationReport } from "../../contracts/workspace.js";
+import type {
+  EvaluationTranscriptTurn,
+  NewEvaluationReport,
+} from "../../contracts/workspace.js";
 
 interface ReportContext {
   title: string;
@@ -24,12 +32,17 @@ interface ReportContext {
    * letter tone and reflection fall back to session engagement instead.
    */
   meaningfulScore?: boolean;
+  /**
+   * The turns the findings cite. Absent on the failure path, which reports
+   * without having read a transcript.
+   */
+  transcript?: EvaluationTranscriptTurn[];
 }
 
 export function buildEvaluationReport(
   result: EvaluationResult,
   ctx: ReportContext,
-): EvaluationReport {
+): NewEvaluationReport {
   const topic = ctx.title?.trim() || "this topic";
   const meaningful = ctx.meaningfulScore !== false;
   const tone = meaningful ? toneFromScore(result.score) : toneFromTurns(ctx.turnCount);
@@ -78,6 +91,10 @@ export function buildEvaluationReport(
     continueLearning: continueLearning.length
       ? continueLearning
       : fallbackContinue(topic),
+    score: result.score,
+    depthScore: result.depthScore,
+    findings: result.findings,
+    transcript: ctx.transcript ?? [],
   };
 }
 

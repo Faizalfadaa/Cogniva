@@ -1,0 +1,62 @@
+{
+  "_comment": [
+    "Per-voice decoding settings. Edit and send the next request — no restart,",
+    "and the render cache keys on these values so you never hear a stale clip.",
+    "",
+    "Settings are nested by engine because the same key means different things",
+    "to each model: repetition_penalty defaults to 1.2 in Chatterbox and 5.0 in",
+    "XTTS. A flat block (no engine name) applies to whichever engine is running.",
+    "",
+    "Chatterbox knobs:",
+    "  exaggeration  delivery intensity. 0.5 neutral, higher = more theatrical.",
+    "  cfg_weight    how tightly generation is steered. The model card suggests",
+    "                lowering it for fast-talking references, which loosens the",
+    "                pacing and gives the words more room.",
+    "",
+    "The values below are starting points reasoned from the model card, NOT",
+    "verified by ear. Run tune.py, listen, and replace them.",
+    "Only keys in ALLOWED_INFERENCE_KEYS (app/config.py) are applied."
+  ],
+
+  "yuzuki": {
+    "_note": "Soft and careful already — kept close to neutral.",
+    "chatterbox": {
+      "exaggeration": 0.45,
+      "cfg_weight": 0.5
+    },
+    "xtts": {
+      "temperature": 0.70,
+      "top_p": 0.85,
+      "top_k": 50
+    }
+  },
+
+  "reina": {
+    "_note": "Fast, excitable reference. Lower cfg_weight to unhurry the pacing.",
+    "chatterbox": {
+      "exaggeration": 0.6,
+      "cfg_weight": 0.3
+    },
+    "xtts": {
+      "temperature": 0.60,
+      "top_p": 0.78,
+      "top_k": 35,
+      "speed": 0.95
+    }
+  },
+
+  "akira": {
+    "_note": "Quiet deadpan. Slightly under neutral so it does not go flat.",
+    "chatterbox": {
+      "exaggeration": 0.4,
+      "cfg_weight": 0.45
+    },
+    "xtts": {
+      "temperature": 0.55,
+      "top_p": 0.75,
+      "top_k": 30,
+      "speed": 0.96,
+      "repetition_penalty": 6.0
+    }
+  }
+}

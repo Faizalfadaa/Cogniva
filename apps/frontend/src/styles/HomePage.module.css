@@ -31,8 +31,14 @@
 }
 
 .logoMark {
-  color: var(--lime);
-  font-size: 18px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--forest-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
 }
 
 .logoText {
@@ -67,6 +73,12 @@
 }
 
 .newBtnPlus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
   font-size: 18px;
   line-height: 1;
   font-weight: 400;
@@ -121,14 +133,61 @@
   margin-top: auto;
   padding-top: 16px;
   border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
+.logoutBtn {
+  width: 100%;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-on-dark-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.logoutBtn:hover {
+  background: var(--forest-mid);
+  color: var(--text-on-dark);
+}
+
+/* The whole chip is the profile button — it opens the profile dialog. */
 .userChip {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   padding: 8px 12px;
   border-radius: var(--radius-md);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+
+.userChip:hover { background: var(--forest-mid); }
+
+.userChip:disabled {
+  cursor: default;
+}
+
+.userChip:disabled:hover {
+  background: transparent;
+}
+
+.userChip:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+.userChipCaret {
+  margin-left: auto;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-on-dark-muted);
+  flex-shrink: 0;
 }
 
 .userAvatar {
@@ -157,6 +216,7 @@
 /* ─── Main ─── */
 .main {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -171,6 +231,8 @@
 }
 
 .mainHeaderLeft {
+  min-width: 0;
+  overflow-wrap: anywhere;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -191,6 +253,7 @@
 
 /* ─── Search ─── */
 .searchBox {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -212,6 +275,7 @@
 }
 
 .searchInput {
+  min-width: 0;
   border: none;
   background: none;
   outline: none;
@@ -456,7 +520,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  line-height: 1;
   color: var(--text-muted);
 }
 
@@ -548,6 +612,58 @@
   text-underline-offset: 3px;
 }
 
+/* ─── Onboarding (first visit) ─── */
+.onbDots {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.onbDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  transition: width var(--dur-base) var(--ease-out), background var(--dur-base);
+}
+
+.onbDotActive {
+  width: 18px;
+  border-radius: var(--radius-pill);
+  background: var(--lime);
+}
+
+.onbIcon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--lime-tint);
+  color: var(--lime-text);
+  margin-bottom: 4px;
+}
+
+/* Slightly wider than .modalBody — these steps carry a full sentence or two. */
+.onbBody {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  max-width: 320px;
+  min-height: 92px;
+}
+
+.onbNav {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+}
+
+.onbNav > button {
+  flex: 1;
+}
+
 /* ─── Name Modal ─── */
 .modalOverlay {
   position: fixed;
@@ -557,10 +673,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
   z-index: 100;
 }
 
 .modal {
+  /* auto margins (not align-items) do the centering, so a card taller than the
+     viewport stays fully scrollable instead of having its top clipped. */
+  margin: auto;
+  /* Anchor for .loginClose. Only matters when LoginScreen is opened with an
+     onClose (from the landing page); harmless otherwise. */
+  position: relative;
   background: var(--card-bg);
   border-radius: var(--radius-xl);
   padding: 40px 36px;
@@ -681,10 +805,77 @@
   color: var(--text-primary);
 }
 
+.profileAvatarLg {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--lime);
+  color: var(--lime-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.profileFieldLabel {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
 .logoImg {
   height: 25px;
-  width: auto;
+  width: 25px;
   object-fit: contain;
+}
+
+.loginLogo {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: var(--forest-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loginLogo img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.authError {
+  width: 100%;
+  color: #c0392b;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.guestBtn {
+  width: 100%;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.guestBtn:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.guestBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ─── Spinner ─── */
@@ -697,10 +888,10 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Mobile (≤768px) — sidebar collapses into a top bar.
+   Compact windows (≤1024px) — sidebar collapses into a top bar.
    Desktop layout above is untouched; this block only overrides.
 ═══════════════════════════════════════════════════════════ */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .layout {
     flex-direction: column;
     min-height: 100vh;
@@ -729,7 +920,15 @@
     min-width: 0;
   }
 
-  .logo { padding: 0; }
+  /* The wordmark is the only part of the top line allowed to give up space, so
+     the avatar stays beside New workspace instead of wrapping to its own row. */
+  .logo { padding: 0; min-width: 0; flex: 0 1 auto; }
+  .logoText {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   .newBtn { padding: 8px 12px; flex-shrink: 0; }
 
@@ -752,11 +951,16 @@
     order: 0;
     margin-top: 0;
     padding-top: 0;
+    margin-left: auto;
     border-top: none;
     flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
   }
-  .userChip { padding: 0; }
-  .userName { display: none; }
+  .logoutBtn { display: none; }
+  .userChip { width: auto; padding: 0; }
+  .userName,
+  .userChipCaret { display: none; }
 
   /* Main content: tighter padding, stacked header, denser grid. */
   .mainHeader {
@@ -788,6 +992,7 @@
   .newCard { min-height: 170px; }
 
   .modal { padding: 32px 24px; }
+  .onbBody { min-height: 0; }
 }
 
 /* Small phones (≤420px) — go single column so titles/thumbs stay legible. */
@@ -796,4 +1001,44 @@
   .loadingGrid {
     grid-template-columns: 1fr 1fr;
   }
+
+  /* Not enough room for the wordmark next to New workspace + the avatar;
+     the logo mark alone still identifies the app. */
+  .logoText { display: none; }
 }
+
+/* ─── Sign-in dismiss controls ───
+   Only rendered when LoginScreen receives an onClose, i.e. when it is opened
+   as an overlay from the landing page. On HomePage there is nowhere to go
+   back to, so neither of these exists. */
+.loginClose {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  border: none;
+  background: none;
+  padding: 6px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--dur-fast);
+}
+
+.loginClose:hover:not(:disabled) { color: var(--text-primary); }
+.loginClose:disabled { opacity: 0.4; cursor: default; }
+
+.loginBackLink {
+  margin-top: 2px;
+  border: none;
+  background: none;
+  padding: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--dur-fast);
+}
+
+.loginBackLink:hover:not(:disabled) { color: var(--text-secondary); }
+.loginBackLink:disabled { opacity: 0.4; cursor: default; }

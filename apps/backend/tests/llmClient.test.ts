@@ -13,6 +13,7 @@ import { LLMClient, LLMError, type GenAILike } from "../src/llm/index.js";
 interface StubResponse {
   text?: string;
   promptFeedback?: { blockReason?: string } | null;
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
 }
 
 function stub(response: StubResponse, capture: { args?: unknown } = {}): GenAILike {
@@ -54,6 +55,42 @@ describe("LLMClient.structured", () => {
     expect(capture.args.config.maxOutputTokens).toBe(128);
     expect(capture.args.config.responseMimeType).toBe("application/json");
     expect(capture.args.config.responseJsonSchema).toEqual({ type: "object" });
+  });
+
+  it("records the call's token usage on lastUsage", async () => {
+    const client = makeClient();
+    expect(client.lastUsage).toBeNull();
+    client.client = stub({
+      text: '{"answer": 42}',
+      usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 340 },
+    });
+
+    await client.structured({ system: "s", user: "u", schema: {} });
+
+    expect(client.lastUsage).toEqual({ inputTokens: 1200, outputTokens: 340 });
+  });
+
+  it("treats a response with no usageMetadata as zero, not a crash", async () => {
+    const client = makeClient();
+    client.client = stub({ text: '{"answer": 42}' });
+
+    await client.structured({ system: "s", user: "u", schema: {} });
+
+    expect(client.lastUsage).toEqual({ inputTokens: 0, outputTokens: 0 });
+  });
+
+  it("still records usage when the payload is unusable — those tokens were spent", async () => {
+    const client = makeClient();
+    client.client = stub({
+      text: "not json at all",
+      usageMetadata: { promptTokenCount: 90, candidatesTokenCount: 10 },
+    });
+
+    await expect(
+      client.structured({ system: "s", user: "u", schema: {} }),
+    ).rejects.toBeInstanceOf(LLMError);
+
+    expect(client.lastUsage).toEqual({ inputTokens: 90, outputTokens: 10 });
   });
 
   it("raises on a safety block", async () => {

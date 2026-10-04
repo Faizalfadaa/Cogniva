@@ -17,23 +17,45 @@
 
 import {
   LearnerAgent,
+  ReferencerAgent,
   getEvaluator,
   seedLearnerState,
   seedLearnerStateFromEvaluation,
+  type ChatExchange,
+  type ReferenceProblemCode,
+  type ReferenceSuggestions,
   type TranscriptTurn,
 } from "../../agents/index.js";
 import * as config from "../../config/index.js";
 import type { VisionInterpretation } from "../../contracts/board.js";
 import { utcNowIso } from "../../contracts/common.js";
 import type { Session } from "../../contracts/session.js";
+import type { Timeline } from "../../contracts/timeline.js";
 import type { Topic } from "../../contracts/topic.js";
 import type {
   ChatMessage,
+  CheckpointErrorKind,
+  LearnerSpeech,
+  ReferenceSource,
+  Locale,
   TeachingCheckpoint,
   Workspace,
 } from "../../contracts/workspace.js";
 import { getOrchestrator } from "../../orchestrator/index.js";
+import {
+  buildOutline,
+  buildReferenceIndex,
+  queriesFromTranscript,
+  retrieveExcerpts,
+  type ReferenceExcerpt,
+} from "../retrieval/index.js";
 import { newId, sessions } from "../storage/sessionStore.js";
+import {
+  learnerNameForWorkspace,
+  speechSegments,
+  synthesizeSpeech,
+  voiceForWorkspace,
+} from "../tts/index.js";
 import { buildEvaluationReport } from "./evaluationReport.js";
 import { newWorkspaceId, workspaces } from "./workspaceStore.js";
 
@@ -45,72 +67,87 @@ const chatLearner = new LearnerAgent();
 /** Anonymous owner for requests that arrive without an x-client-id (e.g. curl). */
 export const ANON_OWNER = "anonymous";
 
-export function listWorkspaces(ownerId: string = ANON_OWNER): Workspace[] {
+export async function listWorkspaces(ownerId: string = ANON_OWNER): Promise<Workspace[]> {
   return workspaces.list(ownerId);
 }
 
 /** True when this device owns the workspace — gates every per-workspace route. */
-export function isOwner(id: string, ownerId: string = ANON_OWNER): boolean {
+export async function isOwner(id: string, ownerId: string = ANON_OWNER): Promise<boolean> {
   return workspaces.isOwner(id, ownerId);
 }
 
-export function createWorkspace(ownerId: string = ANON_OWNER): Workspace {
+export async function createWorkspace(
+  ownerId: string = ANON_OWNER,
+  locale: Locale = "id",
+): Promise<Workspace> {
   const id = newWorkspaceId();
   const now = utcNowIso();
-  const workspace: Workspace = { id, state: "Draft", createdAt: now, updatedAt: now };
-  workspaces.setOwner(id, ownerId);
+  // The language is settled here and never written again: a session's
+  // transcript, report and (in English) spoken replies all end up in it, so a
+  // workspace that changed language halfway would be half in each.
+  const workspace: Workspace = { id, state: "Draft", locale, createdAt: now, updatedAt: now };
 
   // Back it with a Session so the orchestrator/Evaluator drive it unchanged.
+  // The session is written first: the workspace row references it.
   const session: Session = {
     sessionId: newId("ses"),
     topicId: id, // synthetic — the Topic is built from workspace metadata
     status: "SETUP",
     createdAt: now,
     turnCount: 0,
+    tokensUsed: 0,
     evaluationIds: [],
   };
-  sessions.saveSession(session);
-  workspaces.linkSession(id, session.sessionId);
+  await sessions.saveSession(session);
 
-  return workspaces.save(workspace);
+  return workspaces.create(workspace, ownerId, session.sessionId);
 }
 
-export function getWorkspace(id: string): Workspace | undefined {
+export async function getWorkspace(id: string): Promise<Workspace | undefined> {
   return workspaces.get(id);
 }
 
-export function deleteWorkspace(id: string): boolean {
-  const ws = workspaces.get(id);
+export async function deleteWorkspace(id: string): Promise<boolean> {
+  const ws = await workspaces.get(id);
   if (!ws) return false;
 
-  const sessionId = workspaces.sessionId(id);
-  if (sessionId) sessions.deleteSession(sessionId);
-  workspaces.delete(id);
+  const sessionId = await workspaces.sessionId(id);
+  await workspaces.delete(id);
+  if (sessionId) await sessions.deleteSession(sessionId);
 
   return true;
 }
 
-export function updateMeta(
+export async function updateMeta(
   id: string,
-  meta: { title?: string; description?: string },
-): Workspace | undefined {
-  const ws = workspaces.get(id);
+  meta: { title?: string; description?: string; learnerId?: string; locale?: Locale },
+): Promise<Workspace | undefined> {
+  const ws = await workspaces.get(id);
   if (!ws) return undefined;
   if (meta.title !== undefined) ws.title = meta.title;
   if (meta.description !== undefined) ws.description = meta.description;
+  // The picked student, so speech can be synthesized in the voice the user is
+  // actually looking at (§TTS). Validated where it is used, not here.
+  if (meta.learnerId !== undefined) ws.learnerId = meta.learnerId;
+  // The session language is chosen when the workspace is opened and fixed from
+  // the first teaching turn onwards: the student has spoken in it by then, and
+  // the report is written in it, so changing it would leave a session half in
+  // one language. A later request is ignored rather than refused — the client
+  // has no business asking, and nothing it is doing depends on the answer.
+  if (meta.locale !== undefined && ws.state === "Draft") ws.locale = meta.locale;
   return touch(ws);
 }
 
-export function saveDraft(
+export async function saveDraft(
   id: string,
   payload: { snapshot?: unknown; thumbnail?: string },
-): Workspace | undefined {
-  const ws = workspaces.get(id);
+): Promise<Workspace | undefined> {
+  const ws = await workspaces.get(id);
   if (!ws) return undefined;
   ws.currentWhiteboardSnapshot = payload.snapshot;
   if (payload.thumbnail) ws.thumbnailUrl = payload.thumbnail;
   // First real draft flips a blank workspace into Teaching (mirrors the mock).
-  if (ws.state === "Draft") startTeaching(ws);
+  if (ws.state === "Draft") await startTeaching(ws);
   return touch(ws);
 }
 
@@ -119,19 +156,171 @@ export async function setPdf(
   data: Buffer,
   mime: string,
 ): Promise<Workspace | undefined> {
-  const ws = workspaces.get(id);
+  const ws = await workspaces.get(id);
   if (!ws) return undefined;
-  workspaces.savePdf(id, { data, mime });
+  await workspaces.savePdf(id, { data, mime });
   ws.pdfUrl = `/api/workspaces/${id}/pdf`;
+
+  // An upload replaces whatever the Referencer had found: there is one answer
+  // key per session, and leaving the old provenance would label this PDF with
+  // someone else's URL.
+  await workspaces.saveReferenceSource(id, undefined);
+  ws.referenceSource = undefined;
 
   // Extract the text and keep it as this session's reference material — the
   // answer key the Evaluator grades against (§3.7). It flows ONLY to the
-  // Evaluator (via synthTopic), never to the Learner (§1.4). Extraction failures
-  // (e.g. a scanned/image-only PDF) are non-fatal: the session has no reference.
+  // Evaluator, never to the Learner (§1.4). Extraction failures (e.g. a
+  // scanned/image-only PDF) are non-fatal: the session has no reference.
   const text = await extractPdfText(data);
-  if (text) workspaces.saveReference(id, text);
+  if (text) {
+    await workspaces.saveReference(id, text);
+    // Chunk + embed in the background so the upload response stays fast, the
+    // same pattern the checkpoint/chat/finish calls use. Evaluation builds the
+    // index synchronously if it is still missing by then.
+    void indexReference(id, text);
+  }
 
   return touch(ws);
+}
+
+/**
+ * Store reference material the user typed or pasted in themselves.
+ *
+ * The third source, beside an uploaded PDF (setPdf) and a page the Referencer
+ * found (useReference), and the only one that needs no extraction step — the
+ * text is already text. It lands in the same place as the other two and is read
+ * by the Evaluator alone (§1.4).
+ */
+export async function setReferenceText(
+  id: string,
+  raw: string,
+): Promise<{ workspace: Workspace; chars: number } | undefined> {
+  const ws = await workspaces.get(id);
+  if (!ws) return undefined;
+
+  const text = raw
+    .replace(/\r\n?/g, "\n")
+    .trim()
+    .slice(0, config.RAG_MAX_REFERENCE_CHARS);
+  await workspaces.saveReference(id, text);
+
+  // Pasted text has no provenance to show, and any previous chip would now be
+  // pointing at material that is no longer in use.
+  await workspaces.saveReferenceSource(id, undefined);
+  ws.referenceSource = undefined;
+
+  void indexReference(id, text);
+  return { workspace: await touch(ws), chars: text.length };
+}
+
+/** Build (or rebuild) the retrieval index for a workspace's reference text. */
+async function indexReference(id: string, text: string): Promise<void> {
+  try {
+    const index = await buildReferenceIndex(text);
+    await workspaces.saveReferenceIndex(id, index);
+    console.log(
+      `[workspace] reference indexed for ${id}: ${index.size} bagian, mode ${index.mode}`,
+    );
+  } catch (err) {
+    // buildReferenceIndex already degrades to keyword mode internally; reaching
+    // here means chunking itself failed, and the Evaluator falls back to the
+    // full-text path.
+    console.error("[workspace] reference indexing failed:", err);
+  }
+}
+
+// --- Reference sourcing (§3.7) ---------------------------------------------
+
+/**
+ * A single Referencer instance, matching how the chat Learner is held. Stateless
+ * between calls; it exists so tests have a seam and so the offline default is
+ * decided in one place.
+ */
+const referencer = new ReferencerAgent();
+
+/**
+ * Offer reading material for a workspace whose user has none.
+ *
+ * Synchronous on purpose, unlike the teaching-turn calls. Those return early
+ * because the UI polls a list that fills in later; this one answers a modal the
+ * user is sitting in front of, and there is nothing for them to do until the
+ * options arrive. Nothing is stored — the user hands back the option they chose.
+ */
+export async function suggestReferences(
+  id: string,
+  hint?: string,
+): Promise<ReferenceSuggestions | undefined> {
+  const ws = await workspaces.get(id);
+  if (!ws) return undefined;
+
+  return referencer.suggest({
+    topic: topicNameOf(ws),
+    description: ws.description,
+    hint,
+  });
+}
+
+/** The outcome of adopting a suggested source. */
+export interface UseReferenceResult {
+  ok: boolean;
+  /** Empty when ok; otherwise why the source could not be used, in English. */
+  problem: string;
+  /** The same reason as a stable code, so the UI can translate it. */
+  problemCode?: ReferenceProblemCode;
+  /** How much reference text was extracted. Useful signal for the UI. */
+  chars: number;
+  workspace?: Workspace;
+}
+
+/**
+ * Adopt one suggested source as this session's reference material.
+ *
+ * Same destination as a PDF upload — reference text plus a retrieval index, read
+ * by the Evaluator alone (§1.4). The difference is only where the text came
+ * from, which is recorded so the UI can show it after a reload.
+ */
+export async function useReference(
+  id: string,
+  choice: { url: string; title?: string; source?: string },
+): Promise<UseReferenceResult | undefined> {
+  const ws = await workspaces.get(id);
+  if (!ws) return undefined;
+
+  const fetched = await referencer.read(choice.url, topicNameOf(ws));
+  if (!fetched.ok) {
+    return { ok: false, problem: fetched.problem, problemCode: fetched.problemCode, chars: 0 };
+  }
+
+  const text = fetched.text.slice(0, config.RAG_MAX_REFERENCE_CHARS);
+  await workspaces.saveReference(id, text);
+
+  const provenance: ReferenceSource = {
+    url: choice.url,
+    title: choice.title?.trim() || fetched.title,
+    source: choice.source?.trim() || hostLabel(choice.url),
+  };
+  await workspaces.saveReferenceSource(id, provenance);
+  ws.referenceSource = provenance;
+
+  // Same background indexing as an upload: the response stays fast, and
+  // evaluation rebuilds the index synchronously if it is somehow still missing.
+  void indexReference(id, text);
+
+  return { ok: true, problem: "", chars: text.length, workspace: await touch(ws) };
+}
+
+/** What the session is about, as the Referencer should search for it. */
+function topicNameOf(ws: Workspace): string {
+  return ws.title?.trim() || ws.description?.trim().slice(0, 120) || "";
+}
+
+/** "khanacademy.org" from a URL — the fallback publisher label. */
+function hostLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
 }
 
 /** Pull plain text out of a PDF buffer. Loaded lazily so the heavy PDF engine is
@@ -142,8 +331,13 @@ async function extractPdfText(data: Buffer): Promise<string> {
     const pdf = await getDocumentProxy(new Uint8Array(data));
     const { text } = await extractText(pdf, { mergePages: true });
     const merged = Array.isArray(text) ? text.join("\n") : text;
-    // Cap the length to keep the Evaluator prompt bounded.
-    return merged.replace(/[ \t]+\n/g, "\n").trim().slice(0, 20000);
+    // Retrieval (§3.7) now bounds the Evaluator prompt by selecting passages, so
+    // the old 20k truncation is gone — a long PDF is chunked, not cut off. What
+    // remains is a sanity bound against a pathologically large upload.
+    return merged
+      .replace(/[ \t]+\n/g, "\n")
+      .trim()
+      .slice(0, config.RAG_MAX_REFERENCE_CHARS);
   } catch (err) {
     console.error("[workspace] PDF text extraction failed:", err);
     return "";
@@ -152,65 +346,118 @@ async function extractPdfText(data: Buffer): Promise<string> {
 
 // --- Teaching checkpoints --------------------------------------------------
 
-export function submitCheckpoint(
+export async function submitCheckpoint(
   id: string,
   payload: {
-    snapshotImage: string;
+    /** Absent on a voice-only turn. */
+    snapshotImage?: string;
     snapshotMime: string;
     whiteboardSnapshot?: unknown;
     audio?: string;
     audioMime?: string;
+    timeline?: Timeline;
+    /** Only what changed on the board since the last Teach. */
+    newContentImage?: string;
   },
-): TeachingCheckpoint | undefined {
-  const ws = workspaces.get(id);
+): Promise<TeachingCheckpoint | undefined> {
+  const ws = await workspaces.get(id);
   if (!ws) return undefined;
 
   // A checkpoint implies teaching; make sure the session is live first.
-  if (ws.state === "Draft") startTeaching(ws);
+  if (ws.state === "Draft") await startTeaching(ws);
 
   const checkpoint: TeachingCheckpoint = {
     id: newId("chk"),
-    snapshotImageUrl: dataUrl(payload.snapshotMime, payload.snapshotImage),
+    // Empty rather than a data URL with no data in it, which would render as a
+    // broken image wherever the board is shown back.
+    snapshotImageUrl: payload.snapshotImage
+      ? dataUrl(payload.snapshotMime, payload.snapshotImage)
+      : "",
     whiteboardSnapshot: payload.whiteboardSnapshot,
     audioUrl: payload.audio
       ? dataUrl(payload.audioMime ?? "audio/webm", payload.audio)
       : undefined,
     learnerResponse: undefined,
+    // Stored with the checkpoint, and also handed to the turn below so the
+    // student can match each drawing with what was being said as it was made.
+    timeline: payload.timeline,
     createdAt: utcNowIso(),
   };
-  workspaces.addCheckpoint(id, checkpoint);
-  touch(ws);
+  await workspaces.addCheckpoint(id, checkpoint);
+  await touch(ws);
 
   // Run the actual teaching turn in the background; the UI polls getCheckpoints
   // for `learnerResponse` and getChatMessages for the mirrored reply.
-  void (async () => {
-    let reply: string;
+  inBackground("teaching turn", async () => {
+    let reply: TurnReply;
     try {
       reply = await runTeachingTurn(ws, {
-        image: payload.snapshotImage,
+        // An empty image is how the orchestrator already spells "nothing on
+        // the board": Vision is skipped and the turn runs on the speech alone.
+        image: payload.snapshotImage ?? "",
         audio: payload.audio ?? null,
+        newImage: payload.newContentImage ?? null,
+        timeline: payload.timeline,
       });
     } catch (err) {
+      // A thrown turn stays untagged: errorKind is for conditions we understand
+      // and can explain, not for "something broke". The client surfaces those
+      // from the failed request itself.
       console.error("[workspace] teaching turn failed:", err);
-      reply = "Hmm, I'm a little confused about this one... could you walk me through it again slowly?";
+      reply = {
+        text: "Hmm, I'm a little confused about this one... could you walk me through it again slowly?",
+      };
     }
-    workspaces.updateCheckpoint(id, checkpoint.id, { learnerResponse: reply });
-    workspaces.addMessage(id, learnerMessage(reply));
-    touch(ws);
-  })();
+    if (!(await stillExists(id))) return;
+    // A tagged turn is a system message, not something the student said —
+    // speaking "you are out of budget" in the learner's voice would be odd, and
+    // it would spend GPU time on a session that just hit its ceiling.
+    const speech = reply.errorKind ? undefined : planSpeech(reply.text);
+
+    // The text and the plan for speaking it land in the same write. With the
+    // voice on, the UI holds the words and reveals each sentence as its clip
+    // starts; with it off (or on a tagged turn) there is no plan, and the text
+    // shows at once exactly as before.
+    //
+    // This replaces rendering the whole reply and attaching one clip afterwards,
+    // which left the voice trailing the text by the full render time. Per
+    // sentence, the first clip is ready after rendering only that sentence and
+    // the rest render behind it.
+    await workspaces.updateCheckpoint(id, checkpoint.id, {
+      learnerResponse: reply.text,
+      errorKind: reply.errorKind,
+      speech,
+    });
+    // Still mirrored into chat: the text is written in the student's voice, and
+    // dropping it would leave a silent gap in the conversation history. Both
+    // carry the same speech id, so a client showing both speaks the line once.
+    const message = await workspaces.addMessage(id, learnerMessage(reply.text, speech));
+    await bump(id);
+
+    if (!speech) return;
+    await speakSegments(id, speech, (next) =>
+      Promise.all([
+        workspaces.updateCheckpoint(id, checkpoint.id, { speech: next }),
+        workspaces.updateMessage(id, message.id, { speech: next }),
+      ]),
+    );
+  });
 
   return checkpoint;
 }
 
-export function getCheckpoints(id: string): TeachingCheckpoint[] | undefined {
-  if (!workspaces.get(id)) return undefined;
+export async function getCheckpoints(id: string): Promise<TeachingCheckpoint[] | undefined> {
+  if (!(await workspaces.get(id))) return undefined;
   return workspaces.listCheckpoints(id);
 }
 
 // --- Chat ------------------------------------------------------------------
 
-export function sendChatMessage(id: string, content: string): ChatMessage | undefined {
-  const ws = workspaces.get(id);
+export async function sendChatMessage(
+  id: string,
+  content: string,
+): Promise<ChatMessage | undefined> {
+  const ws = await workspaces.get(id);
   if (!ws) return undefined;
 
   const userMsg: ChatMessage = {
@@ -219,12 +466,12 @@ export function sendChatMessage(id: string, content: string): ChatMessage | unde
     content,
     createdAt: utcNowIso(),
   };
-  workspaces.addMessage(id, userMsg);
-  touch(ws);
+  await workspaces.addMessage(id, userMsg);
+  await touch(ws);
 
   // The Learner replies asynchronously so the user's own bubble lands instantly;
   // the reply surfaces on the next getChatMessages poll.
-  void (async () => {
+  inBackground("chat reply", async () => {
     let reply: string;
     try {
       reply = await runChatReply(ws, content);
@@ -232,57 +479,91 @@ export function sendChatMessage(id: string, content: string): ChatMessage | unde
       console.error("[workspace] chat reply failed:", err);
       reply = "Oh, sorry, I blanked for a second there... could you say that again?";
     }
-    workspaces.addMessage(id, learnerMessage(reply));
-    touch(ws);
-  })();
+    if (!(await stillExists(id))) return;
+    // Same as the checkpoint path: text and speech plan in one write, then the
+    // sentences are voiced one at a time.
+    const speech = planSpeech(reply);
+    const message = await workspaces.addMessage(id, learnerMessage(reply, speech));
+    await bump(id);
+
+    if (!speech) return;
+    await speakSegments(id, speech, (next) =>
+      workspaces.updateMessage(id, message.id, { speech: next }),
+    );
+  });
 
   return userMsg;
 }
 
-export function getChatMessages(id: string): ChatMessage[] | undefined {
-  if (!workspaces.get(id)) return undefined;
+export async function getChatMessages(id: string): Promise<ChatMessage[] | undefined> {
+  if (!(await workspaces.get(id))) return undefined;
   return workspaces.listMessages(id);
 }
 
 // --- Evaluation ------------------------------------------------------------
 
-export function finishSession(id: string): boolean {
-  const ws = workspaces.get(id);
+export async function finishSession(id: string): Promise<boolean> {
+  const ws = await workspaces.get(id);
   if (!ws) return false;
-  // Idempotent: only a teaching workspace can be finished.
-  if (ws.state !== "Teaching" && ws.state !== "Draft") return true;
 
+  // Idempotent, and safe against two requests arriving together. Reading the
+  // state and then writing it left a gap in which both callers saw "Teaching",
+  // so both started an evaluation; the two runs disagreed and the user saw
+  // whichever landed last. Claiming it in one operation means only one caller
+  // can win, and the rest return the same "already handled" as a second click
+  // on a finished session.
+  if (!(await workspaces.claimForEvaluation(id))) return true;
   ws.state = "Evaluating";
-  touch(ws);
 
-  void (async () => {
+  inBackground("evaluation", async () => {
     try {
       await runEvaluation(ws);
     } catch (err) {
       console.error("[workspace] evaluation failed:", err);
     }
+    if (!(await stillExists(id))) return;
     // Even on failure, surface a report so the debrief never dead-ends (§10).
-    if (!workspaces.getReport(id)) {
-      const session = requireSession(ws);
-      workspaces.saveReport(
+    if (!(await workspaces.getReport(id))) {
+      const session = await requireSession(ws);
+      await workspaces.saveReport(
         id,
         buildEvaluationReport(emptyEvaluation(session.sessionId), {
           title: ws.title ?? "",
           turnCount: session.turnCount,
-          learnerState: sessions.getLearnerState(session.sessionId),
+          learnerState: await sessions.getLearnerState(session.sessionId),
           meaningfulScore: false,
         }),
       );
     }
-    ws.state = "Completed";
-    touch(ws);
-  })();
+    await bump(id, { state: "Completed" });
+  });
 
   return true;
 }
 
-export function getReport(id: string) {
-  return workspaces.getReport(id);
+/**
+ * A finished round's debrief. The latest one unless a round is named.
+ *
+ * Read straight out of storage — the Evaluator ran once, when the round was
+ * finished, and opening this screen never re-runs it.
+ */
+export async function getReport(id: string, round?: number) {
+  return workspaces.getReport(id, round);
+}
+
+/** Which rounds this workspace has finished, for the debrief's round picker. */
+export async function getReportRounds(id: string) {
+  return workspaces.listReportRounds(id);
+}
+
+/**
+ * Every scored session this owner has finished, oldest first.
+ *
+ * Read at the moment a debrief is opened rather than frozen into the report, so
+ * an older session's trend keeps up as newer ones land behind it.
+ */
+export async function getScoreHistory(ownerId: string) {
+  return workspaces.listScoreHistory(ownerId);
 }
 
 /**
@@ -292,12 +573,12 @@ export function getReport(id: string) {
  * round's evaluation so the student now targets the user's real weak spots
  * (§4.3). Only a Completed workspace resumes.
  */
-export function resumeSession(id: string): Workspace | undefined {
-  const ws = workspaces.get(id);
+export async function resumeSession(id: string): Promise<Workspace | undefined> {
+  const ws = await workspaces.get(id);
   if (!ws) return undefined;
   if (ws.state !== "Completed") return ws; // nothing to resume
 
-  const session = requireSession(ws);
+  const session = await requireSession(ws);
   // EVALUATED/ENDED -> TEACHING. Direct move (the service owns workspace state),
   // keeping turnCount and evaluationIds intact.
   session.status = "TEACHING";
@@ -306,57 +587,93 @@ export function resumeSession(id: string): Workspace | undefined {
   // Adaptive seeding (§4.3): re-aim the Learner at the weak spots the last
   // evaluation found, instead of carrying the old static misconceptions — so the
   // next round the student probes what the user actually got wrong/missed.
-  const evaluation = sessions.getLatestEvaluation(session.sessionId);
+  const evaluation = await sessions.getLatestEvaluation(session.sessionId);
   if (evaluation) {
-    sessions.saveLearnerState(
+    await sessions.saveLearnerState(
       seedLearnerStateFromEvaluation(
         session.sessionId,
         evaluation,
-        sessions.getLearnerState(session.sessionId),
+        await sessions.getLearnerState(session.sessionId),
       ),
     );
   }
 
-  sessions.saveSession(session);
+  await sessions.saveSession(session);
   ws.state = "Teaching";
   return touch(ws);
 }
 
 // --- Internals -------------------------------------------------------------
 
+/** End-of-session copy in the selected character's voice and session language. */
+const BUDGET_EXCEEDED_REPLIES = {
+  id: {
+    yuzuki: "E-Etto… Sensei, maaf, cukup dulu untuk kali ini, ya? Aku perlu menata lagi yang tadi kupelajari… Setelah itu, aku ceritakan bagian yang sudah kupahami dan yang masih bikin bingung.",
+    reina: "Waaah, Sensei! Kepalaku udah penuh sampai campur aduk! Kita cukupkan dulu, ya! Aku mau cerita hasil belajarku sebelum semuanya ketuker!",
+    akira: "…Cukup dulu, Sensei. Aku perlu mencerna penjelasan tadi. Mari kita tutup sesi ini. Akan kuberi tahu mana yang kupahami dan mana yang masih belum jelas.",
+  },
+  en: {
+    yuzuki: "E-Etto… Sensei, sorry, could we stop here for now? I need a little time to sort through what I've learned… Then I'll tell you what I understood and what still confuses me.",
+    reina: "Waaah, Sensei! My head's so full, everything's getting mixed up! Let's stop here for now! I want to tell you what I've learned before I get it all scrambled!",
+    akira: "…That's enough for now, Sensei. I need to digest that explanation. Let's wrap up this session. I'll tell you what I understood and what's still unclear.",
+  },
+} satisfies Record<Locale, Record<ReturnType<typeof voiceForWorkspace>, string>>;
+
+/**
+ * What one teaching turn produced. `text` is always readable prose so a client
+ * that ignores `errorKind` still shows something sensible; `errorKind` marks the
+ * turns that ended in a handled condition rather than a real student reply.
+ */
+interface TurnReply {
+  text: string;
+  errorKind?: CheckpointErrorKind;
+}
+
 /** Run one teaching turn through the orchestrator, never pausing for confirmation. */
 async function runTeachingTurn(
   ws: Workspace,
-  input: { image: string; audio: string | null },
-): Promise<string> {
-  const session = requireSession(ws);
-  const topic = synthTopic(ws);
-  const orchestrator = getOrchestrator();
+  input: {
+    image: string;
+    audio: string | null;
+    newImage: string | null;
+    timeline: Timeline | undefined;
+  },
+): Promise<TurnReply> {
+  const session = await requireSession(ws);
+  const topic = await synthTopic(ws);
 
-  let result = await orchestrator.runTeachingTurn(session, topic, {
+  // The workspace UI has no confirmation step, so the planner is told not to
+  // schedule one (§S5): an unsure board reading now gets one directed re-read
+  // and then proceeds on Vision's best guess. This used to be a second full
+  // teaching turn — the whole pipeline run twice for one checkpoint.
+  const result = await getOrchestrator().runTeachingTurn(session, topic, {
     image: input.image,
     audio: input.audio,
     typedText: null,
+    allowConfirmation: false,
+    newImage: input.newImage,
+    timeline: input.timeline,
+    learnerName: learnerNameForWorkspace(ws.learnerId, ws.id),
   });
 
-  // Low-confidence board reading would normally pause and ask the user, but the
-  // workspace UI has no confirmation step — re-run trusting Vision's best guess.
-  if (result.kind === "confirmation") {
-    const guess = result.interpretation?.transcribedText?.trim() || "The explanation on the whiteboard";
-    result = await orchestrator.runTeachingTurn(session, topic, {
-      image: null,
-      audio: input.audio,
-      typedText: guess,
-    });
+  // Only one orchestrator call now (the planner absorbed the retry), so one
+  // budget check is enough -- the old second check guarded a retry that no
+  // longer exists.
+  if (result.kind === "budget_exceeded") {
+    const character = voiceForWorkspace(ws.learnerId, ws.id);
+    return {
+      text: BUDGET_EXCEEDED_REPLIES[ws.locale][character],
+      errorKind: "budget_exceeded",
+    };
   }
 
-  return result.response?.text ?? "Okay... go on, I'm following.";
+  return { text: result.response?.text ?? "Okay... go on, I'm following." };
 }
 
 /** Drive the Learner persona for a free-text chat message (no teaching turn saved). */
 async function runChatReply(ws: Workspace, content: string): Promise<string> {
-  const session = requireSession(ws);
-  const topic = synthTopic(ws);
+  const session = await requireSession(ws);
+  const topic = await synthTopic(ws);
 
   const interpretation: VisionInterpretation = {
     snapshotId: `chat_${session.sessionId}`,
@@ -367,7 +684,7 @@ async function runChatReply(ws: Workspace, content: string): Promise<string> {
   };
 
   const state =
-    sessions.getLearnerState(session.sessionId) ??
+    (await sessions.getLearnerState(session.sessionId)) ??
     seedLearnerState(session.sessionId, [], { topicTitle: topic.title });
 
   const [response, nextState] = await chatLearner.respond({
@@ -377,103 +694,286 @@ async function runChatReply(ws: Workspace, content: string): Promise<string> {
     speech: null,
     state,
     turnIndex: session.turnCount,
+    learnerName: learnerNameForWorkspace(ws.learnerId, ws.id),
   });
-  sessions.saveLearnerState(nextState);
+  await sessions.saveLearnerState(nextState);
   return response.text;
 }
 
 /** End the round and run the Evaluator, then store the mapped debrief report. */
 async function runEvaluation(ws: Workspace): Promise<void> {
-  const session = requireSession(ws);
+  const session = await requireSession(ws);
 
   if (session.status === "TEACHING") session.status = "ENDED";
   session.endedAt = utcNowIso();
-  sessions.saveSession(session);
+  await sessions.saveSession(session);
 
-  // Same transcript projection the session REST layer feeds the Evaluator (§5.2).
-  const transcript: TranscriptTurn[] = sessions.listTurns(session.sessionId).map((turn) => {
-    const learner = sessions.getResponse(turn.learnerResponseId);
-    return {
-      turnIndex: turn.turnIndex,
-      boardText: turn.interpretation.transcribedText,
-      speech: turn.speechTranscript?.transcript || undefined,
-      learnerUtterance: learner?.text,
-    };
-  });
+  // Same transcript projection the session REST layer feeds the Evaluator (§5.2),
+  // with the chat panel folded in: see attachChat.
+  const rows = await sessions.listTurnsWithResponses(session.sessionId);
+  const chatByTurn = groupChatByTurn(
+    rows.map(({ turn }) => ({ turnIndex: turn.turnIndex, createdAt: turn.createdAt })),
+    await workspaces.listMessages(ws.id),
+  );
+  const transcript: TranscriptTurn[] = rows.map(({ turn, response }) => ({
+    turnIndex: turn.turnIndex,
+    boardText: turn.interpretation.transcribedText,
+    newBoardText: turn.interpretation.newText,
+    speech: turn.speechTranscript?.transcript || undefined,
+    learnerUtterance: response?.text,
+    chat: chatByTurn.get(turn.turnIndex),
+  }));
 
-  const topic = synthTopic(ws);
+  const topic = await synthTopic(ws);
+  const { referenceExcerpts, referenceOutline } = await retrieveReference(
+    ws,
+    transcript,
+    topic,
+  );
+
   const result = await getEvaluator().evaluate(
     {
       sessionId: session.sessionId,
       turns: transcript,
-      referenceMaterial: topic.referenceMaterial,
+      // Only sent when retrieval produced nothing; excerpts take precedence.
+      referenceMaterial: referenceExcerpts.length ? "" : topic.referenceMaterial,
       keyConcepts: topic.keyConcepts,
       commonMisconceptions: topic.commonMisconceptions,
+      referenceExcerpts,
+      referenceOutline,
     },
     newId("ev"),
   );
-  sessions.saveEvaluation(result);
+  await sessions.saveEvaluation(result);
   session.evaluationId = result.evaluationId;
-  session.evaluationIds = sessions.listEvaluations(session.sessionId).map((e) => e.evaluationId);
+  session.evaluationIds = (await sessions.listEvaluations(session.sessionId)).map(
+    (e) => e.evaluationId,
+  );
   session.status = "EVALUATED";
-  sessions.saveSession(session);
+  await sessions.saveSession(session);
 
   // A synthesized workspace Topic has no key concepts, so the deterministic
   // offline evaluator can't produce a meaningful score — only a real LLM can.
   const usedMock = process.env.USE_MOCK_AI === "true" || !config.llmAvailable();
 
-  workspaces.saveReport(
+  await workspaces.saveReport(
     ws.id,
     buildEvaluationReport(result, {
       title: ws.title ?? "",
       turnCount: session.turnCount,
-      learnerState: sessions.getLearnerState(session.sessionId),
+      learnerState: await sessions.getLearnerState(session.sessionId),
       meaningfulScore: !usedMock,
+      // The same turns the Evaluator read, minus the student's own replies:
+      // the debrief highlights what the user taught, not what it answered.
+      // The chat survives that cut whole, both sides, because a reply with the
+      // question stripped off it cannot be read (see EvaluationTranscriptTurn).
+      transcript: transcript.map((turn) => ({
+        turnIndex: turn.turnIndex,
+        boardText: turn.boardText,
+        newBoardText: turn.newBoardText,
+        speech: turn.speech,
+        chat: turn.chat,
+      })),
     }),
   );
 }
 
+/**
+ * Fold the chat panel into the turn timeline.
+ *
+ * Chat and teaching turns are two separate streams in storage, and the
+ * Evaluator reads one of them. Merging is by timestamp rather than by
+ * position: a message belongs to the last turn that had already happened when
+ * it was sent, which is the turn whose board the student was looking at while
+ * they asked. Position would be a guess, and a wrong guess hangs the teacher's
+ * words off someone else's drawing.
+ *
+ * Messages sent before the first turn attach to that first turn. They were
+ * still part of the lesson, and the alternative is dropping them.
+ *
+ * A session with no turns at all keeps no chat: there is nothing to attach it
+ * to. That session has no transcript to evaluate either, so the debrief
+ * already falls back to the empty report.
+ */
+function groupChatByTurn(
+  turns: { turnIndex: number; createdAt: string }[],
+  messages: ChatMessage[],
+): Map<number, ChatExchange[]> {
+  const byTurn = new Map<number, ChatExchange[]>();
+  if (turns.length === 0) return byTurn;
+
+  const ordered = [...turns].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+  const startedAt = ordered.map((turn) => new Date(turn.createdAt).getTime());
+
+  for (const message of messages) {
+    const text = message.content?.trim();
+    if (!text) continue;
+
+    const sentAt = new Date(message.createdAt).getTime();
+    let at = 0;
+    while (at + 1 < startedAt.length && startedAt[at + 1] <= sentAt) at++;
+
+    const turnIndex = ordered[at].turnIndex;
+    const list = byTurn.get(turnIndex) ?? [];
+    list.push({ sender: message.sender, text });
+    byTurn.set(turnIndex, list);
+  }
+
+  return byTurn;
+}
+
+/**
+ * The retrieval step of the Evaluator's RAG path (§3.7).
+ *
+ * Searches this workspace's indexed reference for the passages relevant to what
+ * the user actually taught, and returns them alongside an outline of the whole
+ * document. A workspace with no PDF returns nothing, and the Evaluator falls
+ * back to whatever full reference text the topic carries.
+ */
+async function retrieveReference(
+  ws: Workspace,
+  transcript: TranscriptTurn[],
+  topic: Topic,
+): Promise<{ referenceExcerpts: ReferenceExcerpt[]; referenceOutline: string[] }> {
+  const empty = { referenceExcerpts: [], referenceOutline: [] };
+
+  const text = await workspaces.getReference(ws.id);
+  if (!text) return empty;
+
+  // The upload indexes in the background; if the user finished before that
+  // landed, build it now rather than silently grading against nothing.
+  let index = await workspaces.getReferenceIndex(ws.id);
+  if (!index) {
+    index = await buildReferenceIndex(text);
+    await workspaces.saveReferenceIndex(ws.id, index);
+  }
+  if (index.size === 0) return empty;
+
+  const queries = queriesFromTranscript(transcript, topic.keyConcepts);
+  const referenceExcerpts = await retrieveExcerpts(index, queries);
+  if (referenceExcerpts.length === 0) return empty;
+
+  console.log(
+    `[workspace] retrieval untuk ${ws.id}: ${referenceExcerpts.length}/${index.size} bagian (mode ${index.mode})`,
+  );
+  return { referenceExcerpts, referenceOutline: buildOutline(index) };
+}
+
 /** Move a Draft workspace (and its Session) into the teaching loop. */
-function startTeaching(ws: Workspace): void {
+async function startTeaching(ws: Workspace): Promise<void> {
   ws.state = "Teaching";
-  const session = requireSession(ws);
+  const session = await requireSession(ws);
   if (session.status === "SETUP") {
     session.status = "TEACHING";
     session.startedAt = utcNowIso();
-    if (!sessions.getLearnerState(session.sessionId)) {
-      sessions.saveLearnerState(
-        seedLearnerState(session.sessionId, synthTopic(ws).commonMisconceptions, {
-          topicTitle: synthTopic(ws).title,
+    if (!(await sessions.getLearnerState(session.sessionId))) {
+      const topic = await synthTopic(ws);
+      await sessions.saveLearnerState(
+        seedLearnerState(session.sessionId, topic.commonMisconceptions, {
+          topicTitle: topic.title,
         }),
       );
     }
-    sessions.saveSession(session);
+    await sessions.saveSession(session);
   }
 }
 
 /** Build the Topic the agents need from whatever metadata the workspace has. */
-function synthTopic(ws: Workspace): Topic {
+async function synthTopic(ws: Workspace): Promise<Topic> {
   return {
     topicId: ws.id,
     title: ws.title?.trim() || "Untitled session",
     description: ws.description?.trim() || "",
     // Grounding: the uploaded PDF's text becomes the Evaluator's answer key.
-    referenceMaterial: workspaces.getReference(ws.id) ?? "",
+    referenceMaterial: (await workspaces.getReference(ws.id)) ?? "",
     keyConcepts: [],
     commonMisconceptions: [],
     difficulty: "medium",
   };
 }
 
-function requireSession(ws: Workspace): Session {
-  const sessionId = workspaces.sessionId(ws.id);
-  const session = sessionId ? sessions.getSession(sessionId) : undefined;
+async function requireSession(ws: Workspace): Promise<Session> {
+  const sessionId = await workspaces.sessionId(ws.id);
+  const session = sessionId ? await sessions.getSession(sessionId) : undefined;
   if (!session) throw new Error(`No session backing workspace ${ws.id}`);
   return session;
 }
 
-function learnerMessage(content: string): ChatMessage {
-  return { id: newId("msg"), sender: "learner", content, createdAt: utcNowIso() };
+function learnerMessage(content: string, speech?: LearnerSpeech): ChatMessage {
+  return {
+    id: newId("msg"),
+    sender: "learner",
+    content,
+    speech,
+    createdAt: utcNowIso(),
+  };
+}
+
+/**
+ * The plan for speaking a reply: its sentences, none voiced yet.
+ *
+ * Undefined when speech is switched off, which is the signal the UI uses to show
+ * the text immediately instead of waiting for audio that is not coming.
+ */
+function planSpeech(text: string): LearnerSpeech | undefined {
+  if (!config.TTS_ENABLED) return undefined;
+  const segments = speechSegments(text);
+  if (segments.length === 0) return undefined;
+  return {
+    id: newId("sp"),
+    status: "pending",
+    segments: segments.map((segment) => ({ text: segment })),
+  };
+}
+
+/**
+ * Voice a reply one sentence at a time, publishing each clip the moment it lands.
+ *
+ * The UI starts playing the first sentence while the rest are still rendering,
+ * so every clip is persisted as soon as it exists rather than all at the end.
+ *
+ * A failed sentence ends the reply as "unavailable" instead of skipping ahead: a
+ * gap in the middle of a spoken line sounds broken, and the UI reveals whatever
+ * is left as text. The voice is read once, when the reply starts speaking, so one
+ * line is never split across two characters if the pick changes mid-reply.
+ */
+async function speakSegments(
+  workspaceId: string,
+  speech: LearnerSpeech,
+  persist: (speech: LearnerSpeech) => Promise<unknown>,
+): Promise<void> {
+  const ws = await workspaces.get(workspaceId);
+  const voice = voiceForWorkspace(ws?.learnerId, workspaceId);
+
+  let current = speech;
+  for (let index = 0; index < current.segments.length; index++) {
+    const clip = await synthesizeSpeech(current.segments[index].text, voice);
+    // Re-checked after every render: the workspace can be deleted mid-reply.
+    if (!(await stillExists(workspaceId))) return;
+
+    if (!clip) {
+      current = { ...current, status: "unavailable" };
+      await persist(current);
+      await bump(workspaceId);
+      return;
+    }
+
+    const audioId = newId("aud");
+    await workspaces.saveAudioClip(workspaceId, audioId, { data: clip.audio, mime: clip.mime });
+    const audioUrl = `/api/workspaces/${workspaceId}/audio/${audioId}`;
+    const segments = current.segments.map((segment, i) =>
+      i === index ? { ...segment, audioUrl } : segment,
+    );
+    current = {
+      ...current,
+      segments,
+      status: index === segments.length - 1 ? "ready" : "pending",
+    };
+    await persist(current);
+    await bump(workspaceId);
+  }
 }
 
 function emptyEvaluation(sessionId: string) {
@@ -481,6 +981,7 @@ function emptyEvaluation(sessionId: string) {
     evaluationId: newId("ev"),
     sessionId,
     score: 0,
+    depthScore: 0,
     findings: [],
     summary: "",
     strengths: [],
@@ -489,9 +990,48 @@ function emptyEvaluation(sessionId: string) {
   };
 }
 
-function touch(ws: Workspace): Workspace {
+function touch(ws: Workspace): Promise<Workspace> {
   ws.updatedAt = utcNowIso();
   return workspaces.save(ws);
+}
+
+/**
+ * Run the agent work for a request that has already been answered.
+ *
+ * Nothing may escape one of these: the user can delete a workspace while its
+ * teaching turn is still running, and the write that lands afterwards then fails
+ * against a foreign key that no longer resolves. Unhandled, that rejection takes
+ * down the process — so every background job is wrapped and its failure is
+ * logged instead.
+ */
+function inBackground(label: string, job: () => Promise<void>): void {
+  void job().catch((err) => {
+    console.error(`[workspace] ${label} gagal di latar belakang:`, err);
+  });
+}
+
+/**
+ * Whether the workspace is still there before a background job writes to it.
+ * A deleted workspace makes its in-flight turn moot: the reply is dropped rather
+ * than resurrected. This only narrows the window — `inBackground` is what closes
+ * it — but it keeps the ordinary delete-while-thinking case out of the log.
+ */
+async function stillExists(id: string): Promise<boolean> {
+  return Boolean(await workspaces.get(id));
+}
+
+/**
+ * Touch a workspace by id, re-reading it first.
+ *
+ * The background jobs (a teaching turn, a chat reply, an evaluation) finish long
+ * after the request that started them, and the workspace may have been edited in
+ * the meantime. Writing back the copy they captured would silently undo that
+ * edit — so they re-read, apply only their own change, and save.
+ */
+async function bump(id: string, patch: Partial<Workspace> = {}): Promise<void> {
+  const fresh = await workspaces.get(id);
+  if (!fresh) return;
+  await touch({ ...fresh, ...patch });
 }
 
 function dataUrl(mime: string, base64: string): string {

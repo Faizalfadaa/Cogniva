@@ -2,14 +2,18 @@
  * Evaluator output guard (Architecture Document §3.7, §6.9).
  *
  * Normalizes the model's raw JSON into the canonical EvaluationResult: clamps the
- * score to 0..100, drops findings with an unknown category, and coerces field
+ * scores to 0..100, drops findings with an unknown category, and coerces field
  * types. Mirrors the Learner/Vision/ASR guards so a slightly-off model response
  * never breaks the debrief.
+ *
+ * It also takes the transcript, because one field cannot be checked without it:
+ * `sourceQuote` is only useful if it really occurs in the turn it points at.
  */
 
 import { utcNowIso } from "../../contracts/common.js";
 import type { FindingCategory } from "../../contracts/enums.js";
-import type { EvaluationResult, Finding } from "./types.js";
+import { scoreFindings } from "./scoring.js";
+import type { EvaluationResult, Finding, TranscriptTurn } from "./types.js";
 
 const ALLOWED_CATEGORIES: readonly FindingCategory[] = [
   "CORRECT",
@@ -22,12 +26,21 @@ export function normalizeEvaluation(
   raw: Record<string, unknown>,
   sessionId: string,
   evaluationId: string,
+  turns: TranscriptTurn[] = [],
 ): EvaluationResult {
+  // Findings first: the score is computed from them, so it has to be the
+  // normalized set. A finding this guard drops (unknown category, empty
+  // concept and detail) must not be able to move the number either.
+  const findings = normalizeFindings(raw.findings, turns);
+
   return {
     evaluationId,
     sessionId,
-    score: clampScore(raw.score),
-    findings: normalizeFindings(raw.findings),
+    // Not read from the model. See scoring.ts for why the arithmetic lives in
+    // code while the judgements behind it stay the model's.
+    score: scoreFindings(findings).score,
+    depthScore: clampScore(raw.depthScore),
+    findings,
     summary: typeof raw.summary === "string" ? raw.summary.trim() : "",
     strengths: normalizeStringArray(raw.strengths),
     improvements: normalizeStringArray(raw.improvements),
@@ -41,14 +54,14 @@ function clampScore(value: unknown): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-function normalizeFindings(value: unknown): Finding[] {
+function normalizeFindings(value: unknown, turns: TranscriptTurn[]): Finding[] {
   if (!Array.isArray(value)) return [];
   return value
-    .map(coerceFinding)
+    .map((item) => coerceFinding(item, turns))
     .filter((f): f is Finding => f !== null);
 }
 
-function coerceFinding(value: unknown): Finding | null {
+function coerceFinding(value: unknown, turns: TranscriptTurn[]): Finding | null {
   if (!value || typeof value !== "object") return null;
   const f = value as Record<string, unknown>;
   const category = f.category;
@@ -63,12 +76,125 @@ function coerceFinding(value: unknown): Finding | null {
   const evidenceTurnIndex =
     typeof idx === "number" && Number.isFinite(idx) ? Math.trunc(idx) : null;
 
-  return {
+  const finding: Finding = {
     category: category as FindingCategory,
     concept,
     detail,
     evidenceTurnIndex,
   };
+
+  const quote = resolveSourceQuote(f.sourceQuote, evidenceTurnIndex, turns);
+  if (quote) finding.sourceQuote = quote;
+
+  // Kept even on a CORRECT finding if the model volunteered one: the prompt asks
+  // it to stay quiet there, but advice that arrived anyway is still advice, and
+  // dropping it silently would be a surprise the UI cannot explain.
+  const followUp = typeof f.followUp === "string" ? f.followUp.trim() : "";
+  if (followUp) finding.followUp = followUp;
+
+  return finding;
+}
+
+/**
+ * Accept a sourceQuote only when the evidence turn actually contains it.
+ *
+ * The prompt asks for a verbatim substring so the debrief can highlight the one
+ * sentence a finding rests on. Models paraphrase anyway, and a quote that is not
+ * in the text highlights nothing: the UI searches, finds no match, and shows no
+ * indication that anything went wrong. Verifying here turns that silent failure
+ * into a visible one place earlier.
+ *
+ * A rejected quote does not take the finding with it. The judgement is still
+ * sound without a precise anchor, and the UI falls back to highlighting the
+ * whole turn.
+ *
+ * The match returns the source's own slice rather than the model's rendering of
+ * it, so whatever the UI searches for is guaranteed to be found.
+ */
+function resolveSourceQuote(
+  value: unknown,
+  evidenceTurnIndex: number | null,
+  turns: TranscriptTurn[],
+): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const quote = value.trim();
+  if (!quote || evidenceTurnIndex === null) return undefined;
+
+  const turn = turns.find((t) => t.turnIndex === evidenceTurnIndex);
+  if (!turn) return undefined;
+
+  // The teacher's own chat lines only. The student's are in the same list and
+  // the model is told not to quote them, but a finding anchored to the
+  // student's words would claim the teacher said something they never did, so
+  // this does not rely on the instruction being followed.
+  const taught = (turn.chat ?? []).filter((message) => message.sender === "user");
+
+  return (
+    findVerbatim(turn.boardText, quote) ??
+    findVerbatim(turn.newBoardText, quote) ??
+    findVerbatim(turn.speech, quote) ??
+    firstVerbatim(taught, quote)
+  );
+}
+
+/** The first of these lines that contains `quote` verbatim, if any. */
+function firstVerbatim(
+  messages: { text: string }[],
+  quote: string,
+): string | undefined {
+  for (const message of messages) {
+    const found = findVerbatim(message.text, quote);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
+ * Locate `needle` in `haystack`, tolerating the two ways a model rewrites a
+ * quote without changing its words: different runs of whitespace (the board
+ * text arrives with newlines the model flattens) and different capitalization
+ * at a sentence boundary. Anything beyond that is a paraphrase, not a quote.
+ */
+function findVerbatim(haystack: string | undefined, needle: string): string | undefined {
+  if (!haystack) return undefined;
+  if (haystack.includes(needle)) return needle;
+
+  const flatHaystack = collapse(haystack);
+  const flatNeedle = collapse(needle);
+  if (!flatNeedle.text) return undefined;
+
+  const at = flatHaystack.text.indexOf(flatNeedle.text);
+  if (at < 0) return undefined;
+
+  // Map the match back through the offset table to slice the original text.
+  const start = flatHaystack.offsets[at];
+  const end = flatHaystack.offsets[at + flatNeedle.text.length - 1] + 1;
+  return haystack.slice(start, end);
+}
+
+/**
+ * Lowercase `s` with each run of whitespace squeezed to one space, alongside the
+ * index in the original string that every surviving character came from.
+ */
+function collapse(s: string): { text: string; offsets: number[] } {
+  let text = "";
+  const offsets: number[] = [];
+  let gap = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (/\s/.test(ch)) {
+      gap = text.length > 0;
+      continue;
+    }
+    if (gap) {
+      text += " ";
+      offsets.push(i);
+      gap = false;
+    }
+    text += ch.toLowerCase();
+    offsets.push(i);
+  }
+  return { text, offsets };
 }
 
 function normalizeStringArray(value: unknown): string[] {

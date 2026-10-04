@@ -11,6 +11,8 @@ export const sessionSchema = z.object({
   startedAt: z.string().optional(),
   endedAt: z.string().optional(),
   turnCount: z.number().int().default(0),
+  /** Total LLM tokens (input + output) this session has spent so far. */
+  tokensUsed: z.number().int().default(0),
   /** The most recent evaluation (the latest round). */
   evaluationId: z.string().optional(),
   /**

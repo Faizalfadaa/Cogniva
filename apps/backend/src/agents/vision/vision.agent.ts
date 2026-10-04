@@ -31,7 +31,7 @@ export async function runVisionTurn(
 
     const rawOutput: VisionLLMOutput = useMockAI
       ? mockVisionAI(input)
-      : normalizeVisionLLMOutput(await callRealAI(input));
+      : normalizeVisionLLMOutput(await callRealAI(input, options));
 
     return toVisionInterpretation(
       rawOutput,
@@ -52,7 +52,10 @@ export async function runVisionTurn(
  * used by the Learner). See GAPS_VISION.md for the minimal proposed diff so the
  * wrapper can accept an image without changing how the Learner uses it.
  */
-async function callRealAI(input: VisionAgentInput): Promise<Record<string, unknown>> {
+async function callRealAI(
+  input: VisionAgentInput,
+  options: RunVisionOptions,
+): Promise<Record<string, unknown>> {
   const messages = buildVisionMessages(input);
   const system = messages.find((m) => m.role === "system")?.content ?? "";
   const user = messages.find((m) => m.role === "user")?.content ?? "";
@@ -64,10 +67,13 @@ async function callRealAI(input: VisionAgentInput): Promise<Record<string, unkno
     thinkingBudget: config.LLM_THINKING_BUDGET,
   });
 
-  return llm.structured({
+  const data = await llm.structured({
     system,
     user,
     schema: VISION_LLM_OUTPUT_SCHEMA,
     image: { data: input.imageBase64, mimeType: input.mimeType },
   });
+
+  if (options.onUsage && llm.lastUsage) options.onUsage(llm.lastUsage);
+  return data;
 }

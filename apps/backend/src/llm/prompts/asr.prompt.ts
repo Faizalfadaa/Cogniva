@@ -14,8 +14,21 @@ export const ASR_LLM_OUTPUT_SCHEMA: Record<string, unknown> = {
     confidence: { type: "number" },
     language: { type: "string" },
     ambiguities: { type: "array", items: { type: "string" } },
+    segments: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          start: { type: "number" },
+          end: { type: "number" },
+          text: { type: "string" },
+        },
+        required: ["start", "end", "text"],
+      },
+    },
   },
-  required: ["transcript", "confidence", "language", "ambiguities"],
+  required: ["transcript", "confidence", "language", "ambiguities", "segments"],
 };
 
 /**
@@ -54,7 +67,13 @@ IMPORTANT RULES:
    don't force it if the audio doesn't support it, and don't use the topic to
    "fix" wrong content.
 6. Fill 'language' with the detected BCP-47 language code (e.g. "en-US").
-7. Reply with ONLY valid JSON matching the given schema.
+7. Also split the transcript into 'segments' at natural sentence or phrase
+   boundaries. For each, give 'start' and 'end' in SECONDS from the beginning of
+   the clip, and its 'text'. The segment texts, read in order, must be the same
+   words as 'transcript'. If the clip has no speech, return an empty list.
+   These times are used to line the speech up with what was drawn on the board,
+   so place them by when the words are actually heard, not evenly spaced.
+8. Reply with ONLY valid JSON matching the given schema.
 `;
 
 export function buildAsrMessages(input: AsrAgentInput): AIMessage[] {

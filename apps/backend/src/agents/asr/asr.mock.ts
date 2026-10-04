@@ -14,13 +14,16 @@ export function mockAsrAI(input: AsrAgentInput): AsrLLMOutput {
       confidence: 0,
       language: config.ASR_DEFAULT_LANGUAGE,
       ambiguities: ["no audio to transcribe (mock)"],
+      segments: [],
     };
   }
 
+  const transcript = `(mock) spoken explanation about ${input.topic}`;
   return {
-    transcript: `(mock) spoken explanation about ${input.topic}`,
+    transcript,
     confidence: 1,
     language: config.ASR_DEFAULT_LANGUAGE,
     ambiguities: [],
+    segments: [{ start: 0, end: 3, text: transcript }],
   };
 }

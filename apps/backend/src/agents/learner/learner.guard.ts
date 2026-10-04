@@ -1,4 +1,6 @@
 import {
+  AskedConcept,
+  AskedConceptKind,
   LearnerAction,
   LearnerActionKind,
   LearnerAgentInput,
@@ -11,6 +13,20 @@ import {
   LearnerState,
   Misconception
 } from "./learner.types";
+import {
+  isProbingType,
+  isRepeatExhausted,
+  moveOnText,
+  probeKey,
+  recordProbe
+} from "./learner.repeat";
+import {
+  backToLessonText,
+  boundaryText,
+  isDrillExhausted,
+  nextFollowUpDepth,
+  teacherSetBoundary
+} from "./learner.depth";
 
 const allowedResponseTypes: LearnerResponseType[] = [
   "question",
@@ -25,12 +41,24 @@ const allowedActionKinds: LearnerActionKind[] = [
   "recall_earlier"
 ];
 
+/**
+ * How many open gaps the student carries into the next turn.
+ *
+ * The student picks what to ask from its gaps, and nothing used to remove one
+ * except the model deciding to. So gaps from the first topic of a lesson were
+ * still there, and still winning, three topics later. Capping the list and
+ * keeping it in the order the gaps appeared lets the oldest fall off as newer
+ * ones arrive, the way a real student's attention moves with the lesson.
+ */
+export const MAX_OPEN_GAPS = 5;
+
 const allowedStrategies: LearnerResponseStrategy[] = [
   "ask_clarification",
   "request_example",
   "challenge_claim",
   "paraphrase",
-  "attempt_problem"
+  "attempt_problem",
+  "extend_example"
 ];
 
 /**
@@ -82,15 +110,35 @@ export function normalizeLearnerOutput(
   raw: LearnerLLMOutput,
   input: LearnerAgentInput
 ): LearnerAgentOutput {
+  // A question that pushes the concept to a new case is counted under its own
+  // budget, so "what about FFFFF?" is not mistaken for asking the same thing a
+  // third time (learner.repeat.ts).
+  const kind: AskedConceptKind =
+    normalizeAction(raw.action).strategy === "extend_example"
+      ? "extend"
+      : "probe";
+
+  // Whether this question asks how the teacher's own answer works. The model
+  // says so; learner.depth.ts counts it.
+  const followsUp = raw.response?.followsUp === true;
+
+  // The response is settled first: the repeat limit can turn a third question
+  // into "I get it, let's move on", and the state has to count what was
+  // actually said, not what the model proposed.
+  const response = normalizeResponse(raw.response, input, kind, followsUp);
+
   return {
-    nextState: normalizeState(raw.nextState, input),
-    response: normalizeResponse(raw.response, input)
+    nextState: normalizeState(raw.nextState, input, response, kind, followsUp),
+    response
   };
 }
 
 function normalizeState(
   state: Partial<LearnerState> | undefined,
-  input: LearnerAgentInput
+  input: LearnerAgentInput,
+  response: LearnerResponse,
+  kind: AskedConceptKind,
+  followsUp = false
 ): LearnerState {
   return {
     sessionId: input.sessionId,
@@ -102,21 +150,49 @@ function normalizeState(
       state?.activeMisconceptions,
       input.currentState.activeMisconceptions
     ),
-    openGaps: normalizeStringArray(
-      state?.openGaps,
+    openGaps: byRecency(
+      normalizeStringArray(state?.openGaps, input.currentState.openGaps),
       input.currentState.openGaps
-    ),
+    ).slice(-MAX_OPEN_GAPS),
     questionsAsked: normalizeStringArray(
       state?.questionsAsked,
       input.currentState.questionsAsked
     ),
+    askedConcepts: nextAskedConcepts(input, response, kind),
+    followUpDepth: nextFollowUpDepth(input.currentState, response, followsUp),
     updatedAtTurn: input.turnIndex
   };
 }
 
+/**
+ * Count this turn's question against its concept. Only a question or a stated
+ * confusion counts: a paraphrase or an acknowledgment moves the session forward
+ * rather than holding the user on the same point.
+ */
+function nextAskedConcepts(
+  input: LearnerAgentInput,
+  response: LearnerResponse,
+  kind: AskedConceptKind
+): AskedConcept[] {
+  if (!isProbingType(response.type)) {
+    return [...(input.currentState.askedConcepts ?? [])];
+  }
+
+  const key = probeKey(response.targetConcept, response.text);
+
+  return recordProbe(
+    input.currentState,
+    key,
+    response.targetConcept?.trim() || "",
+    kind
+  );
+}
+
 function normalizeResponse(
   response: LearnerLLMOutput["response"] | undefined,
-  input: LearnerAgentInput
+  input: LearnerAgentInput,
+  kind: AskedConceptKind = "probe",
+  followsUp = false
 ): LearnerResponse {
   const safeType = getSafeResponseType(response?.type);
   const safeDerivedFrom = getSafeDerivedFrom(response?.derivedFrom);
@@ -130,15 +206,46 @@ function normalizeResponse(
     text = createDefaultQuestion(input);
   }
 
+  const targetConcept =
+    typeof response?.targetConcept === "string"
+      ? response.targetConcept.trim()
+      : undefined;
+
+  // The teacher just said they can't take this further. Another question,
+  // however it is worded, would be the student ignoring that (learner.depth.ts).
+  if (isProbingType(safeType) && teacherSetBoundary(input.teachingText)) {
+    return acknowledgment(input, boundaryText(input.teachingText), targetConcept);
+  }
+
+  // The last reply already asked how the teacher's own answer works. A second
+  // one in a row walks the lesson away from the material (learner.depth.ts).
+  if (isProbingType(safeType) && followsUp && isDrillExhausted(input.currentState)) {
+    return acknowledgment(input, backToLessonText(input.teachingText), targetConcept);
+  }
+
+  // Two questions on this concept have already been answered. Asking a third
+  // time is what leaves the user stuck, so the student takes the explanation as
+  // given and asks for the next material instead (learner.repeat.ts).
+  if (
+    isProbingType(safeType) &&
+    isRepeatExhausted(input.currentState, probeKey(targetConcept, text), kind)
+  ) {
+    return {
+      responseId: createId("lr"),
+      turnIndex: input.turnIndex,
+      type: "acknowledgment",
+      text: moveOnText(targetConcept, input.turnIndex),
+      targetConcept,
+      derivedFrom: "new_info"
+    };
+  }
+
   return {
     responseId: createId("lr"),
     turnIndex: input.turnIndex,
     type: safeType,
     text,
-    targetConcept:
-      typeof response?.targetConcept === "string"
-        ? response.targetConcept.trim()
-        : undefined,
+    targetConcept,
     derivedFrom: safeDerivedFrom
   };
 }
@@ -146,6 +253,25 @@ function normalizeResponse(
 export function createFallbackOutput(
   input: LearnerAgentInput
 ): LearnerAgentOutput {
+  const targetConcept = "the latest explanation";
+  const key = probeKey(targetConcept, "");
+
+  // Even a failed turn respects the limit: three LLM failures in a row would
+  // otherwise read as the student asking the same thing three times.
+  if (isRepeatExhausted(input.currentState, key)) {
+    return {
+      nextState: { ...input.currentState, updatedAtTurn: input.turnIndex },
+      response: {
+        responseId: createId("lr"),
+        turnIndex: input.turnIndex,
+        type: "acknowledgment",
+        text: moveOnText(undefined, input.turnIndex),
+        targetConcept,
+        derivedFrom: "new_info"
+      }
+    };
+  }
+
   const fallbackText = createDefaultQuestion(input);
 
   return {
@@ -155,6 +281,7 @@ export function createFallbackOutput(
         ...input.currentState.questionsAsked,
         fallbackText
       ],
+      askedConcepts: recordProbe(input.currentState, key, targetConcept),
       updatedAtTurn: input.turnIndex
     },
     response: {
@@ -162,7 +289,7 @@ export function createFallbackOutput(
       turnIndex: input.turnIndex,
       type: "confusion",
       text: fallbackText,
-      targetConcept: "the latest explanation",
+      targetConcept,
       derivedFrom: "gap"
     }
   };
@@ -203,6 +330,18 @@ function getSafeDerivedFrom(value: unknown): LearnerResponseDerivedFrom {
   return "gap";
 }
 
+/**
+ * Order `next` oldest first: gaps carried over keep the order they had, and
+ * gaps that are new this turn go after them. The model returns the list in
+ * whatever order it likes, so without this "the end of the list" would not
+ * mean "most recent" and the cap would cut arbitrarily.
+ */
+export function byRecency(next: string[], previous: string[]): string[] {
+  const carried = previous.filter((gap) => next.includes(gap));
+  const added = next.filter((gap) => !previous.includes(gap));
+  return [...carried, ...added];
+}
+
 function normalizeStringArray(value: unknown, fallback: string[]): string[] {
   if (!Array.isArray(value)) {
     return [...fallback];
@@ -237,6 +376,22 @@ function normalizeMisconceptions(
       belief: item.belief.trim()
     }))
     .filter((item) => item.concept && item.belief);
+}
+
+/** The student letting a question go and handing the floor back. */
+function acknowledgment(
+  input: LearnerAgentInput,
+  text: string,
+  targetConcept: string | undefined
+): LearnerResponse {
+  return {
+    responseId: createId("lr"),
+    turnIndex: input.turnIndex,
+    type: "acknowledgment",
+    text,
+    targetConcept,
+    derivedFrom: "new_info"
+  };
 }
 
 function createDefaultQuestion(input: LearnerAgentInput): string {

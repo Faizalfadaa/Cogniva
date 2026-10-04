@@ -12,6 +12,12 @@ function num(value: string | undefined, fallback: number): number {
   return Number.isFinite(n) && value !== undefined && value !== "" ? n : fallback;
 }
 
+function bool(value: string | undefined, fallback: boolean): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return fallback;
+}
+
 // --- LLM wrapper (Architecture Document §3.3, §7.3) ------------------------
 
 /**
@@ -36,6 +42,47 @@ export const LLM_THINKING_BUDGET: number = num(
   process.env.COGNIVA_LLM_THINKING_BUDGET,
   0,
 );
+
+// --- Planner / Orchestrator (§3.3) -----------------------------------------
+
+/**
+ * The Planner decides the order of work for a turn (which agents run, and
+ * whether any can be skipped). It is a small, cheap call on purpose — the fast
+ * model is the right default; a stronger one buys little for a scheduling
+ * decision but is paid on every turn.
+ */
+export const PLANNER_MODEL: string =
+  process.env.COGNIVA_PLANNER_MODEL ?? "gemini-2.5-flash";
+
+/**
+ * A plan is a handful of step names and one-line reasons, so it needs far fewer
+ * tokens than the agents' outputs. Keeping it small also keeps the extra latency
+ * the Planner adds to the teaching loop small.
+ */
+export const PLANNER_MAX_TOKENS: number = num(process.env.COGNIVA_PLANNER_MAX_TOKENS, 512);
+
+/**
+ * "auto" plans with the model when a credential is configured and falls back to
+ * the deterministic rules otherwise. Set COGNIVA_PLANNER_MODE=rules to force the
+ * rule engine even with a key — the same decisions, zero extra latency, which is
+ * what you want for load tests and for reproducible demos.
+ */
+export const PLANNER_MODE: "auto" | "rules" =
+  process.env.COGNIVA_PLANNER_MODE === "rules" ? "rules" : "auto";
+
+/**
+ * Hard ceiling on steps per teaching turn (§S8 budgets). A full turn is
+ * read_board -> verify_board -> transcribe_audio -> ask_learner; the extra slot
+ * is headroom so a re-plan cannot strand a turn before it reaches the student.
+ */
+export const PLANNER_MAX_STEPS: number = num(process.env.COGNIVA_PLANNER_MAX_STEPS, 5);
+
+/**
+ * How many times one turn may ask for a new plan after a step surprises it
+ * (typically: the board came back unreadable). Each re-plan is one extra model
+ * call, so one is usually the right number.
+ */
+export const PLANNER_MAX_REPLANS: number = num(process.env.COGNIVA_PLANNER_MAX_REPLANS, 1);
 
 // --- Vision (§3.4) ---------------------------------------------------------
 
@@ -80,6 +127,169 @@ export const VISION_CONFIDENCE_THRESHOLD: number = num(
 export const EVALUATOR_MODEL: string =
   process.env.COGNIVA_EVALUATOR_MODEL ?? "gemini-2.5-flash";
 
+/**
+ * Sampling temperature for the Evaluator only.
+ *
+ * Near-zero on purpose. An assessment is supposed to be the same twice: the
+ * same transcript against the same reference should classify the same way, and
+ * at the model's default temperature it did not. Only this agent sets one —
+ * the Learner keeps its default, because a student whose replies never vary
+ * stops reading as a person.
+ */
+export const EVALUATOR_TEMPERATURE: number = num(
+  process.env.COGNIVA_EVALUATOR_TEMPERATURE,
+  0,
+);
+
+// --- Retrieval / RAG for the Evaluator (§3.7) ------------------------------
+
+/**
+ * Embedding model used to index the reference material and to embed retrieval
+ * queries. `gemini-embedding-001` is the current model; older ids such as
+ * `text-embedding-004` are no longer served on v1beta.
+ */
+export const EMBEDDING_MODEL: string =
+  process.env.COGNIVA_EMBEDDING_MODEL ?? "gemini-embedding-001";
+
+/**
+ * Output dimensionality requested from the embedding model. The model's native
+ * size is 3072; asking for fewer truncates the vector, which keeps the in-memory
+ * index small. Truncated vectors are NOT unit-length, so the client re-normalizes
+ * them — cosine similarity then reduces to a plain dot product.
+ */
+export const EMBEDDING_DIMENSIONS: number = num(
+  process.env.COGNIVA_EMBEDDING_DIMENSIONS,
+  768,
+);
+
+/** How many texts go in one embedContent call. Keeps requests well under limits. */
+export const EMBEDDING_BATCH_SIZE: number = num(
+  process.env.COGNIVA_EMBEDDING_BATCH_SIZE,
+  32,
+);
+
+/** Target size of one reference chunk, in characters. */
+export const RAG_CHUNK_SIZE: number = num(process.env.COGNIVA_RAG_CHUNK_SIZE, 900);
+
+/**
+ * Characters of the preceding text carried into each chunk. Overlap keeps a
+ * sentence that straddles a chunk boundary readable in at least one chunk.
+ */
+export const RAG_CHUNK_OVERLAP: number = num(
+  process.env.COGNIVA_RAG_CHUNK_OVERLAP,
+  150,
+);
+
+/** Chunks retrieved per query before the results of all queries are merged. */
+export const RAG_TOP_K: number = num(process.env.COGNIVA_RAG_TOP_K, 3);
+
+/** Upper bound on the merged excerpt set handed to the Evaluator prompt. */
+export const RAG_MAX_CHUNKS: number = num(process.env.COGNIVA_RAG_MAX_CHUNKS, 8);
+
+/** Upper bound on how many queries one evaluation may embed (cost guard). */
+export const RAG_MAX_QUERIES: number = num(process.env.COGNIVA_RAG_MAX_QUERIES, 12);
+
+/**
+ * Weight of the keyword score when blending with vector similarity (0..1).
+ * Vectors capture meaning; keywords catch exact tokens a paraphrase would miss —
+ * formulas, symbols, and names such as "ATP", "NADPH", "C6H12O6".
+ */
+export const RAG_KEYWORD_WEIGHT: number = num(
+  process.env.COGNIVA_RAG_KEYWORD_WEIGHT,
+  0.3,
+);
+
+/** Entries in the outline of the whole document sent alongside the excerpts. */
+export const RAG_MAX_OUTLINE_ENTRIES: number = num(
+  process.env.COGNIVA_RAG_MAX_OUTLINE_ENTRIES,
+  60,
+);
+
+/**
+ * Sanity bound on extracted reference text. Chunking replaced the old 20k
+ * truncation, so this only guards against a pathologically large upload.
+ */
+export const RAG_MAX_REFERENCE_CHARS: number = num(
+  process.env.COGNIVA_RAG_MAX_REFERENCE_CHARS,
+  400_000,
+);
+
+// --- Referencer (§3.7, reference sourcing) ---------------------------------
+
+/**
+ * The Referencer proposes reading material when the user has none of their own.
+ * It runs with a grounding tool (Google Search / URL context) rather than from
+ * the model's memory, because a model asked for sources from memory invents
+ * plausible-looking URLs that lead nowhere.
+ */
+export const REFERENCER_MODEL: string =
+  process.env.COGNIVA_REFERENCER_MODEL ?? "gemini-2.5-flash";
+
+/**
+ * The grounded pass writes a short candidate list, and a second, tool-free pass
+ * turns it into JSON. Both are small; the ceiling is here to stop a runaway
+ * search summary, not to fit a document.
+ */
+export const REFERENCER_MAX_TOKENS: number = num(
+  process.env.COGNIVA_REFERENCER_MAX_TOKENS,
+  2048,
+);
+
+/** How many options the user is offered. Enough to choose from, few enough to read. */
+export const REFERENCER_OPTIONS: number = num(process.env.COGNIVA_REFERENCER_OPTIONS, 4);
+
+/**
+ * Output ceiling for the read pass, which is far larger than the search pass:
+ * that one writes four short entries, this one writes notes covering a whole
+ * article. Gemini stops at MAX_TOKENS rather than failing, so a page longer than
+ * this yields notes that end early instead of no notes at all.
+ */
+export const REFERENCER_READ_MAX_TOKENS: number = num(
+  process.env.COGNIVA_REFERENCER_READ_MAX_TOKENS,
+  16_384,
+);
+
+/**
+ * Sanity bound on the text pulled out of a chosen source. Larger than a typical
+ * article so nothing useful is lost, far below RAG_MAX_REFERENCE_CHARS because a
+ * fetched page is not an uploaded textbook.
+ */
+export const REFERENCER_MAX_FETCH_CHARS: number = num(
+  process.env.COGNIVA_REFERENCER_MAX_FETCH_CHARS,
+  60_000,
+);
+
+/**
+ * Extra hosts this deployment refuses to offer, on top of the built-in list in
+ * agents/referencer/referencer.trust.ts. Comma-separated bare domains; each one
+ * also covers its subdomains ("example.org" blocks "id.example.org").
+ *
+ * The built-in list is the policy; this is for a site that has to add to it —
+ * a local content farm, or a source a school has ruled out.
+ */
+export const REFERENCER_BLOCKED_HOSTS: readonly string[] = (
+  process.env.COGNIVA_REFERENCER_BLOCKED_HOSTS ?? ""
+)
+  .split(",")
+  .map((host) => host.trim().toLowerCase().replace(/^www\./, ""))
+  .filter((host) => host.includes("."));
+
+/**
+ * Lowest trust tier still offered: "high" (universities, government bodies,
+ * journals, open textbooks), "medium" (publishers with a real editorial
+ * process), or "low" (anything not on the blocklist).
+ *
+ * "low" is the default, and it is not a weak setting — the blocklist has already
+ * removed the sources that have no accountability at all. What is left at "low"
+ * is an unrecognised host, which is usually a departmental page rather than a
+ * bad one; it is ranked last and labelled so the user can judge it. Raise this
+ * to "medium" when the list has to be defensible without the user looking.
+ */
+export const REFERENCER_MIN_TRUST: "high" | "medium" | "low" = ((): "high" | "medium" | "low" => {
+  const raw = (process.env.COGNIVA_REFERENCER_MIN_TRUST ?? "").trim().toLowerCase();
+  return raw === "high" || raw === "medium" || raw === "low" ? raw : "low";
+})();
+
 // --- ASR (§3.5) ------------------------------------------------------------
 
 /**
@@ -108,6 +318,58 @@ export const ASR_CONFIDENCE_THRESHOLD: number = num(
   process.env.COGNIVA_ASR_CONFIDENCE_THRESHOLD,
   0.6,
 );
+
+// --- Token budget (§7.3 cost control) --------------------------------------
+
+/**
+ * Ceiling on the tokens one session may spend across all its turns. Once a
+ * session is at or over this, the orchestrator refuses the turn instead of
+ * calling any model, so a runaway session can't drain the shared quota.
+ */
+export const SESSION_TOKEN_BUDGET: number = num(
+  process.env.COGNIVA_SESSION_TOKEN_BUDGET,
+  50000,
+);
+
+/**
+ * Presentation escape hatch: skip budget ENFORCEMENT so a live demo can't be
+ * cut off mid-sentence. Usage is still measured and recorded either way — we
+ * want to be able to answer "how many tokens did that cost?" afterwards.
+ */
+export const DEMO_MODE: boolean = bool(process.env.COGNIVA_DEMO_MODE, false);
+
+// --- Text-to-speech (voice sidecar, services/tts) ---------------------------
+
+/**
+ * Give the Learner a voice. Off by default: the service is a separate Python
+ * process that has to be started deliberately, and the app must run end to end
+ * without it.
+ */
+export const TTS_ENABLED: boolean = bool(process.env.COGNIVA_TTS_ENABLED, false);
+
+/** Base URL of the voice service. */
+export const TTS_URL: string = (
+  process.env.COGNIVA_TTS_URL ?? "http://localhost:8020"
+).replace(/\/+$/, "");
+
+/**
+ * Request timeout in seconds.
+ *
+ * Deliberately large. Render time on a laptop GPU is far less stable than it
+ * looks: the same sentence took 8 s in one run and over three minutes in
+ * another, with the GPU parked at idle clocks rather than overheating. 45 s was
+ * cutting off renders that would have finished. Nothing on screen waits for
+ * this — the reply text is published before synthesis starts and the voice is
+ * attached on a later poll.
+ */
+export const TTS_TIMEOUT: number = num(process.env.COGNIVA_TTS_TIMEOUT, 150);
+
+/**
+ * Language handed to the voice model. The Learner answers in English
+ * (llm/prompts/learner.prompt.ts), and neither engine speaks Indonesian, so
+ * "en" is both the correct and the only sensible default here.
+ */
+export const TTS_LANGUAGE: string = process.env.COGNIVA_TTS_LANGUAGE ?? "en";
 
 // --- Server ----------------------------------------------------------------
 

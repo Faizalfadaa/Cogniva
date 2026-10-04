@@ -1,8 +1,13 @@
 /**
  * Evaluator agent — post-session assessment (Architecture Document §3.7, §5.2).
  *
- * Runs once after the session ends (status ENDED), reading the full transcript +
- * the topic's referenceMaterial, and returns a canonical EvaluationResult. Like
+ * Runs once after the session ends (status ENDED), reading the full transcript
+ * plus the reference material, and returns a canonical EvaluationResult.
+ *
+ * The reference arrives in one of two forms (see EvaluatorInput): retrieved
+ * excerpts + an outline on the RAG path, or the whole document when there is no
+ * index. This file is unaffected by the difference — the prompt builder decides
+ * how to render whichever form it was given. Like
  * the other agents it routes the real call through the centralized Gemini
  * wrapper (§7.3) and falls back to a deterministic offline evaluation when no
  * credential is configured or the call fails — so the debrief always renders
@@ -49,6 +54,7 @@ export async function runEvaluator(
         maxTokens: config.LLM_MAX_TOKENS,
         timeout: config.LLM_TIMEOUT,
         thinkingBudget: config.LLM_THINKING_BUDGET,
+        temperature: config.EVALUATOR_TEMPERATURE,
       });
 
     const raw = await llm.structured({
@@ -56,7 +62,9 @@ export async function runEvaluator(
       user,
       schema: EVALUATOR_LLM_OUTPUT_SCHEMA,
     });
-    return normalizeEvaluation(raw, input.sessionId, evaluationId);
+    // The turns go along so the guard can verify each finding's sourceQuote
+    // against the text it claims to come from.
+    return normalizeEvaluation(raw, input.sessionId, evaluationId, input.turns);
   } catch (error) {
     console.error("[EvaluatorAgent] Failed, using deterministic fallback:", error);
     return mockEvaluator(input, evaluationId);

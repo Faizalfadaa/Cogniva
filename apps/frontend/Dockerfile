@@ -22,11 +22,6 @@ COPY . .
 # Empty base => relative /api/... requests, resolved by nginx (see nginx.conf).
 ARG VITE_API_BASE=""
 ENV VITE_API_BASE=${VITE_API_BASE}
-# Whiteboard engine. Production runs on a real HTTPS domain where tldraw demands a
-# paid license, so default the image to Excalidraw (MIT, no license enforcement).
-# Local `npm run dev` leaves this unset and keeps tldraw.
-ARG VITE_WHITEBOARD="excalidraw"
-ENV VITE_WHITEBOARD=${VITE_WHITEBOARD}
 RUN npm run build
 
 # ---- Stage 2: serve with nginx --------------------------------------------

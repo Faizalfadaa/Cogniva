@@ -4,11 +4,13 @@
  * Used when no Gemini credential is configured (or USE_MOCK_AI=true), and as the
  * graceful fallback when a real evaluation call fails — so the debrief always
  * renders rather than dead-ending the flow. It scores by naive keyword coverage
- * of the topic's keyConcepts across the transcript: covered -> CORRECT, absent
- * -> MISSED. No model call, fully reproducible.
+ * of the topic's keyConcepts across the transcript -- board, speech, and what
+ * the user typed in chat -- covered -> CORRECT, absent -> MISSED. No model
+ * call, fully reproducible.
  */
 
 import { utcNowIso } from "../../contracts/common.js";
+import { scoreFindings } from "./scoring.js";
 import type { EvaluationResult, Finding, EvaluatorInput, TranscriptTurn } from "./types.js";
 
 const STOPWORDS = new Set([
@@ -39,12 +41,21 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
         concept,
         detail: "This key concept wasn't touched on at all during the session.",
         evidenceTurnIndex: null,
+        followUp: `Next session, open with ${concept} and walk through how it works before moving on.`,
       });
     }
   }
 
-  const total = input.keyConcepts.length || 1;
-  const score = input.turns.length === 0 ? 0 : Math.round((covered.length / total) * 100);
+  // Keyword coverage can say whether a concept was mentioned, never how deeply
+  // it was explained, so there is no honest offline measure of depth. What the
+  // transcript does support is a volume proxy, capped at 50: non-zero once the
+  // user actually wrote something, never high enough to pass for a judgement
+  // the offline path did not make.
+  const explained = input.turns
+    .map((turn) => `${turn.boardText ?? ""} ${turn.speech ?? ""} ${taughtInChat(turn)}`.trim())
+    .join(" ");
+  const depthScore =
+    input.turns.length === 0 ? 0 : Math.min(50, Math.round(explained.length / 20));
 
   // Watch for any common misconception surfacing verbatim in the transcript.
   for (const belief of input.commonMisconceptions) {
@@ -55,19 +66,27 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
         concept: "Common misconception",
         detail: `Your explanation brushed against a common misconception: "${belief}".`,
         evidenceTurnIndex: idx,
+        followUp: `Check what the reference says about "${belief}", then say the correct version out loud before you teach it again.`,
       });
     }
   }
+
+  // Same arithmetic the real path uses (scoring.ts), over findings this path
+  // reached by keyword matching rather than by judgement. The number then means
+  // the same thing in both modes even though the evidence behind it is weaker,
+  // which is what makes an offline score comparable to an online one at all.
+  const score = input.turns.length === 0 ? 0 : scoreFindings(findings).score;
 
   return {
     evaluationId,
     sessionId: input.sessionId,
     score,
+    depthScore,
     findings,
     summary:
       input.turns.length === 0
         ? "No teaching turns were recorded yet, so there's nothing to assess."
-        : `You conveyed ${covered.length} of ${total} key concepts. ` +
+        : `You conveyed ${covered.length} of ${input.keyConcepts.length} key concepts. ` +
           (missed.length
             ? "A few important parts were still missed."
             : "Concept coverage is complete, nice work!"),
@@ -77,12 +96,26 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
   };
 }
 
+/**
+ * This turn's chat, teacher's side only.
+ *
+ * The student's lines are excluded on purpose. They name the concept constantly
+ * — asking about it is what a student does — so counting them would mark every
+ * concept the student was curious about as one the user taught.
+ */
+function taughtInChat(turn: TranscriptTurn): string {
+  return (turn.chat ?? [])
+    .filter((message) => message.sender === "user")
+    .map((message) => message.text)
+    .join(" ");
+}
+
 /** First turn whose text shares a distinctive content word with the concept. */
 function findEvidenceTurn(turns: TranscriptTurn[], concept: string): number | null {
   const words = contentWords(concept);
   if (words.length === 0) return null;
   for (const turn of turns) {
-    const text = [turn.boardText, turn.speech, turn.learnerUtterance]
+    const text = [turn.boardText, turn.speech, turn.learnerUtterance, taughtInChat(turn)]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();

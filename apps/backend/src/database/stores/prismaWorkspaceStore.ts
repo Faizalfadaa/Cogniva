@@ -1,0 +1,594 @@
+/**
+ * Postgres-backed WorkspaceStore (Architecture Document §8).
+ *
+ * Ownership note: there are no user accounts yet, so the frontend's per-device
+ * `x-client-id` is the owner. The FK to `users` is real, so a device is
+ * provisioned as a user row the first time it creates a workspace — which is
+ * also the seam where real accounts will slot in later without touching this
+ * store's callers.
+ */
+
+import { randomUUID } from "node:crypto";
+
+import type { Finding } from "../../contracts/evaluation.js";
+import type {
+  ChatMessage,
+  ChatSender,
+  CheckpointErrorKind,
+  EvaluationReport,
+  EvaluationTranscriptTurn,
+  LearnerSpeech,
+  ReferenceSource,
+  EvaluationRoundSummary,
+  NewEvaluationReport,
+  ScoreHistoryPoint,
+  TeachingCheckpoint,
+  Workspace,
+  WorkspaceState,
+} from "../../contracts/workspace.js";
+import { asLocale } from "../../contracts/workspace.js";
+import type { Timeline } from "../../contracts/timeline.js";
+import {
+  ReferenceIndex,
+  type SerializedReferenceIndex,
+} from "../../modules/retrieval/index.js";
+import type { StoredBlob, WorkspaceStore } from "../../modules/storage/types.js";
+import { Prisma, type workspace as WorkspaceRow } from "../../generated/prisma/client";
+import { prisma } from "../prisma.js";
+
+export class PrismaWorkspaceStore implements WorkspaceStore {
+  // --- Workspaces -------------------------------------------------------
+
+  async create(
+    workspace: Workspace,
+    ownerId: string,
+    sessionId: string,
+  ): Promise<Workspace> {
+    await ensureOwner(ownerId);
+    await prisma.workspace.create({
+      data: {
+        id_workspace: workspace.id,
+        id_user: ownerId,
+        id_session: sessionId,
+        title: workspace.title ?? null,
+        description: workspace.description ?? null,
+        state: workspace.state,
+        locale: workspace.locale,
+        created_at: new Date(workspace.createdAt),
+        updated_at: new Date(workspace.updatedAt),
+      },
+    });
+    return workspace;
+  }
+
+  async save(workspace: Workspace): Promise<Workspace> {
+    // Only the mutable metadata: the owner and the backing session are set once,
+    // by create(), and the PDF / reference columns have their own writers.
+    await prisma.workspace.updateMany({
+      where: { id_workspace: workspace.id },
+      data: {
+        title: workspace.title ?? null,
+        description: workspace.description ?? null,
+        state: workspace.state,
+        whiteboard_snapshot: toJson(workspace.currentWhiteboardSnapshot),
+        thumbnail_url: workspace.thumbnailUrl ?? null,
+        learner_id: workspace.learnerId ?? null,
+        updated_at: new Date(workspace.updatedAt),
+      },
+    });
+    return workspace;
+  }
+
+  async get(id: string): Promise<Workspace | undefined> {
+    const row = await prisma.workspace.findUnique({ where: { id_workspace: id } });
+    return row ? toWorkspace(row) : undefined;
+  }
+
+  async isOwner(id: string, ownerId: string): Promise<boolean> {
+    const row = await prisma.workspace.findFirst({
+      where: { id_workspace: id, id_user: ownerId },
+      select: { id_workspace: true },
+    });
+    return row !== null;
+  }
+
+  async list(ownerId: string): Promise<Workspace[]> {
+    const rows = await prisma.workspace.findMany({
+      where: { id_user: ownerId },
+      orderBy: { updated_at: "desc" },
+    });
+    return rows.map(toWorkspace);
+  }
+
+  async delete(id: string): Promise<void> {
+    // Checkpoints, messages and the report cascade from this row.
+    await prisma.workspace.deleteMany({ where: { id_workspace: id } });
+  }
+
+  async sessionId(workspaceId: string): Promise<string | undefined> {
+    const row = await prisma.workspace.findUnique({
+      where: { id_workspace: workspaceId },
+      select: { id_session: true },
+    });
+    return row?.id_session;
+  }
+
+  // --- Checkpoints ------------------------------------------------------
+
+  async addCheckpoint(
+    workspaceId: string,
+    checkpoint: TeachingCheckpoint,
+  ): Promise<TeachingCheckpoint> {
+    await prisma.checkpoint.create({
+      data: {
+        id_checkpoint: checkpoint.id,
+        id_workspace: workspaceId,
+        snapshot_image_url: checkpoint.snapshotImageUrl,
+        whiteboard_snapshot: toJson(checkpoint.whiteboardSnapshot),
+        audio_url: checkpoint.audioUrl ?? null,
+        learner_response: checkpoint.learnerResponse ?? null,
+        learner_audio_url: checkpoint.learnerAudioUrl ?? null,
+        speech: toJson(checkpoint.speech),
+        error_kind: checkpoint.errorKind ?? null,
+        timeline: toJson(checkpoint.timeline),
+        created_at: new Date(checkpoint.createdAt),
+      },
+    });
+    return checkpoint;
+  }
+
+  async listCheckpoints(workspaceId: string): Promise<TeachingCheckpoint[]> {
+    const rows = await prisma.checkpoint.findMany({
+      where: { id_workspace: workspaceId },
+      orderBy: { seq: "asc" },
+    });
+    return rows.map((row) => ({
+      id: row.id_checkpoint,
+      snapshotImageUrl: row.snapshot_image_url,
+      whiteboardSnapshot: row.whiteboard_snapshot ?? undefined,
+      audioUrl: row.audio_url ?? undefined,
+      learnerResponse: row.learner_response ?? undefined,
+      learnerAudioUrl: row.learner_audio_url ?? undefined,
+      speech: readSpeech(row.speech),
+      errorKind: (row.error_kind as CheckpointErrorKind | null) ?? undefined,
+      timeline: (row.timeline as Timeline | null) ?? undefined,
+      createdAt: row.created_at.toISOString(),
+    }));
+  }
+
+  async updateCheckpoint(
+    workspaceId: string,
+    checkpointId: string,
+    patch: Partial<TeachingCheckpoint>,
+  ): Promise<void> {
+    const data: Prisma.checkpointUncheckedUpdateManyInput = {};
+    if (patch.snapshotImageUrl !== undefined) data.snapshot_image_url = patch.snapshotImageUrl;
+    if ("whiteboardSnapshot" in patch) data.whiteboard_snapshot = toJson(patch.whiteboardSnapshot);
+    if ("audioUrl" in patch) data.audio_url = patch.audioUrl ?? null;
+    if ("learnerResponse" in patch) data.learner_response = patch.learnerResponse ?? null;
+    if ("learnerAudioUrl" in patch) data.learner_audio_url = patch.learnerAudioUrl ?? null;
+    if ("speech" in patch) data.speech = toJson(patch.speech);
+    if ("errorKind" in patch) data.error_kind = patch.errorKind ?? null;
+    if ("timeline" in patch) data.timeline = toJson(patch.timeline);
+    if (patch.createdAt !== undefined) data.created_at = new Date(patch.createdAt);
+    if (Object.keys(data).length === 0) return;
+
+    // Scoped by workspace as well as id, mirroring the in-memory store: a
+    // checkpoint id from another workspace must not match.
+    await prisma.checkpoint.updateMany({
+      where: { id_checkpoint: checkpointId, id_workspace: workspaceId },
+      data,
+    });
+  }
+
+  // --- Chat messages ----------------------------------------------------
+
+  async addMessage(workspaceId: string, message: ChatMessage): Promise<ChatMessage> {
+    await prisma.chat_message.create({
+      data: {
+        id_chat: message.id,
+        id_workspace: workspaceId,
+        sender: message.sender,
+        content: message.content,
+        learner_audio_url: message.learnerAudioUrl ?? null,
+        speech: toJson(message.speech),
+        created_at: new Date(message.createdAt),
+      },
+    });
+    return message;
+  }
+
+  async updateMessage(
+    workspaceId: string,
+    messageId: string,
+    patch: Partial<ChatMessage>,
+  ): Promise<ChatMessage | undefined> {
+    const data: Prisma.chat_messageUncheckedUpdateManyInput = {};
+    if (patch.content !== undefined) data.content = patch.content;
+    if ("learnerAudioUrl" in patch) data.learner_audio_url = patch.learnerAudioUrl ?? null;
+    if ("speech" in patch) data.speech = toJson(patch.speech);
+    if (Object.keys(data).length === 0) return undefined;
+
+    // Scoped by workspace as well as id, mirroring the in-memory store.
+    const { count } = await prisma.chat_message.updateMany({
+      where: { id_chat: messageId, id_workspace: workspaceId },
+      data,
+    });
+    if (count === 0) return undefined;
+
+    const row = await prisma.chat_message.findUnique({ where: { id_chat: messageId } });
+    return row
+      ? {
+          id: row.id_chat,
+          sender: row.sender as ChatSender,
+          content: row.content,
+          learnerAudioUrl: row.learner_audio_url ?? undefined,
+          speech: readSpeech(row.speech),
+          createdAt: row.created_at.toISOString(),
+        }
+      : undefined;
+  }
+
+  async listMessages(workspaceId: string): Promise<ChatMessage[]> {
+    const rows = await prisma.chat_message.findMany({
+      where: { id_workspace: workspaceId },
+      orderBy: { seq: "asc" },
+    });
+    return rows.map((row) => ({
+      id: row.id_chat,
+      sender: row.sender as ChatSender,
+      content: row.content,
+      learnerAudioUrl: row.learner_audio_url ?? undefined,
+      speech: readSpeech(row.speech),
+      createdAt: row.created_at.toISOString(),
+    }));
+  }
+
+  /**
+   * One conditional UPDATE, so the database decides the winner.
+   *
+   * `count` is 1 for the request that moved the row and 0 for every other,
+   * including one that arrived after the workspace was already Evaluating or
+   * Completed. That is the whole guard: no lock table, no in-process set that
+   * a second server instance would not share.
+   */
+  async claimForEvaluation(workspaceId: string): Promise<boolean> {
+    const { count } = await prisma.workspace.updateMany({
+      where: { id_workspace: workspaceId, state: { in: ["Teaching", "Draft"] } },
+      data: { state: "Evaluating", updated_at: new Date() },
+    });
+    return count === 1;
+  }
+
+  // --- Evaluation report ------------------------------------------------
+
+  async saveReport(
+    workspaceId: string,
+    report: NewEvaluationReport,
+  ): Promise<EvaluationReport> {
+    const idReport = `rep_${randomUUID().replace(/-/g, "").slice(0, 8)}`;
+    // Appended, never replaced: a resumed session that finishes again adds a
+    // round, and the earlier debrief stays readable. The round number is read
+    // and written in one transaction so two finishes racing each other cannot
+    // both claim the same one — the unique index would reject the loser, which
+    // is the outcome we want over silently overwriting a round.
+    const created = await prisma.$transaction(async (tx) => {
+      const previous = await tx.report.findFirst({
+        where: { id_workspace: workspaceId },
+        orderBy: { round: "desc" },
+        select: { round: true },
+      });
+      const round = (previous?.round ?? 0) + 1;
+
+      return tx.report.create({
+        data: {
+          id_report: idReport,
+          id_workspace: workspaceId,
+          round,
+          letter: report.letter,
+          reflection: report.notebook.reflection,
+          continue_learning: report.continueLearning,
+          score: report.score,
+          depth_score: report.depthScore,
+          // Stored as JSON rather than child tables: unlike the notebook lines,
+          // nothing queries into a finding, and the shape is the contract's to
+          // change (§6.9).
+          findings: report.findings as Prisma.InputJsonValue,
+          transcript: (report.transcript ?? []) as unknown as Prisma.InputJsonValue,
+          learned: {
+            create: report.notebook.learned.map((content, seq) => ({
+              id_learned: `lrn_${idReport}_${seq}`,
+              seq,
+              content,
+            })),
+          },
+          confused: {
+            create: report.notebook.stillConfused.map((content, seq) => ({
+              id_confused: `cnf_${idReport}_${seq}`,
+              seq,
+              content,
+            })),
+          },
+        },
+      });
+    });
+
+    return { ...report, round: created.round, createdAt: created.created_at.toISOString() };
+  }
+
+  async getReport(
+    workspaceId: string,
+    round?: number,
+  ): Promise<EvaluationReport | undefined> {
+    const row = await prisma.report.findFirst({
+      where: { id_workspace: workspaceId, ...(round === undefined ? {} : { round }) },
+      // Latest round when none was asked for, which is what the debrief screen
+      // opens on.
+      orderBy: { round: "desc" },
+      include: {
+        learned: { orderBy: { seq: "asc" } },
+        confused: { orderBy: { seq: "asc" } },
+      },
+    });
+    if (!row) return undefined;
+    return {
+      round: row.round,
+      createdAt: row.created_at.toISOString(),
+      letter: row.letter,
+      notebook: {
+        learned: row.learned.map((item) => item.content),
+        stillConfused: row.confused.map((item) => item.content),
+        reflection: row.reflection,
+      },
+      continueLearning: row.continue_learning,
+      // Null on reports written before the breakdown columns existed, and the
+      // debrief still has to render for them (§10), so they read as an empty
+      // evaluation rather than a missing one.
+      score: row.score ?? 0,
+      depthScore: row.depth_score ?? 0,
+      findings: (row.findings as Finding[] | null) ?? [],
+      transcript: (row.transcript as EvaluationTranscriptTurn[] | null) ?? [],
+    };
+  }
+
+  async listReportRounds(workspaceId: string): Promise<EvaluationRoundSummary[]> {
+    const rows = await prisma.report.findMany({
+      where: { id_workspace: workspaceId },
+      orderBy: { round: "asc" },
+      select: {
+        round: true,
+        score: true,
+        depth_score: true,
+        findings: true,
+        created_at: true,
+      },
+    });
+    return rows.map((row) => ({
+      round: row.round,
+      score: row.score ?? 0,
+      depthScore: row.depth_score ?? 0,
+      findingCount: ((row.findings as Finding[] | null) ?? []).length,
+      createdAt: row.created_at.toISOString(),
+    }));
+  }
+
+  /**
+   * Scored reports only, one point per round. A report written before the
+   * breakdown columns existed has a null score, and plotting it as a zero
+   * would invent a failed session the user never had.
+   */
+  async listScoreHistory(ownerId: string): Promise<ScoreHistoryPoint[]> {
+    const rows = await prisma.report.findMany({
+      where: { workspace: { id_user: ownerId }, score: { not: null } },
+      orderBy: { created_at: "asc" },
+      select: {
+        id_workspace: true,
+        round: true,
+        score: true,
+        created_at: true,
+        workspace: { select: { title: true } },
+      },
+    });
+    return rows.map((row) => ({
+      workspaceId: row.id_workspace,
+      round: row.round,
+      title: row.workspace.title,
+      score: row.score as number,
+      completedAt: row.created_at.toISOString(),
+    }));
+  }
+
+  // --- PDF blob ---------------------------------------------------------
+
+  async savePdf(workspaceId: string, blob: StoredBlob): Promise<void> {
+    await prisma.workspace.updateMany({
+      where: { id_workspace: workspaceId },
+      // Prisma's Bytes maps to Uint8Array; a Node Buffer is one, but with a
+      // wider ArrayBufferLike, so it is narrowed here rather than cast.
+      data: { pdf_data: new Uint8Array(blob.data), pdf_mime: blob.mime },
+    });
+  }
+
+  async getPdf(workspaceId: string): Promise<StoredBlob | undefined> {
+    const row = await prisma.workspace.findUnique({
+      where: { id_workspace: workspaceId },
+      select: { pdf_data: true, pdf_mime: true },
+    });
+    if (!row?.pdf_data) return undefined;
+    return { data: Buffer.from(row.pdf_data), mime: row.pdf_mime ?? "application/pdf" };
+  }
+
+  // --- Reference material -----------------------------------------------
+
+  async saveReference(workspaceId: string, text: string): Promise<void> {
+    await prisma.workspace.updateMany({
+      where: { id_workspace: workspaceId },
+      data: { reference_text: text },
+    });
+  }
+
+  async getReference(workspaceId: string): Promise<string | undefined> {
+    const row = await prisma.workspace.findUnique({
+      where: { id_workspace: workspaceId },
+      select: { reference_text: true },
+    });
+    return row?.reference_text ?? undefined;
+  }
+
+  async saveReferenceSource(
+    workspaceId: string,
+    source: ReferenceSource | undefined,
+  ): Promise<void> {
+    await prisma.workspace.updateMany({
+      where: { id_workspace: workspaceId },
+      data: { reference_source: toJson(source) },
+    });
+  }
+
+  async getReferenceSource(workspaceId: string): Promise<ReferenceSource | undefined> {
+    const row = await prisma.workspace.findUnique({
+      where: { id_workspace: workspaceId },
+      select: { reference_source: true },
+    });
+    return readReferenceSource(row?.reference_source);
+  }
+
+  // --- Reference index --------------------------------------------------
+
+  async saveReferenceIndex(workspaceId: string, index: ReferenceIndex): Promise<void> {
+    await prisma.workspace.updateMany({
+      where: { id_workspace: workspaceId },
+      data: { reference_index: index.toJSON() as unknown as Prisma.InputJsonValue },
+    });
+  }
+
+  async getReferenceIndex(workspaceId: string): Promise<ReferenceIndex | undefined> {
+    const row = await prisma.workspace.findUnique({
+      where: { id_workspace: workspaceId },
+      select: { reference_index: true },
+    });
+    if (!row?.reference_index) return undefined;
+    return ReferenceIndex.fromJSON(
+      row.reference_index as unknown as SerializedReferenceIndex,
+    );
+  }
+
+  // --- Synthesized learner speech (§TTS) ---------------------------------
+
+  async saveAudioClip(workspaceId: string, audioId: string, blob: StoredBlob): Promise<void> {
+    await prisma.voice_clip.create({
+      data: {
+        id_clip: audioId,
+        id_workspace: workspaceId,
+        // Prisma's Bytes maps to Uint8Array; a Node Buffer is one, but with a
+        // wider ArrayBufferLike, so it is narrowed here rather than cast.
+        data: new Uint8Array(blob.data),
+        mime: blob.mime,
+      },
+    });
+  }
+
+  async getAudioClip(workspaceId: string, audioId: string): Promise<StoredBlob | undefined> {
+    // Scoped by workspace as well as clip id: the audio route is exempt from the
+    // ownership check (an <audio> element cannot send x-client-id), so this
+    // scoping is what stops a clip id from reaching across workspaces.
+    const row = await prisma.voice_clip.findFirst({
+      where: { id_clip: audioId, id_workspace: workspaceId },
+      select: { data: true, mime: true },
+    });
+    if (!row) return undefined;
+    return { data: Buffer.from(row.data), mime: row.mime };
+  }
+}
+
+// --- Helpers ---------------------------------------------------------------
+
+/**
+ * Make sure the calling device has a `users` row to own its workspaces. Until
+ * real accounts exist the device id *is* the identity, so the derived username
+ * and email are placeholders that are unique by construction.
+ */
+async function ensureOwner(ownerId: string): Promise<void> {
+  await prisma.users.upsert({
+    where: { id_user: ownerId },
+    create: {
+      id_user: ownerId,
+      username: ownerId,
+      email: `${ownerId}@device.cogniva.local`,
+      password_hash: null,
+      profile_photo: null,
+    },
+    update: {},
+  });
+}
+
+function toWorkspace(row: WorkspaceRow): Workspace {
+  return {
+    id: row.id_workspace,
+    title: row.title ?? undefined,
+    description: row.description ?? undefined,
+    // Rebuilt rather than stored: it is a route on this server, not data.
+    pdfUrl: row.pdf_mime ? `/api/workspaces/${row.id_workspace}/pdf` : undefined,
+    referenceSource: readReferenceSource(row.reference_source),
+    state: row.state as WorkspaceState,
+    currentWhiteboardSnapshot: row.whiteboard_snapshot ?? undefined,
+    thumbnailUrl: row.thumbnail_url ?? undefined,
+    learnerId: row.learner_id ?? undefined,
+    locale: asLocale(row.locale),
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+  };
+}
+
+/**
+ * Coerce an opaque client document (an Excalidraw snapshot, a Timeline) into what a
+ * Json column accepts. `undefined` clears the column rather than leaving it
+ * untouched, matching the in-memory store's assignment semantics.
+ */
+function toJson(value: unknown): Prisma.InputJsonValue | typeof Prisma.DbNull {
+  if (value === undefined || value === null) return Prisma.DbNull;
+  return value as Prisma.InputJsonValue;
+}
+/**
+ * Read the reference_source Json column back into a typed value.
+ *
+ * The column is opaque to Postgres, so a row written by an older build (or by
+ * hand) can hold anything. Anything that is not the expected shape is treated as
+ * absent rather than surfaced half-filled.
+ */
+function readReferenceSource(value: unknown): ReferenceSource | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const url = typeof record.url === "string" ? record.url : "";
+  if (!url) return undefined;
+  return {
+    url,
+    title: typeof record.title === "string" ? record.title : "",
+    source: typeof record.source === "string" ? record.source : "",
+  };
+}
+
+/**
+ * Read a speech Json column back into a typed value.
+ *
+ * The column is opaque to Postgres, so anything malformed is treated as absent
+ * rather than handed to the UI half-filled — a reply without speech still shows
+ * its text, which is the safe way to be wrong here.
+ */
+function readSpeech(value: unknown): LearnerSpeech | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const { id, status, segments } = record;
+  if (typeof id !== "string" || !Array.isArray(segments)) return undefined;
+  if (status !== "pending" && status !== "ready" && status !== "unavailable") return undefined;
+  return {
+    id,
+    status,
+    segments: segments.flatMap((segment) => {
+      if (!segment || typeof segment !== "object") return [];
+      const { text: spoken, audioUrl } = segment as Record<string, unknown>;
+      if (typeof spoken !== "string") return [];
+      return [typeof audioUrl === "string" ? { text: spoken, audioUrl } : { text: spoken }];
+    }),
+  };
+}

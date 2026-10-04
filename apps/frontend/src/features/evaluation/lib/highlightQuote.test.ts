@@ -1,0 +1,202 @@
+import { describe, expect, it } from 'vitest'
+
+import type { EvaluationFindingDTO } from '../../../dto/EvaluationReportDTO'
+import {
+  findingsForTurn,
+  highlightQuoteInText,
+  segmentTextForFindings,
+} from './highlightQuote'
+
+const turn = {
+  turnIndex: 0,
+  boardText: 'Chlorophyll absorbs red and blue light. Green is reflected.',
+  speech: 'That is why leaves look green to our eyes.',
+}
+
+/** A turn whose only mention of ATP is in the chat that followed it. */
+const withChat = {
+  turnIndex: 0,
+  boardText: 'The light reactions run in the thylakoid membrane.',
+  chat: [
+    { sender: 'learner' as const, text: 'Is ATP the sugar the plant keeps?' },
+    { sender: 'user' as const, text: 'No, it is the battery that powers it.' },
+  ],
+}
+
+describe('highlightQuoteInText', () => {
+  it('finds a quote in the board text', () => {
+    const match = highlightQuoteInText(turn, 'absorbs red and blue light')
+
+    expect(match).toEqual({ field: 'boardText', index: 12, text: 'absorbs red and blue light' })
+    expect(turn.boardText.slice(match!.index, match!.index + match!.text.length)).toBe(
+      'absorbs red and blue light',
+    )
+  })
+
+  it('falls through to the speech when the board does not contain it', () => {
+    const match = highlightQuoteInText(turn, 'leaves look green')
+
+    expect(match?.field).toBe('speech')
+    expect(turn.speech.slice(match!.index, match!.index + match!.text.length)).toBe(
+      'leaves look green',
+    )
+  })
+
+  it('returns null for a quote in neither channel, so the caller falls back', () => {
+    expect(highlightQuoteInText(turn, 'the plant captures sunlight')).toBeNull()
+  })
+
+  it('returns null when there is no quote at all', () => {
+    expect(highlightQuoteInText(turn, undefined)).toBeNull()
+    expect(highlightQuoteInText(turn, null)).toBeNull()
+    expect(highlightQuoteInText(turn, '')).toBeNull()
+  })
+
+  it('does not tolerate case or whitespace drift, which the backend already filtered', () => {
+    expect(highlightQuoteInText(turn, 'CHLOROPHYLL ABSORBS')).toBeNull()
+    expect(highlightQuoteInText(turn, 'red  and  blue')).toBeNull()
+  })
+
+  it('matches a turn with no speech channel', () => {
+    expect(highlightQuoteInText({ boardText: 'ATP is made here.' }, 'ATP')).toEqual({
+      field: 'boardText',
+      index: 0,
+      text: 'ATP',
+    })
+  })
+
+  it('finds a quote in what the user typed in chat, and says which bubble', () => {
+    const match = highlightQuoteInText(withChat, 'the battery that powers it')
+
+    expect(match).toEqual({
+      field: 'chat',
+      chatIndex: 1,
+      index: 10,
+      text: 'the battery that powers it',
+    })
+    expect(
+      withChat.chat[1].text.slice(match!.index, match!.index + match!.text.length),
+    ).toBe('the battery that powers it')
+  })
+
+  it('marks a quote in what this turn added, ahead of the whole board', () => {
+    const later = {
+      boardText: 'Water is split.\nRuBisCO fixes CO2.',
+      newBoardText: 'RuBisCO fixes CO2.',
+    }
+    expect(highlightQuoteInText(later, 'RuBisCO fixes CO2')).toEqual({
+      field: 'newBoardText',
+      index: 0,
+      text: 'RuBisCO fixes CO2',
+    })
+    // Earlier material is only in the whole board, and is still found there.
+    expect(highlightQuoteInText(later, 'Water is split')?.field).toBe('boardText')
+  })
+
+  it('never anchors to the student, whose words are in the same list', () => {
+    // The phrase only occurs in a learner bubble. Marking it would show the
+    // user's own question back to them as evidence of what they taught.
+    expect(highlightQuoteInText(withChat, 'Is ATP the sugar')).toBeNull()
+  })
+})
+
+describe('segmentTextForFindings', () => {
+  const correct: EvaluationFindingDTO = {
+    category: 'CORRECT',
+    concept: 'absorption',
+    detail: 'right',
+  }
+  const confusing: EvaluationFindingDTO = {
+    category: 'CONFUSING',
+    concept: 'reflection',
+    detail: 'muddled',
+  }
+
+  it('splits a sentence into plain and highlighted runs', () => {
+    const segments = segmentTextForFindings('abc def ghi', [
+      { finding: correct, index: 4, length: 3 },
+    ])
+
+    expect(segments).toEqual([
+      { text: 'abc ' },
+      { text: 'def', finding: correct },
+      { text: ' ghi' },
+    ])
+  })
+
+  it('lays several findings down in document order, not array order', () => {
+    const segments = segmentTextForFindings('one two three', [
+      { finding: confusing, index: 8, length: 5 },
+      { finding: correct, index: 0, length: 3 },
+    ])
+
+    expect(segments.map((s) => s.text)).toEqual(['one', ' two ', 'three'])
+    expect(segments[0].finding).toBe(correct)
+    expect(segments[2].finding).toBe(confusing)
+  })
+
+  it('skips a match that overlaps an earlier one rather than nesting marks', () => {
+    const segments = segmentTextForFindings('one two three', [
+      { finding: correct, index: 0, length: 7 },
+      { finding: confusing, index: 4, length: 3 },
+    ])
+
+    expect(segments).toEqual([{ text: 'one two', finding: correct }, { text: ' three' }])
+  })
+
+  it('returns nothing for empty text', () => {
+    expect(segmentTextForFindings('', [{ finding: correct, index: 0, length: 1 }])).toEqual([])
+  })
+})
+
+describe('findingsForTurn', () => {
+  const findings: EvaluationFindingDTO[] = [
+    {
+      category: 'CORRECT',
+      concept: 'absorption',
+      detail: 'right',
+      evidenceTurnIndex: 0,
+      sourceQuote: 'absorbs red and blue light',
+    },
+    {
+      // Cites this turn, but the backend rejected its quote: whole-turn fallback.
+      category: 'WRONG',
+      concept: 'reflection',
+      detail: 'off',
+      evidenceTurnIndex: 0,
+    },
+    {
+      category: 'MISSED',
+      concept: 'Calvin cycle',
+      detail: 'absent',
+      evidenceTurnIndex: null,
+    },
+    {
+      category: 'CORRECT',
+      concept: 'other turn',
+      detail: 'elsewhere',
+      evidenceTurnIndex: 1,
+      sourceQuote: 'absorbs red and blue light',
+    },
+  ]
+
+  it('separates precise anchors from whole-turn fallbacks, ignoring other turns', () => {
+    const { quoted, wholeTurn } = findingsForTurn(findings, turn)
+
+    expect(quoted).toHaveLength(1)
+    expect(quoted[0].finding.concept).toBe('absorption')
+    expect(quoted[0].match.field).toBe('boardText')
+
+    expect(wholeTurn.map((f) => f.concept)).toEqual(['reflection'])
+  })
+
+  it('treats a quote the turn does not contain as a whole-turn fallback', () => {
+    const { quoted, wholeTurn } = findingsForTurn(
+      [{ category: 'WRONG', concept: 'x', detail: 'y', evidenceTurnIndex: 0, sourceQuote: 'nope' }],
+      turn,
+    )
+
+    expect(quoted).toHaveLength(0)
+    expect(wholeTurn).toHaveLength(1)
+  })
+})

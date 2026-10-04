@@ -1,8 +1,20 @@
 import type { CognivaBridge } from './CognivaBridge';
+import { getGuestSessionId } from '../state/guestSession';
 import type { WorkspaceDTO } from '../dto/WorkspaceDTO';
+import type { Locale } from '../i18n/messages';
 import type { TeachingCheckpointDTO } from '../dto/TeachingCheckpointDTO';
 import type { ChatMessageDTO } from '../dto/ChatMessageDTO';
-import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
+import type {
+  EvaluationReportDTO,
+  EvaluationRoundSummaryDTO,
+  ScoreHistoryPointDTO,
+} from '../dto/EvaluationReportDTO';
+import type { TimelineDTO } from '../dto/TimelineDTO';
+import type {
+  ReferenceSuggestionsDTO,
+  SaveReferenceTextResultDTO,
+  UseReferenceResultDTO,
+} from '../dto/ReferenceDTO';
 
 // ---------------------------------------------------------------------------
 // RealCognivaBridge — talks to the Fastify backend (§7.1) over plain REST.
@@ -15,32 +27,11 @@ import type { EvaluationReportDTO } from '../dto/EvaluationReportDTO';
 
 const BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 
-// A stable per-device id so the backend can keep each device's workspaces
-// separate (there are no user accounts). Sent as x-client-id on every request.
-// Persisted in localStorage; regenerated only if storage is wiped.
-const DEVICE_ID_KEY = 'cogniva:deviceId';
-
-function getDeviceId(): string {
-  try {
-    let id = localStorage.getItem(DEVICE_ID_KEY);
-    if (!id) {
-      id =
-        globalThis.crypto?.randomUUID?.() ??
-        `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      localStorage.setItem(DEVICE_ID_KEY, id);
-    }
-    return id;
-  } catch {
-    // localStorage unavailable (private mode) — fall back to a per-tab id.
-    return 'anonymous';
-  }
-}
-
-const CLIENT_ID = getDeviceId();
-
-/** Headers sent on every request so the backend scopes data to this device. */
+/** Accounts use their login cookie; guests use an ID held only in this page. */
 function clientHeaders(): Record<string, string> {
-  return { 'x-client-id': CLIENT_ID };
+  const guestId = getGuestSessionId();
+  if (guestId) return { 'x-guest-session': guestId };
+  return {};
 }
 
 async function json<T>(res: Response): Promise<T> {
@@ -52,7 +43,7 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 function getJson<T>(path: string): Promise<T> {
-  return fetch(`${BASE}${path}`, { headers: clientHeaders() }).then(json<T>);
+  return fetch(`${BASE}${path}`, { headers: clientHeaders(), credentials: 'include' }).then(json<T>);
 }
 
 function sendJson<T>(path: string, method: string, body?: unknown): Promise<T> {
@@ -65,6 +56,7 @@ function sendJson<T>(path: string, method: string, body?: unknown): Promise<T> {
     init.headers = { ...init.headers, 'Content-Type': 'application/json' };
     init.body = JSON.stringify(body);
   }
+  init.credentials = 'include';
   return fetch(`${BASE}${path}`, init).then(json<T>);
 }
 
@@ -95,14 +87,15 @@ export class RealCognivaBridge implements CognivaBridge {
     return getJson<WorkspaceDTO[]>('/api/workspaces');
   }
 
-  createWorkspace(): Promise<WorkspaceDTO> {
-    return sendJson<WorkspaceDTO>('/api/workspaces', 'POST');
+  createWorkspace(locale: Locale): Promise<WorkspaceDTO> {
+    return sendJson<WorkspaceDTO>('/api/workspaces', 'POST', { locale });
   }
 
   async deleteWorkspace(workspaceId: string): Promise<void> {
     const res = await fetch(`${BASE}/api/workspaces/${workspaceId}`, {
       method: 'DELETE',
       headers: clientHeaders(),
+      credentials: 'include',
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
@@ -118,7 +111,7 @@ export class RealCognivaBridge implements CognivaBridge {
 
   updateWorkspaceMeta(
     workspaceId: string,
-    meta: { title?: string; description?: string }
+    meta: { title?: string; description?: string; learnerId?: string; locale?: Locale }
   ): Promise<WorkspaceDTO> {
     return sendJson<WorkspaceDTO>(`/api/workspaces/${workspaceId}`, 'PATCH', meta);
   }
@@ -129,6 +122,39 @@ export class RealCognivaBridge implements CognivaBridge {
       data,
       mime: mime === 'application/octet-stream' ? 'application/pdf' : mime,
     });
+  }
+
+  saveReferenceText(workspaceId: string, text: string): Promise<SaveReferenceTextResultDTO> {
+    return sendJson<SaveReferenceTextResultDTO>(
+      `/api/workspaces/${workspaceId}/reference-text`,
+      'POST',
+      { text },
+    );
+  }
+
+  suggestReferences(workspaceId: string, hint?: string): Promise<ReferenceSuggestionsDTO> {
+    return sendJson<ReferenceSuggestionsDTO>(
+      `/api/workspaces/${workspaceId}/references/suggest`,
+      'POST',
+      { hint },
+    );
+  }
+
+  async useReference(
+    workspaceId: string,
+    choice: { url: string; title?: string; source?: string }
+  ): Promise<UseReferenceResultDTO> {
+    const res = await fetch(`${BASE}/api/workspaces/${workspaceId}/references/use`, {
+      method: 'POST',
+      headers: { ...clientHeaders(), 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(choice),
+    });
+    // 422 is the documented "this source could not be read" answer and carries a
+    // usable body, so it is unwrapped rather than thrown — unlike a 404 or a 500,
+    // which are still failures the caller should see as such.
+    if (res.status === 422) return res.json() as Promise<UseReferenceResultDTO>;
+    return json<UseReferenceResultDTO>(res);
   }
 
   async saveWhiteboardDraft(
@@ -146,19 +172,30 @@ export class RealCognivaBridge implements CognivaBridge {
 
   async submitCheckpoint(
     workspaceId: string,
-    payload: { snapshotImage: Blob; whiteboardSnapshot: unknown; audio?: Blob }
+    payload: {
+      snapshotImage: Blob | null;
+      whiteboardSnapshot: unknown;
+      audio?: Blob;
+      timeline?: TimelineDTO;
+      newContentImage?: Blob;
+    }
   ): Promise<TeachingCheckpointDTO> {
-    const image = await blobToBase64(payload.snapshotImage);
+    const image = payload.snapshotImage ? await blobToBase64(payload.snapshotImage) : undefined;
+    const fresh = payload.newContentImage ? await blobToBase64(payload.newContentImage) : undefined;
     const audio = payload.audio ? await blobToBase64(payload.audio) : undefined;
     return sendJson<TeachingCheckpointDTO>(
       `/api/workspaces/${workspaceId}/checkpoints`,
       'POST',
       {
-        snapshotImage: image.data,
-        snapshotMime: image.mime === 'application/octet-stream' ? 'image/png' : image.mime,
+        // Left out entirely for a voice-only turn, not sent as an empty string.
+        snapshotImage: image?.data,
+        snapshotMime:
+          image && image.mime !== 'application/octet-stream' ? image.mime : 'image/png',
         whiteboardSnapshot: payload.whiteboardSnapshot,
         audio: audio?.data,
         audioMime: audio?.mime,
+        timeline: payload.timeline,
+        newContentImage: fresh?.data,
       }
     );
   }
@@ -185,6 +222,7 @@ export class RealCognivaBridge implements CognivaBridge {
     const res = await fetch(`${BASE}/api/workspaces/${workspaceId}/finish`, {
       method: 'POST',
       headers: clientHeaders(),
+      credentials: 'include',
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
@@ -192,10 +230,21 @@ export class RealCognivaBridge implements CognivaBridge {
     }
   }
 
-  getEvaluationReport(workspaceId: string): Promise<EvaluationReportDTO> {
+  getEvaluationReport(workspaceId: string, round?: number): Promise<EvaluationReportDTO> {
     // 404 until the evaluation finishes — surfaced as a rejection, matching the
     // mock so the Evaluation screen keeps polling getWorkspace() until Completed.
-    return getJson<EvaluationReportDTO>(`/api/workspaces/${workspaceId}/report`);
+    const query = round === undefined ? '' : `?round=${round}`;
+    return getJson<EvaluationReportDTO>(`/api/workspaces/${workspaceId}/report${query}`);
+  }
+
+  getEvaluationRounds(workspaceId: string): Promise<EvaluationRoundSummaryDTO[]> {
+    return getJson<EvaluationRoundSummaryDTO[]>(
+      `/api/workspaces/${workspaceId}/report/rounds`,
+    );
+  }
+
+  getScoreHistory(): Promise<ScoreHistoryPointDTO[]> {
+    return getJson<ScoreHistoryPointDTO[]>('/api/reports/history');
   }
 
   // Resume a finished session back into teaching — transcript and the Learner's

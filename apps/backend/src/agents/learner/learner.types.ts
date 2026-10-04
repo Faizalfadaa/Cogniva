@@ -3,12 +3,44 @@ export type Misconception = {
   belief: string;
 };
 
+/**
+ * How many times the student has pressed on one core concept, so it can stop
+ * after two instead of circling (see learner.repeat.ts). `key` is the normalized
+ * comparison key; `label` is the concept as the student named it.
+ */
+export type AskedConcept = {
+  key: string;
+  label: string;
+  count: number;
+  /**
+   * Which budget this tally is: plain questions about the concept, or questions
+   * that push it to a new case. They are counted apart because an extension is
+   * a NEW question, not the user being asked the same thing twice. Absent on
+   * entries written before extensions existed, and read as "probe".
+   */
+  kind?: AskedConceptKind;
+};
+
+export type AskedConceptKind = "probe" | "extend";
+
 export type LearnerState = {
   sessionId: string;
   understoodConcepts: string[];
   activeMisconceptions: Misconception[];
   openGaps: string[];
   questionsAsked: string[];
+  /**
+   * Optional: states written before the repeat limit existed have no tally, and
+   * the model never fills this in — the guard does.
+   */
+  askedConcepts?: AskedConcept[];
+  /**
+   * How many questions in a row have asked how the teacher's own previous
+   * answer works, rather than about the lesson (see learner.depth.ts). Optional
+   * for the same reason as `askedConcepts`, and kept by the guard, never by the
+   * model.
+   */
+  followUpDepth?: number;
   updatedAtTurn: number;
 };
 
@@ -47,6 +79,13 @@ export type LearnerAgentInput = {
    */
   currentState: LearnerState;
 
+  /**
+   * The name of the character the user picked, which the student gives when
+   * asked. Absent outside a workspace (the bare session API has no character),
+   * and the prompt then falls back to its own name.
+   */
+  learnerName?: string;
+
   /** Names of the tools allowed this turn (filled by the agent loop). */
   availableTools?: string[];
 
@@ -65,7 +104,14 @@ export type LearnerResponseStrategy =
   | "request_example"
   | "challenge_claim"
   | "paraphrase"
-  | "attempt_problem";
+  | "attempt_problem"
+  /**
+   * Take what was just taught and push it to a harder case of its own accord:
+   * taught F0 → decimal, the student asks how FFFFF would go. It builds on the
+   * explanation instead of poking at what is missing from it, which is the one
+   * kind of question that makes the teacher extend their own understanding.
+   */
+  | "extend_example";
 
 /** The student's decision: use a tool to investigate first, or respond directly. */
 export type LearnerAction = {
@@ -105,6 +151,12 @@ export type LearnerLLMOutput = {
     text: string;
     targetConcept?: string;
     derivedFrom: LearnerResponseDerivedFrom;
+    /**
+     * True when the question asks how or why the teacher's previous answer
+     * itself works, rather than about the lesson material. The model reports
+     * it; the guard does the counting (learner.depth.ts).
+     */
+    followsUp?: boolean;
   };
 };
 

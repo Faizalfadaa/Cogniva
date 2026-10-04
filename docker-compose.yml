@@ -1,28 +1,95 @@
-# Cogniva — two independent services, one network.
+# Cogniva — three services, one network.
 #
+#   db        Postgres 16 — every workspace, session and transcript lives here
 #   frontend  nginx serving the built SPA + reverse-proxying to the backend (:80)
 #   backend   Fastify API run with tsx (:8000, internal)
 #
-# Only the frontend publishes a host port; the browser reaches the API through
-# nginx on the same origin. Copy .env.docker.example to .env and set your key:
+# Only the frontend (via caddy) publishes a host port; the browser reaches the
+# API through nginx on the same origin, and the database is never exposed off
+# the compose network. Copy .env.example to .env and set your key:
 #
-#   cp .env.docker.example .env
+#   cp .env.example .env
 #   docker compose up -d --build
+#
+# The backend applies pending migrations on start, so a fresh volume becomes a
+# fully migrated database on the first boot.
 
 services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cogniva}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cogniva}
+      POSTGRES_DB: ${POSTGRES_DB:-cogniva}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    # The backend waits on this, so it never starts against a database that is
+    # still initialising and dies on its first query.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cogniva} -d ${POSTGRES_DB:-cogniva}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - cogniva
+
   backend:
     build:
       context: ./apps/backend
     image: cogniva-backend:latest
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
+      # Required: all storage is Postgres. The backend refuses to start without it.
+      DATABASE_URL: >-
+        postgresql://${POSTGRES_USER:-cogniva}:${POSTGRES_PASSWORD:-cogniva}@db:5432/${POSTGRES_DB:-cogniva}?schema=public
       # Optional — without it the Learner uses a deterministic mock.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-dev}
       COGNIVA_LEARNER_MODEL: ${COGNIVA_LEARNER_MODEL:-gemini-2.5-flash}
+      # Learner voice. Only has an effect when the `voice` profile is running.
+      COGNIVA_TTS_ENABLED: ${COGNIVA_TTS_ENABLED:-false}
+      COGNIVA_TTS_URL: http://tts:8020
       PORT: "8000"
       NODE_ENV: production
     expose:
       - "8000"
+    networks:
+      - cogniva
+
+  # Learner voice (Chatterbox Turbo, MIT). Opt-in: it adds a ~2.9 GB model
+  # download and, on CPU, 10-30s per reply. Start it explicitly with a profile:
+  #
+  #   docker compose --profile voice up -d --build
+  #
+  # The backend degrades to silence when it is absent, so the default stack is
+  # unaffected. The XTTS v2 engine is still selectable with TTS_ENGINE=xtts, but
+  # it is licensed for NON-COMMERCIAL use only (CPML) — the MIT-licensed
+  # Chatterbox engines are the default for that reason.
+  tts:
+    profiles: ["voice"]
+    build:
+      context: ./services/tts
+    image: cogniva-tts:latest
+    restart: unless-stopped
+    environment:
+      # "chatterbox-turbo" (default, fastest), "chatterbox", or "xtts".
+      TTS_ENGINE: ${TTS_ENGINE:-chatterbox-turbo}
+      TTS_DEVICE: ${TTS_DEVICE:-cpu}
+      TTS_DEFAULT_LANGUAGE: ${TTS_DEFAULT_LANGUAGE:-en}
+    volumes:
+      # Reference recordings stay on the host — personal data, never in an image.
+      - ./services/tts/voices:/app/voices:ro
+      - tts_cache:/app/.cache
+      # Coqui's model cache, which only the xtts engine uses. The Chatterbox
+      # engines download into the container's own filesystem — see the Dockerfile.
+      - tts_models:/root/.local/share/tts
+    expose:
+      - "8020"
     networks:
       - cogniva
 
@@ -32,9 +99,6 @@ services:
       args:
         # Empty => the SPA calls relative /api paths, proxied by nginx.
         VITE_API_BASE: ""
-        # Production runs on an HTTPS domain → Excalidraw (tldraw needs a paid
-        # license there). Override to "tldraw" only if you have a tldraw license.
-        VITE_WHITEBOARD: ${VITE_WHITEBOARD:-excalidraw}
     image: cogniva-frontend:latest
     restart: unless-stopped
     depends_on:
@@ -61,8 +125,11 @@ services:
       - cogniva
 
 volumes:
+  db_data:
   caddy_data:
   caddy_config:
+  tts_cache:
+  tts_models:
 
 networks:
   cogniva:

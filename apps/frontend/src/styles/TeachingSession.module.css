@@ -11,6 +11,7 @@
 /* workspaceBody sits below the header and splits into
    canvas (flex:1) + chat sidebar (fixed width or zero) */
 .workspaceBody {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -27,28 +28,151 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  height: 60px;
-  padding: 0 16px;
+  min-height: 60px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
   background: var(--cream);
   border-bottom: 1px solid var(--border);
 }
 
 .headerLeft {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 560px;
 }
 
 .headerRight {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+/* One Reference button whose menu holds both routes: an agent that looks
+   material up, or a file of the user's own. */
+.referenceMenu {
+  position: relative;
+  flex: none;
+}
+
+.referenceBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--dur-fast), color var(--dur-fast);
+}
+.referenceBtn:hover { border-color: var(--text-primary); color: var(--text-primary); }
+.referenceBtn:disabled { opacity: 0.6; cursor: default; }
+.referenceBtn[aria-expanded='true'] { border-color: var(--text-primary); color: var(--text-primary); }
+.referenceBtn:focus-visible { outline: 2px solid var(--lime-edge); outline-offset: 2px; }
+
+.referenceIcon { width: 15px; height: 15px; flex: none; }
+
+.referenceChevron {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  transition: transform var(--dur-fast);
+}
+.referenceBtn[aria-expanded='true'] .referenceChevron { transform: rotate(180deg); }
+
+/* Material is attached: a small green dot, not a second chip beside the button. */
+.referenceDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--forest-mid);
+  flex: none;
+}
+
+.referencePopover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1000;
+  width: 280px;
+  max-width: calc(100vw - 32px);
+  padding: 6px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: 0 12px 32px rgba(30, 25, 10, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.referenceItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.referenceItem:hover,
+.referenceItem:focus-visible {
+  background: var(--parchment);
+  outline: none;
+}
+
+.referenceItemIcon {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  margin-top: 1px;
+  color: var(--forest-dark);
+}
+
+.referenceItemText { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.referenceItemTitle { font-size: 13.5px; font-weight: 600; }
+/* Wraps rather than truncating: the hint is what tells the two choices apart,
+   and cut off at "...untuk materi ..." it says nothing. Two lines at most, so a
+   long web source title cannot stretch the menu. */
+.referenceItemHint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.referenceFootnote {
+  margin: 4px 10px 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
 }
 
 .backBtn {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -61,7 +185,21 @@
 }
 .backBtn:hover { background: var(--parchment); }
 
+/* The Cogniva mark beside the back arrow. Decoration only: the arrow is the
+   single way out of a teaching screen. */
+.brandMark {
+  width: 28px;
+  height: 28px;
+  padding: 5.25px;
+  border-radius: 7px;
+  background: var(--forest-dark);
+  flex: none;
+  object-fit: contain;
+  display: block;
+}
+
 .titleInput {
+  flex: 1 1 120px;
   font-family: var(--font-display);
   font-size: 16px;
   font-weight: 700;
@@ -135,7 +273,7 @@
   padding: 7px 14px;
   border-radius: var(--radius-pill);
   border: 1.5px solid var(--border-strong);
-  background: transparent;
+  background: var(--card-bg);
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 500;
@@ -154,7 +292,9 @@
   padding: 7px 14px;
   border-radius: var(--radius-pill);
   border: 1.5px solid #e0453c;
-  background: rgba(224, 69, 60, 0.08);
+  /* White like the idle state; the red border, label and pulsing dot are what
+     say it is recording. */
+  background: var(--card-bg);
   color: #c0342c;
   font-size: 13px;
   font-weight: 600;
@@ -162,7 +302,7 @@
   transition: border-color var(--dur-fast), background var(--dur-fast);
 }
 .micBtnActive:hover {
-  background: rgba(224, 69, 60, 0.15);
+  border-color: #c0342c;
 }
 
 .micBtnIcon {
@@ -188,7 +328,7 @@
 }
 
 /* Header chat toggle — opens the learner chat drawer. Lives in the header so
-   it never overlaps the whiteboard tool panels (tldraw right / excalidraw left). */
+   it never overlaps the whiteboard tool panels. */
 .headerChatBtn {
   position: relative;
   width: 38px;
@@ -224,16 +364,18 @@
    Learner response bubble  (top-right of canvas)
 ═══════════════════════════════════════════════════════════ */
 /* ── Shared notification stack (intro toasts + teach response + chat toasts) ──
-   Anchored top-left, just below the tldraw style panel (~68px from canvas top). */
+   Anchored bottom-right, stacking upward from just above the chat launcher.
+   The 90px bottom offset clears .chatLauncher (24px offset + 56px tall) with
+   room to spare, so a toast never sits on top of the button that opens chat. */
 .notifStack {
   position: absolute;
-  top: 76px;
-  left: 8px;
+  bottom: 90px;
+  right: 24px;
   z-index: 950;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: flex-start;
+  align-items: flex-end;
   pointer-events: none;
   max-width: 300px;
 }
@@ -245,16 +387,17 @@
   align-items: flex-start;
   gap: 10px;
   width: 280px;
-  background: var(--cream);
-  border: 1px solid var(--border);
+  background: var(--bubble-learner-bg);
+  border: 1px solid var(--bubble-learner-border);
   border-radius: var(--radius-lg);
   padding: 10px 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.13);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
   animation: notifSlideIn 200ms var(--ease-out) both;
 }
 
+/* Slides in from the right edge now that the stack lives bottom-right. */
 @keyframes notifSlideIn {
-  from { opacity: 0; transform: translateX(-10px); }
+  from { opacity: 0; transform: translateX(10px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 
@@ -264,7 +407,7 @@
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  background: var(--parchment);
+  background: var(--forest-dark);
 }
 
 .notifBody {
@@ -278,12 +421,12 @@
 .notifName {
   font-size: 11px;
   font-weight: 700;
-  color: var(--text-secondary);
+  color: var(--bubble-learner-name);
 }
 
 .notifText {
   font-size: 13px;
-  color: var(--text-primary);
+  color: var(--bubble-learner-text);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -303,10 +446,13 @@
   border-radius: 50%;
   font-size: 14px;
   line-height: 1;
-  color: var(--text-muted);
+  color: var(--bubble-learner-muted);
   transition: background var(--dur-fast), color var(--dur-fast);
 }
-.notifClose:hover { background: var(--parchment); color: var(--text-primary); }
+.notifClose:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--bubble-learner-text);
+}
 
 /* Legacy aliases — kept so old .responseName/.responseText in sidebar still work */
 .responseName { font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 2px; }
@@ -491,10 +637,12 @@
   line-height: 1.45;
 }
 
+/* The learner ("character") bubble: forest green so it never washes out
+   against the cream chat panel. The user keeps the lime bubble. */
 .chatBubbleLearner {
   align-self: flex-start;
-  background: var(--parchment);
-  color: var(--text-primary);
+  background: var(--bubble-learner-bg);
+  color: var(--bubble-learner-text);
   border-bottom-left-radius: 4px;
 }
 
@@ -503,26 +651,44 @@
   background: var(--lime);
   color: var(--lime-text);
   border-bottom-right-radius: 4px;
+  /* The line breaks the user typed with Shift+Enter, kept as typed; and a long
+     unbroken string (a link, a formula) wraps instead of pushing the bubble
+     past the panel edge. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Input row */
 .chatSidebarInputRow {
   flex: 0 0 auto;
   display: flex;
+  /* The send button stays level with the last line as the box grows. */
+  align-items: flex-end;
   gap: 6px;
   padding: 10px 12px;
   border-top: 1px solid var(--border);
 }
 
+/* A textarea that grows downward with the message (LearnerStage sets the
+   height). A pill radius would turn a tall box into a capsule, so the corners
+   are a fixed radius: half the one-line height, which still reads as a pill
+   while the message fits on one line. */
 .chatSidebarInput {
   flex: 1;
   min-width: 0;
+  display: block;
+  font: inherit;
   font-size: 13px;
-  padding: 8px 12px;
+  line-height: 1.45;
+  padding: 7px 12px;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-pill);
+  border-radius: 17px;
   background: var(--card-bg);
   outline: none;
+  resize: none;
+  max-height: 140px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
   transition: border-color var(--dur-fast);
 }
 .chatSidebarInput:focus { border-color: var(--lime); }
@@ -544,18 +710,176 @@
 .chatSidebarSend:disabled { opacity: 0.5; cursor: default; }
 
 /* ═══════════════════════════════════════════════════════════
+   Error banner — top-centre of the canvas
+═══════════════════════════════════════════════════════════ */
+/* Deliberately top-centre. The whole bottom-right corner is taken: .notifStack
+   (intro toasts AND the learner response bubble), .chatToastsContainer, and
+   .chatLauncher all live there. Top-right is .introSkip's during the intro.
+   Centre-top is the only clear band, and it is where a system-level problem
+   belongs anyway -- it is about the session, not about one message. */
+.errorBanner {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 980; /* above toasts (950) and the launcher (960) */
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: min(520px, calc(100% - 32px));
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background: var(--card-bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  animation: errorBannerIn 200ms var(--ease-out) both;
+}
+
+@keyframes errorBannerIn {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Variants differ by severity, not decoration: red = the turn failed, amber =
+   the connection dropped and will come back, neutral = a limit we planned for. */
+.errorBannerNetwork { border-left: 4px solid #d98324; }
+.errorBannerAi { border-left: 4px solid #c0392b; }
+.errorBannerBudget { border-left: 4px solid var(--forest-mid); }
+/* A nudge rather than a failure: nothing broke, the user just has not given the
+   student anything yet, so it takes the brand's accent instead of an alarm colour. */
+.errorBannerEmpty { border-left: 4px solid var(--lime-edge); }
+
+.errorBannerIcon {
+  flex: none;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.errorBannerBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.errorBannerTitle {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.errorBannerText {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+/* The raw error string — useful when someone reports a bug, muted so it never
+   competes with the sentence above it. */
+.errorBannerDetail {
+  margin: 6px 0 0;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+.errorBannerClose {
+  flex: none;
+  border: none;
+  background: none;
+  padding: 0 2px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.errorBannerClose:hover { color: var(--text-primary); }
+
+/* ═══════════════════════════════════════════════════════════
+   Chat launcher — floating button, bottom-right of the canvas
+═══════════════════════════════════════════════════════════ */
+/* Lives inside .canvasArea (not the header), so when the sidebar opens as a
+   flex sibling the launcher travels left with the shrinking canvas instead of
+   ending up underneath the panel. Nothing else is anchored bottom-right --
+   .sidebarTrigger (right/middle) is unused CSS, .introSkip is top-right. */
+.chatLauncher {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 960; /* above .notifStack (950) so a tall stack never buries it */
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--lime, #b8d94a);
+  color: var(--text-primary, #2e2b22);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.24);
+  transition: transform 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
+  /* It can be dragged: without this a touch drag scrolls the page instead. */
+  touch-action: none;
+  user-select: none;
+}
+
+/* Lifted while held, so it reads as picked up rather than pressed. */
+.chatLauncherDragging,
+.chatLauncherDragging:hover {
+  cursor: grabbing;
+  transform: scale(1.08);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.3);
+}
+
+.chatLauncher:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+}
+
+.chatLauncher:active { transform: translateY(0); }
+
+.chatLauncher:focus-visible {
+  outline: 2px solid var(--text-primary, #2e2b22);
+  outline-offset: 3px;
+}
+
+.chatLauncherIcon {
+  width: 26px;
+  height: 26px;
+  display: block;
+  pointer-events: none;
+}
+
+/* Secondary: who you are talking to. Small on purpose -- the chat glyph is the
+   thing that has to read at a glance, the face is a supporting detail. */
+.chatLauncherAvatar {
+  position: absolute;
+  left: -2px;
+  bottom: -2px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--lime, #b8d94a);
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
    Chat toast notifications — use shared .notifStack / .notifToast above
 ═══════════════════════════════════════════════════════════ */
 /* ChatToasts renders a .notifStack wrapper; aliases below keep ChatToasts.tsx compiling */
 .chatToastsContainer {
   position: absolute;
-  top: 76px;
-  left: 8px;
+  bottom: 90px;
+  right: 24px;
   z-index: 950;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: flex-start;
+  align-items: flex-end;
   pointer-events: none;
   max-width: 300px;
 }
@@ -567,14 +891,14 @@
   align-items: flex-start;
   gap: 10px;
   width: 280px;
-  background: var(--cream);
-  border: 1px solid var(--border);
+  background: var(--bubble-learner-bg);
+  border: 1px solid var(--bubble-learner-border);
   border-radius: var(--radius-lg);
   padding: 10px 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.13);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
   cursor: pointer;
   opacity: 0;
-  transform: translateX(-10px);
+  transform: translateX(10px);
   transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
 }
 
@@ -584,8 +908,8 @@
 }
 
 .chatToast:hover {
-  border-color: var(--border-strong);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  border-color: var(--border-lime);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .chatToastAvatar {
@@ -594,7 +918,7 @@
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  background: var(--parchment);
+  background: var(--forest-dark);
 }
 
 .chatToastBody {
@@ -608,12 +932,12 @@
 .chatToastName {
   font-size: 11px;
   font-weight: 700;
-  color: var(--text-secondary);
+  color: var(--bubble-learner-name);
 }
 
 .chatToastText {
   font-size: 13px;
-  color: var(--text-primary);
+  color: var(--bubble-learner-text);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -626,6 +950,118 @@
 ═══════════════════════════════════════════════════════════ */
 
 /* Full-canvas dim overlay */
+/* ── Learner picker ──
+   Same overlay language as .introOverlay below (dark scrim + blur, forest card,
+   portrait art) so choosing a character and then meeting them read as one flow
+   rather than two different screens. Sits above the intro's z-index because it
+   comes first. */
+.selectOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 910;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 18, 10, 0.62);
+  backdrop-filter: blur(3px);
+  padding: 24px;
+}
+
+.selectPanel {
+  background: var(--forest-dark);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  padding: 28px 28px 32px;
+  max-width: 860px;
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  text-align: center;
+}
+
+.selectTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-on-dark);
+}
+
+.selectSubtitle {
+  margin: 6px 0 22px;
+  font-size: 13px;
+  color: var(--text-on-dark-muted);
+}
+
+.selectGrid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+}
+
+.selectCard {
+  flex: 0 1 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  background: var(--forest-mid);
+  border: 2px solid transparent;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.selectCard:hover {
+  transform: translateY(-4px);
+  border-color: var(--lime);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.4);
+}
+
+.selectCard:focus-visible {
+  outline: none;
+  border-color: var(--lime);
+  box-shadow: 0 0 0 3px rgba(216, 255, 41, 0.35);
+}
+
+.selectCardImage {
+  width: 100%;
+  height: 260px;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+}
+
+.selectCardName {
+  padding: 12px 10px 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-on-dark);
+}
+
+.selectCardTraits {
+  padding: 0 10px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lime);
+}
+
+/* Two lines of temperament, so the choice is about who they are rather than
+   which portrait looks nicest. */
+.selectCardDesc {
+  padding: 0 12px 14px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-on-dark);
+  opacity: 0.75;
+  text-align: left;
+}
+
 .introOverlay {
   position: absolute;
   inset: 0;
@@ -750,6 +1186,13 @@
    - Toasts/intro are capped to the viewport width.
    Desktop layout above is untouched.
 ═══════════════════════════════════════════════════════════ */
+@media (max-width: 1100px) {
+  .header { gap: 8px; }
+  .headerLeft,
+  .headerRight { flex-basis: 100%; }
+  .titleInput { max-width: none; }
+}
+
 @media (max-width: 768px) {
   /* ── Header: wrap into two rows ── */
   .header {
@@ -804,10 +1247,14 @@
   .chatSidebarInput { padding: 10px 14px; font-size: 16px; }
   .chatSidebarSend { width: 38px; height: 38px; }
 
-  /* ── Toasts: never wider than the screen ── */
+  /* ── Toasts: keep the right edge of the canvas clear ──
+     Both whiteboard engines dock a vertical tool strip against the right edge
+     on phones (Excalidraw's is ~37px wide, starting ~80px below the canvas
+     top). A full-width toast covered it and — being pointer-events:all — also
+     swallowed the taps. Reserve that gutter instead of spanning the viewport. */
   .notifStack,
   .chatToastsContainer {
-    max-width: calc(100vw - 16px);
+    max-width: min(300px, calc(100vw - 76px));
   }
   .notifToast,
   .chatToast {
@@ -826,4 +1273,549 @@
 /* Small phones (≤420px) — drop the mic label to save the second row. */
 @media (max-width: 420px) {
   .micBtnLabel { display: none; }
+}
+
+/* ─── Learner voice (XTTS) ─── */
+
+/* Deafen toggle in the header, sized to match the mic button beside it. */
+.deafenBtn,
+.deafenBtnOn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out);
+}
+
+.deafenBtn:hover { background: var(--parchment); color: var(--text-primary); }
+
+/* Deafened: the struck-through headphones in red, as call apps show it, so it
+   is obvious at a glance why the student has gone quiet. */
+.deafenBtnOn {
+  border-color: rgba(224, 69, 60, 0.45);
+  color: #c0342c;
+}
+.deafenBtnOn:hover { background: rgba(224, 69, 60, 0.08); }
+
+.deafenBtn:disabled,
+.deafenBtnOn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  background: var(--card-bg);
+}
+
+.deafenIcon { width: 17px; height: 17px; display: block; }
+.deafenSlash { stroke: #e0453c; stroke-width: 2.4; }
+
+/* Play/stop control on a learner chat bubble. Sits inline after the text. */
+.chatBubbleSpeak {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  vertical-align: middle;
+  font-size: 9px;
+  color: var(--text-secondary);
+  border-radius: var(--radius-pill);
+  background: rgba(30, 25, 10, 0.06);
+  transition: background var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out);
+}
+
+.chatBubbleSpeak:hover {
+  background: var(--lime);
+  color: var(--lime-text);
+}
+
+/* Replay control in the floating response card, next to the learner's name. */
+.notifSpeak {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  vertical-align: middle;
+  font-size: 8px;
+  color: var(--text-secondary);
+  border-radius: var(--radius-pill);
+  background: rgba(30, 25, 10, 0.07);
+  transition: background var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out);
+}
+
+.notifSpeak:hover {
+  background: var(--lime);
+  color: var(--lime-text);
+}
+
+/* ─── Learner stage: the avatar moves with its own voice ─── */
+/*
+   Every transform below is a function of --voice-level, which useVoiceLevel
+   writes each animation frame (0 = silent, 1 = loud). No keyframes drive the
+   speaking motion, so the character is genuinely in sync with the audio rather
+   than looping an animation that happens to run at the same time.
+*/
+
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  max-width: 50%;
+  height: 100%;
+  min-height: 0;
+  background: var(--cream);
+  border-left: 1px solid var(--border);
+}
+
+.stageHandle {
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 2;
+}
+
+.stageHandle:hover {
+  background: var(--border-lime);
+}
+
+.stageHeader {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.stageIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stageIdentity:focus-visible { outline: 2px solid var(--forest-mid); outline-offset: 2px; }
+
+.stageHeaderAvatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top center;
+  background: var(--parchment);
+  border: 1px solid var(--border);
+}
+
+.stageName {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stageHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stageIconBtn:focus-visible { outline: 2px solid var(--forest-mid); outline-offset: 2px; }
+
+.stageIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--text-primary);
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.stageIconBtn:hover {
+  background: var(--parchment);
+}
+
+/* --- the stage itself --- */
+
+.stageBody {
+  --voice-level: 0;
+  position: relative;
+  flex: 0 0 42%;
+  opacity: 1;
+  transition: flex-basis 320ms cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 220ms ease;
+  min-height: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% 100%, var(--lime-tint) 0%, transparent 60%),
+    var(--cream);
+}
+
+/* Aura behind the character. Scale and opacity ride the amplitude, which reads
+   as breath and presence without needing a second piece of artwork. */
+.stageGlow {
+  position: absolute;
+  bottom: 6%;
+  left: 50%;
+  width: 68%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--lime) 0%, transparent 68%);
+  opacity: calc(0.1 + var(--voice-level) * 0.42);
+  transform: translateX(-50%) scale(calc(0.82 + var(--voice-level) * 0.3));
+  /* Short transition only: it smooths the per-frame steps without adding lag
+     that would visibly trail the voice. */
+  transition: opacity 70ms linear, transform 70ms linear;
+}
+
+/*
+   The character. A loud syllable lifts and grows it very slightly — the numbers
+   are deliberately small, because a static illustration that moves too much
+   stops reading as a person and starts reading as a bouncing image.
+*/
+.stageAvatar {
+  position: relative;
+  max-height: 92%;
+  max-width: 88%;
+  object-fit: contain;
+  transform-origin: 50% 100%;
+  transform:
+    translateY(calc(var(--voice-level) * -6px))
+    scale(calc(1 + var(--voice-level) * 0.022));
+  transition: transform 70ms linear;
+  user-select: none;
+}
+
+/* Idle: a slow breath so the character is never completely dead on screen.
+   Suppressed while speaking, where the voice drives the motion instead. */
+.stageBody:not(.stageBodySpeaking) .stageAvatar {
+  animation: stageBreathe 4.5s var(--ease-out) infinite;
+}
+
+@keyframes stageBreathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-3px) scale(1.006); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stageBody:not(.stageBodySpeaking) .stageAvatar { animation: none; }
+  .stageAvatar,
+  .stageGlow { transition: none; }
+}
+
+/* Level meter, so the reaction is legible even at a glance. Bars are staggered
+   so the middle ones react first, the way a real meter behaves. */
+.stageMeter {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 18px;
+  opacity: calc(0.25 + var(--voice-level) * 0.75);
+}
+
+.stageMeterBar {
+  width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--forest-mid);
+  height: calc(3px + var(--voice-level) * 15px);
+  transition: height 70ms linear;
+}
+
+.stageMeterBar[data-bar="0"],
+.stageMeterBar[data-bar="4"] { height: calc(3px + var(--voice-level) * 7px); }
+.stageMeterBar[data-bar="1"],
+.stageMeterBar[data-bar="3"] { height: calc(3px + var(--voice-level) * 11px); }
+
+/* --- current line --- */
+
+.stageLine {
+  flex-shrink: 0;
+  max-height: 16%;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--card-bg);
+}
+
+.stageLineText {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.stageReplay {
+  margin-top: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--parchment);
+  border-radius: var(--radius-pill);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.stageReplay:hover {
+  background: var(--lime);
+  color: var(--lime-text);
+}
+
+.stageIdle {
+  flex-shrink: 0;
+  padding: 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  border-top: 1px solid var(--border);
+}
+
+.stageTranscript {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--parchment);
+}
+
+.stageTranscript > * { flex-shrink: 0; overflow-wrap: anywhere; }
+
+.typingIndicator {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+}
+
+.typingDots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 2px;
+}
+
+.typingDots > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+  animation: typingBounce 1.2s ease-in-out infinite;
+}
+
+.typingDots > span:nth-child(2) { animation-delay: 0.15s; }
+.typingDots > span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typingDots > span { animation: none; opacity: 0.7; }
+}
+
+/* A split-screen window needs the full canvas width even with chat open. */
+@media (max-width: 1024px) {
+  .stage {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: min(360px, 100%) !important;
+    max-width: 100%;
+    z-index: 20;
+    box-shadow: -8px 0 24px rgb(0 0 0 / 12%);
+  }
+  .stageHandle { display: none; }
+}
+
+@media (max-height: 540px) {
+  .stageBody { flex-basis: 32%; }
+}
+
+.stageBody.stageBodyMinimized {
+  flex-basis: 0%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stageBody { transition: none; }
+}
+
+
+
+/*
+   Speaking motion, driven by CSS alone.
+
+   The amplitude path (--voice-level) is the nicer one: it moves the character
+   in time with the actual waveform. But it depends on Web Audio being able to
+   read the stream, which can fail silently in ways that are invisible from the
+   outside — and an avatar that never moves is worse than one that moves
+   approximately. So the `speaking` class, which only needs playback to have
+   started, carries the motion on its own.
+
+   These animations are additive to the --voice-level transforms above: where
+   amplitude data is available it dominates, and where it is not, this still
+   reads as a character talking.
+*/
+
+.stageBodySpeaking .stageAvatar {
+  animation: stageTalk 620ms var(--ease-out) infinite;
+}
+
+@keyframes stageTalk {
+  0%   { transform: translateY(0)      scale(1); }
+  22%  { transform: translateY(-5px)   scale(1.014); }
+  46%  { transform: translateY(-1.5px) scale(1.004); }
+  70%  { transform: translateY(-4px)   scale(1.011); }
+  100% { transform: translateY(0)      scale(1); }
+}
+
+.stageBodySpeaking .stageGlow {
+  animation: stagePulse 620ms var(--ease-out) infinite;
+}
+
+@keyframes stagePulse {
+  0%, 100% { opacity: 0.16; transform: translateX(-50%) scale(0.86); }
+  35%      { opacity: 0.46; transform: translateX(-50%) scale(1.04); }
+}
+
+/* The meter is the clearest "there is sound" cue, so it animates per bar with
+   staggered delays — a flat row of bars would read as broken. */
+.stageBodySpeaking .stageMeterBar {
+  animation: stageBars 560ms var(--ease-out) infinite;
+}
+
+.stageBodySpeaking .stageMeterBar[data-bar="0"] { animation-delay: 0ms; }
+.stageBodySpeaking .stageMeterBar[data-bar="1"] { animation-delay: 90ms; }
+.stageBodySpeaking .stageMeterBar[data-bar="2"] { animation-delay: 45ms; }
+.stageBodySpeaking .stageMeterBar[data-bar="3"] { animation-delay: 150ms; }
+.stageBodySpeaking .stageMeterBar[data-bar="4"] { animation-delay: 200ms; }
+
+@keyframes stageBars {
+  0%, 100% { height: 4px; }
+  50%      { height: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stageBodySpeaking .stageAvatar,
+  .stageBodySpeaking .stageGlow,
+  .stageBodySpeaking .stageMeterBar { animation: none; }
+}
+
+/* ── Session language picker ──
+   Same scrim and panel as the character picker (.selectOverlay/.selectPanel):
+   picking the language and then the student is one sequence, so it looks like
+   one. Two cards rather than the switch in the header, because this choice is
+   permanent for the session and deserves to be read before it is made. */
+.langGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.langCard,
+.langCardCurrent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 20px 22px;
+  background: var(--forest-mid);
+  border: 2px solid transparent;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.langCardCurrent {
+  border-color: var(--lime);
+}
+
+.langCard:hover,
+.langCardCurrent:hover {
+  transform: translateY(-2px);
+  border-color: var(--lime);
+}
+
+.langCard:focus-visible,
+.langCardCurrent:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
+}
+
+.langCard:disabled,
+.langCardCurrent:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}
+
+.langCode {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--lime);
+}
+
+.langName {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-on-forest);
+}
+
+.langCurrent {
+  font-size: 12px;
+  color: var(--text-on-forest-muted);
+}
+
+.langNote {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-on-forest-muted);
+  text-align: center;
 }

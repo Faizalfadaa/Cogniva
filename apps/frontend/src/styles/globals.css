@@ -21,6 +21,41 @@
   --text-on-dark: #e8e5d8;
   --text-on-dark-muted: #8a9278;
 
+  /* Chat bubbles — a learner ("character") message must read as a distinct
+     surface. Cream-on-parchment made it blend into the panel/canvas behind it,
+     so the learner speaks on forest green while the user keeps the lime. */
+  --bubble-learner-bg: #2d3a1a;
+  --bubble-learner-border: rgba(255, 255, 255, 0.12);
+  --bubble-learner-text: #eef0e4;
+  --bubble-learner-name: #d8ff29;
+  --bubble-learner-muted: rgba(238, 240, 228, 0.6);
+
+  /* On forest-dark surfaces the landing page needs a brighter body text than
+     --text-on-dark, and a green-tinted muted tone rather than a grey one. */
+  --text-on-forest: #f4f2e6;
+  --text-on-forest-muted: #b9c49a;
+  --text-on-forest-faint: #6d7a4d;
+
+  /* Warm, opaque borders/dividers. --border is translucent, which stacks
+     unevenly over the landing page's layered cream sections. */
+  --border-warm: #ece5d5;
+  --border-cream: #efe6cd;
+  --border-sand: #ddd5c0;
+  --divider-warm: #f2ece0;
+
+  /* Accents */
+  --lime-edge: #b6d81f;       /* 2px bottom edge under lime buttons */
+  --green-accent: #7fa03a;    /* small "live"/section markers */
+  --green-deep: #3a4d12;      /* link colour on light surfaces */
+
+  /* A second accent, apart from the brand lime, for the one thing on a screen
+     asking to be acted on — the debrief's "fix this first", a character's
+     temperament chip. Kept separate from the four finding-category badges
+     below so an accent and a status can never be mistaken for each other. */
+  --gold: #e8b33d;
+  --gold-tint: #fbe8be;
+  --gold-text: #4a3510;
+
   /* Borders */
   --border: rgba(30, 25, 10, 0.1);
   --border-strong: rgba(30, 25, 10, 0.18);
@@ -37,8 +72,9 @@
   --badge-completed-text: #1a5e2e;
 
   /* Typography */
-  --font-display: 'Syne', sans-serif;
+  --font-display: 'Fredoka', var(--font-body);
   --font-body: 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   /* Radius */
   --radius-sm: 8px;
@@ -62,6 +98,7 @@
 }
 
 html {
+  scroll-behavior: smooth;
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -88,5 +125,10 @@ input, textarea { font-family: inherit; }
 /* Guard against accidental horizontal scroll on phones. Scoped to ≤768px so
    the desktop layout is untouched. */
 @media (max-width: 768px) {
-  html, body { max-width: 100%; overflow-x: hidden; }
+  /* `clip`, not `hidden`. Both stop sideways scrolling, but `hidden` turns the
+   element into a scroll container, and on <html> that is what breaks
+   `position: sticky` for everything inside (the landing page nav). `clip` has
+   no scroll container, so sticky keeps working. It also does not force the
+   other axis to `auto` the way `hidden` does. */
+html, body { max-width: 100%; overflow-x: clip; }
 }

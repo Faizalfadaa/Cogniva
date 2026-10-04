@@ -16,6 +16,16 @@ import {
   isLearnerTextSafe,
   normalizeLearnerOutput,
 } from "../src/agents/learner/learner.guard.js";
+import {
+  conceptKey,
+  conceptsAtLimit,
+  MAX_SAME_CONCEPT_QUESTIONS,
+} from "../src/agents/learner/learner.repeat.js";
+import {
+  EXTEND_EVERY_TURNS,
+  harderCase,
+  shouldExtendThisTurn,
+} from "../src/agents/learner/learner.extend.js";
 import type { VisionInterpretation } from "../src/contracts/board.js";
 import type { LearnerState } from "../src/contracts/learner.js";
 
@@ -73,6 +83,7 @@ describe("seedLearnerStateFromEvaluation (adaptive resume)", () => {
       evaluationId: "ev_1",
       sessionId: "ses_1",
       score: 60,
+      depthScore: 40,
       findings,
       summary: "ringkasan",
       strengths: [],
@@ -246,5 +257,268 @@ describe("learner guard", () => {
     expect(["question", "confusion"]).toContain(out.response.type);
     expect(out.response.text.trim()).toBeTruthy();
     expect(out.nextState.updatedAtTurn).toBe(3);
+  });
+});
+
+describe("repeat limit (same core question at most twice)", () => {
+  const input = (turnIndex: number, currentState: LearnerState) => ({
+    sessionId: "ses_1",
+    turnIndex,
+    teachingText: "Fotosintesis mengubah cahaya menjadi energi kimia.",
+    currentState,
+  });
+
+  const asks = (concept: string, text: string) =>
+    ({
+      nextState: freshState(),
+      response: { type: "question", text, targetConcept: concept, derivedFrom: "gap" },
+    }) as unknown as Parameters<typeof normalizeLearnerOutput>[0];
+
+  it("normalizes wording so a reworded repeat counts as the same question", () => {
+    expect(conceptKey("the light reaction")).toBe(conceptKey("How does the light reaction work?"));
+    expect(conceptKey("peran cahaya")).not.toBe(conceptKey("peran enzim"));
+  });
+
+  it("counts each question against its concept", () => {
+    let state = freshState();
+
+    const first = normalizeLearnerOutput(
+      asks("peran cahaya", "Kenapa cahaya penting di situ?"),
+      input(1, state),
+    );
+    expect(first.response.type).toBe("question");
+    state = first.nextState;
+    expect(state.askedConcepts).toEqual([
+      { key: "cahaya peran", label: "peran cahaya", count: 1, kind: "probe" },
+    ]);
+
+    // Reworded, same core question -> the same tally, not a new one.
+    const second = normalizeLearnerOutput(
+      asks("cahaya", "Cahaya itu perannya bagaimana?"),
+      input(2, state),
+    );
+    expect(second.response.type).toBe("question");
+    state = second.nextState;
+    expect(state.askedConcepts).toHaveLength(1);
+    expect(state.askedConcepts?.[0].count).toBe(MAX_SAME_CONCEPT_QUESTIONS);
+    expect(conceptsAtLimit(state)).toContain("peran cahaya");
+  });
+
+  it("accepts the explanation and asks to move on instead of asking a third time", () => {
+    const state: LearnerState = {
+      ...freshState(),
+      askedConcepts: [
+        { key: "cahaya peran", label: "peran cahaya", count: MAX_SAME_CONCEPT_QUESTIONS },
+      ],
+    };
+
+    const third = normalizeLearnerOutput(
+      asks("peran cahaya", "Aku masih belum paham peran cahaya, jelaskan lagi?"),
+      input(3, state),
+    );
+
+    expect(third.response.type).toBe("acknowledgment");
+    expect(third.response.text.toLowerCase()).toMatch(/next|comes next|move on/);
+    expect(isLearnerTextSafe(third.response.text)).toBe(true);
+    // The tally does not grow, and the gap is still on the record for the Evaluator.
+    expect(third.nextState.askedConcepts?.[0].count).toBe(MAX_SAME_CONCEPT_QUESTIONS);
+  });
+
+  it("leaves a question about a different concept alone", () => {
+    const state: LearnerState = {
+      ...freshState(),
+      askedConcepts: [
+        { key: "cahaya peran", label: "peran cahaya", count: MAX_SAME_CONCEPT_QUESTIONS },
+      ],
+    };
+
+    const out = normalizeLearnerOutput(
+      asks("peran enzim", "Enzimnya kerjanya bagaimana?"),
+      input(4, state),
+    );
+
+    expect(out.response.type).toBe("question");
+    expect(out.nextState.askedConcepts).toHaveLength(2);
+  });
+
+  it("does not count a paraphrase or an acknowledgment as pressing the same point", () => {
+    const raw = {
+      nextState: freshState(),
+      response: {
+        type: "paraphrase",
+        text: "Jadi cahaya itu yang memulai reaksinya, benar?",
+        targetConcept: "peran cahaya",
+        derivedFrom: "new_info",
+      },
+    } as unknown as Parameters<typeof normalizeLearnerOutput>[0];
+
+    const out = normalizeLearnerOutput(raw, input(1, freshState()));
+    expect(out.response.type).toBe("paraphrase");
+    expect(out.nextState.askedConcepts).toEqual([]);
+  });
+
+  it("holds the mock learner to the same limit across turns", async () => {
+    let state: LearnerState = freshState();
+    const teachingText = 'Yang penting di sini adalah istilah "fotosintesis".';
+    const types: string[] = [];
+
+    for (let turn = 1; turn <= 3; turn++) {
+      const out = await runLearnerTurn(
+        { sessionId: "ses_1", turnIndex: turn, teachingText, currentState: state },
+        { useMock: true },
+      );
+      types.push(out.response.type);
+      state = out.nextState;
+    }
+
+    // Two questions about "fotosintesis", then it moves on.
+    expect(types.slice(0, 2)).toEqual(["question", "question"]);
+    expect(types[2]).toBe("acknowledgment");
+  });
+
+  it("applies the limit to the LLM-failure fallback too", () => {
+    const state: LearnerState = {
+      ...freshState(),
+      askedConcepts: [
+        { key: "explanation latest", label: "the latest explanation", count: MAX_SAME_CONCEPT_QUESTIONS },
+      ],
+    };
+
+    const out = createFallbackOutput({
+      sessionId: "ses_1",
+      turnIndex: 5,
+      teachingText: "x",
+      currentState: state,
+    });
+
+    expect(out.response.type).toBe("acknowledgment");
+  });
+});
+
+describe("extending questions (pushing the idea further)", () => {
+  it("builds a harder case out of the teacher's own example", () => {
+    // The case that motivated this: taught F0, ask about FFFFF.
+    expect(harderCase("F0 dalam heksadesimal sama dengan 240")).toEqual({
+      from: "F0",
+      to: "FFFFF",
+    });
+    // A plain number grows instead.
+    expect(harderCase("misalnya 25 barang")).toEqual({ from: "25", to: "25000" });
+    // Nothing to build on -> no invented case.
+    expect(harderCase("fotosintesis butuh cahaya")).toBeNull();
+  });
+
+  it("stays occasional, and waits until something has landed", () => {
+    const state = (understood: string[]): LearnerState => ({
+      ...freshState(),
+      understoodConcepts: understood,
+    });
+    const at = (turnIndex: number, understood: string[]) =>
+      shouldExtendThisTurn({
+        sessionId: "ses_1",
+        turnIndex,
+        teachingText: "F0 = 240",
+        currentState: state(understood),
+      });
+
+    // Nothing understood yet -> plain beginner questions only.
+    expect(at(EXTEND_EVERY_TURNS, [])).toBe(false);
+    // Not on the opening turn, even with the cadence satisfied.
+    expect(at(0, ["heksadesimal"])).toBe(false);
+    // Then one turn in every EXTEND_EVERY_TURNS, not all of them.
+    expect(at(EXTEND_EVERY_TURNS, ["heksadesimal"])).toBe(true);
+    expect(at(EXTEND_EVERY_TURNS + 1, ["heksadesimal"])).toBe(false);
+  });
+
+  it("asks about the bigger case on such a turn (mock)", async () => {
+    const out = await runLearnerTurn(
+      {
+        sessionId: "ses_1",
+        turnIndex: EXTEND_EVERY_TURNS,
+        teachingText: "Mengubah F0 heksadesimal ke desimal hasilnya 240.",
+        currentState: { ...freshState(), understoodConcepts: ["heksadesimal ke desimal"] },
+      },
+      { useMock: true },
+    );
+
+    expect(out.response.type).toBe("question");
+    expect(out.response.text).toContain("FFFFF");
+    expect(out.response.derivedFrom).toBe("new_info");
+    expect(isLearnerTextSafe(out.response.text)).toBe(true);
+  });
+
+  it("counts extensions apart, so a new case survives the repeat limit", () => {
+    // The concept is already spent on plain questions...
+    const state: LearnerState = {
+      ...freshState(),
+      askedConcepts: [
+        {
+          key: "desimal heksadesimal ke",
+          label: "heksadesimal ke desimal",
+          count: MAX_SAME_CONCEPT_QUESTIONS,
+          kind: "probe",
+        },
+      ],
+    };
+
+    const extending = {
+      nextState: freshState(),
+      action: { kind: "respond", strategy: "extend_example" },
+      response: {
+        type: "question",
+        text: "Kalau F0 begitu, FFFFF bagaimana?",
+        targetConcept: "heksadesimal ke desimal",
+        derivedFrom: "new_info",
+      },
+    } as unknown as Parameters<typeof normalizeLearnerOutput>[0];
+
+    const out = normalizeLearnerOutput(extending, {
+      sessionId: "ses_1",
+      turnIndex: EXTEND_EVERY_TURNS,
+      teachingText: "F0 = 240",
+      currentState: state,
+    });
+
+    // ...but a question about a NEW case still gets asked, under its own budget.
+    expect(out.response.type).toBe("question");
+    expect(out.response.text).toContain("FFFFF");
+    expect(out.nextState.askedConcepts).toHaveLength(2);
+    expect(out.nextState.askedConcepts?.find((e) => e.kind === "extend")?.count).toBe(1);
+    // The plain tally is untouched, so ordinary repeats are still capped.
+    expect(conceptsAtLimit(out.nextState)).toContain("heksadesimal ke desimal");
+  });
+
+  it("caps extensions too — the student can't turn one concept into a quiz", () => {
+    const state: LearnerState = {
+      ...freshState(),
+      askedConcepts: [
+        {
+          key: "desimal heksadesimal ke",
+          label: "heksadesimal ke desimal",
+          count: MAX_SAME_CONCEPT_QUESTIONS,
+          kind: "extend",
+        },
+      ],
+    };
+
+    const extending = {
+      nextState: freshState(),
+      action: { kind: "respond", strategy: "extend_example" },
+      response: {
+        type: "question",
+        text: "Kalau FFFFF begitu, FFFFFFFF bagaimana?",
+        targetConcept: "heksadesimal ke desimal",
+        derivedFrom: "new_info",
+      },
+    } as unknown as Parameters<typeof normalizeLearnerOutput>[0];
+
+    const out = normalizeLearnerOutput(extending, {
+      sessionId: "ses_1",
+      turnIndex: 6,
+      teachingText: "F0 = 240",
+      currentState: state,
+    });
+
+    expect(out.response.type).toBe("acknowledgment");
   });
 });

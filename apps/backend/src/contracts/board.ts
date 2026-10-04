@@ -27,6 +27,12 @@ export const elementSchema = z.object({
   type: elementTypeSchema,
   content: z.string(),
   bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
+  /**
+   * How sure Vision is about this one element, 0..1. Optional because not
+   * every element comes from a model: the typed-text fallback builds elements
+   * by hand and has no confidence to report.
+   */
+  confidence: z.number().optional(),
 });
 export type Element = z.infer<typeof elementSchema>;
 
@@ -45,5 +51,18 @@ export const visionInterpretationSchema = z.object({
   /** true when confidence is below threshold. */
   needsConfirmation: z.boolean(),
   suggestedClarification: z.string().optional(),
+  /**
+   * What was added to the board this turn, read on its own.
+   *
+   * `transcribedText` is the whole board, old material included, because every
+   * turn sends the whole board. On its own it cannot tell the student which part
+   * the teacher just explained, and a student handed the whole board as "what
+   * the teacher just taught" kept asking about topics the lesson had moved on
+   * from. This is that part, read from an image of only the new strokes.
+   *
+   * Absent when there is nothing to compare against (the first reading of a
+   * board, where everything is new); empty when the board did not change.
+   */
+  newText: z.string().optional(),
 });
 export type VisionInterpretation = z.infer<typeof visionInterpretationSchema>;

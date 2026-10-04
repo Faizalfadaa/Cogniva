@@ -1,3 +1,4 @@
+import { defaultClarification } from "../shared/clarification.js";
 import type { Element } from "../../contracts/board.js";
 import type { ElementType } from "../../contracts/enums.js";
 import type {
@@ -61,8 +62,10 @@ export function normalizeVisionLLMOutput(raw: Record<string, unknown>): VisionLL
   };
 }
 
-/** Mapping to the official VisionInterpretation contract -- lossy at two points,
- * documented in GAPS_VISION.md. */
+/** Mapping to the official VisionInterpretation contract. Per-element
+ * `confidence` now survives the mapping, so one smudged element can be told
+ * apart from a clean one even when overallConfidence is high. `bbox` is still
+ * left unset on purpose -- see the note below. */
 export function toVisionInterpretation(
   output: VisionLLMOutput,
   snapshotId: string,
@@ -72,7 +75,9 @@ export function toVisionInterpretation(
     type: KIND_TO_ELEMENT_TYPE[e.kind],
     content: e.content,
     // bbox is intentionally left unset: the vision model used doesn't return
-    // precise pixel coordinates from a text-position description.
+    // precise pixel coordinates from a text-position description, only a rough
+    // `location` hint that has no field in the official contract yet.
+    confidence: e.confidence,
   }));
 
   const needsConfirmation =
@@ -82,7 +87,7 @@ export function toVisionInterpretation(
 
   let suggestedClarification = output.confirmationPrompt;
   if (needsConfirmation && !suggestedClarification) {
-    suggestedClarification = defaultClarification(output.ambiguities);
+    suggestedClarification = defaultClarification(output.ambiguities, "board");
   }
 
   return {
@@ -136,13 +141,6 @@ function averageConfidence(elements: VisionLLMElement[]): number {
 
 function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function defaultClarification(ambiguities: string[]): string {
-  if (ambiguities.length > 0) {
-    return `Some parts aren't clear: ${ambiguities.join("; ")}. Could you clarify or type them?`;
-  }
-  return "The board isn't very legible. Could you rewrite it more neatly or type the main points?";
 }
 
 export { VisionAgentInput };
