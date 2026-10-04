@@ -63,7 +63,16 @@ IMPORTANT RULES:
    certain. Lower that element's 'confidence' and note it in 'ambiguities'.
 4. Use the topic as context to help read similar-looking handwriting, but don't
    force it if the image doesn't support it.
-5. Reply with ONLY valid JSON matching the given schema.
+5. Describe a picture by what it visibly shows: who or what is in it and what
+   is happening ("a woman pours water from a jug into a glass"). Name a person
+   only when the board labels them; don't guess identities from the topic.
+6. When the board is laid out in side-by-side columns, first decide which
+   column each item belongs to by its HORIZONTAL position, then read the
+   columns left to right, each from top to bottom. A heading that sits above
+   one column belongs to THAT column, so it goes right before that column's
+   content, even when it is the highest item on the whole board. Order both
+   the "elements" list and the "transcript" this way.
+7. Reply with ONLY valid JSON matching the given schema.
 `;
 
 export function buildVisionMessages(input: VisionAgentInput): AIMessage[] {
@@ -76,14 +85,22 @@ export function buildVisionMessages(input: VisionAgentInput): AIMessage[] {
 function buildVisionUserPrompt(input: VisionAgentInput): string {
   const parts: string[] = [`Topic being taught: "${input.topic}".`];
 
+  // The previous reading is a reading aid only. It used to come with "pay
+  // attention to what was newly added", and the model took that as "report
+  // only what is new": on a real three-column board it dropped the first
+  // column in 2 of 3 runs, and 0 of 3 with no previous reading at all. What
+  // is new is read separately now (VisionInterpretation.newText), so this
+  // reading has one job, the whole board.
   if (input.previousElements && input.previousElements.length > 0) {
     parts.push(
-      "For context, here are the elements read on the previous turn:",
+      "For reference, here are the elements read from this board on the previous turn.",
+      "Use them only to read the same handwriting consistently:",
       JSON.stringify(input.previousElements),
-      "Pay attention to what was newly added or changed.",
+      "Your reading must still cover EVERYTHING on the board now, including every element",
+      "that was already there on the previous turn. Do not leave out old content.",
     );
   }
 
-  parts.push("Read the board in this image, then output JSON matching the schema.");
+  parts.push("Read the whole board in this image, then output JSON matching the schema.");
   return parts.join("\n");
 }

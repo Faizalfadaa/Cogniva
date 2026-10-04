@@ -15,6 +15,7 @@ import {
   toVisionInterpretation,
 } from "../src/agents/vision/vision.guard.js";
 import type { BoardSnapshot, Element } from "../src/contracts/board.js";
+import { buildVisionMessages } from "../src/llm/prompts/vision.prompt.js";
 
 function snapshot(image = ""): BoardSnapshot {
   return {
@@ -160,5 +161,48 @@ describe("vision.guard mapping (kontrak resmi)", () => {
     // whole reads with high confidence.
     expect(interpretation.elements[0].confidence).toBeCloseTo(0.98);
     expect(interpretation.elements[1].confidence).toBeCloseTo(0.3);
+  });
+});
+
+describe("vision prompt (whole board, every turn)", () => {
+  const previous: Element[] = [
+    { type: "text", content: "Naruto Uzumaki adalah seorang anak dari Minato Namikaze", confidence: 0.97 } as Element,
+  ];
+
+  const user = (previousElements?: Element[]) =>
+    buildVisionMessages({
+      snapshotId: "snap_1",
+      topic: "Anime Naruto",
+      imageBase64: "iVBORw0KGgo=",
+      mimeType: "image/png",
+      previousElements,
+    }).find((m) => m.role === "user")!.content;
+
+  it("asks for everything on the board even when it is told the last reading", () => {
+    // "Pay attention to what was newly added" made the model report only the
+    // new part: on a real three-column board it dropped the first column in 2
+    // of 3 runs. The new part has its own reading now.
+    const prompt = user(previous);
+
+    expect(prompt).toContain("Minato Namikaze");
+    expect(prompt).toMatch(/EVERYTHING on the board/);
+    expect(prompt).toMatch(/Do not leave out old content/);
+    expect(prompt).not.toMatch(/newly added/i);
+  });
+
+  it("reads the whole board on the first turn too", () => {
+    expect(user(undefined)).toMatch(/Read the whole board/);
+  });
+
+  it("tells the reader to describe pictures and to keep a column's heading with it", () => {
+    const system = buildVisionMessages({
+      snapshotId: "snap_1",
+      topic: "Anime Naruto",
+      imageBase64: "iVBORw0KGgo=",
+      mimeType: "image/png",
+    }).find((m) => m.role === "system")!.content;
+
+    expect(system).toMatch(/Describe a picture by what it visibly shows/);
+    expect(system).toMatch(/heading that sits above\s+one column belongs to THAT column/);
   });
 });
