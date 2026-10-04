@@ -122,6 +122,19 @@ export function LearnerStage({
   const transcriptRef = useRef<HTMLDivElement>(null)
   const followMessagesRef = useRef(true)
   const seededRef = useRef(false)
+  const draftRef = useRef<HTMLTextAreaElement>(null)
+
+  // The box grows with what is typed, up to the cap in the stylesheet, so a
+  // long message wraps downward where it can be read instead of scrolling
+  // sideways out of view. Re-measured when the panel opens or is dragged wider
+  // or narrower, since either one rewraps the same text.
+  useLayoutEffect(() => {
+    const box = draftRef.current
+    if (!box) return
+    box.style.height = 'auto'
+    const border = box.offsetHeight - box.clientHeight
+    box.style.height = `${box.scrollHeight + border}px`
+  }, [draft, isOpen, width])
 
   const voice = useLearnerVoice()
   const t = useT()
@@ -366,11 +379,20 @@ export function LearnerStage({
       </div>
 
       <div className={styles.chatSidebarInputRow}>
-        <input
+        <textarea
+          ref={draftRef}
           className={styles.chatSidebarInput}
+          rows={1}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+          onKeyDown={(e) => {
+            // Enter sends and Shift+Enter breaks the line, as in any chat. Not
+            // while an IME is composing: that Enter picks a candidate word.
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault()
+              handleSubmit()
+            }
+          }}
           placeholder={t('stage.say', { name: learner.name })}
           aria-label={t('stage.writeMessage')}
         />

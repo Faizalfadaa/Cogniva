@@ -651,26 +651,44 @@
   background: var(--lime);
   color: var(--lime-text);
   border-bottom-right-radius: 4px;
+  /* The line breaks the user typed with Shift+Enter, kept as typed; and a long
+     unbroken string (a link, a formula) wraps instead of pushing the bubble
+     past the panel edge. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Input row */
 .chatSidebarInputRow {
   flex: 0 0 auto;
   display: flex;
+  /* The send button stays level with the last line as the box grows. */
+  align-items: flex-end;
   gap: 6px;
   padding: 10px 12px;
   border-top: 1px solid var(--border);
 }
 
+/* A textarea that grows downward with the message (LearnerStage sets the
+   height). A pill radius would turn a tall box into a capsule, so the corners
+   are a fixed radius: half the one-line height, which still reads as a pill
+   while the message fits on one line. */
 .chatSidebarInput {
   flex: 1;
   min-width: 0;
+  display: block;
+  font: inherit;
   font-size: 13px;
-  padding: 8px 12px;
+  line-height: 1.45;
+  padding: 7px 12px;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-pill);
+  border-radius: 17px;
   background: var(--card-bg);
   outline: none;
+  resize: none;
+  max-height: 140px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
   transition: border-color var(--dur-fast);
 }
 .chatSidebarInput:focus { border-color: var(--lime); }

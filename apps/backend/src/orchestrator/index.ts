@@ -140,6 +140,11 @@ export interface TeachingInput {
    * student so it can tell which drawing went with which sentence.
    */
   timeline?: Timeline;
+  /**
+   * The name of the character the user picked, so the student answers to it.
+   * Absent on the bare session API, which has no character.
+   */
+  learnerName?: string;
 }
 
 /** Stand-in board text when the reading is empty and we must proceed anyway. */
@@ -169,6 +174,8 @@ interface StepArgs {
   newImage: string | null | undefined;
   /** See TeachingInput.timeline. */
   timeline: Timeline | undefined;
+  /** See TeachingInput.learnerName. */
+  learnerName: string | undefined;
   turnIndex: number;
   previousTurn: TeachingTurn | undefined;
   /**
@@ -213,7 +220,7 @@ export class Orchestrator {
   async runTeachingTurn(
     session: Session,
     topic: Topic,
-    { image, audio, typedText, allowConfirmation = true, newImage, timeline }: TeachingInput,
+    { image, audio, typedText, allowConfirmation = true, newImage, timeline, learnerName }: TeachingInput,
   ): Promise<TurnResult> {
     // Budget gate (§7.3), before anything else: once a session is out of
     // tokens we refuse the turn without calling Vision, ASR or the Learner.
@@ -263,6 +270,7 @@ export class Orchestrator {
       audio,
       newImage,
       timeline,
+      learnerName,
       turnIndex,
       previousTurn,
       previousImage,
@@ -488,6 +496,7 @@ export class Orchestrator {
     onUsage,
     recordUsage,
     timeline,
+    learnerName,
   }: StepArgs): Promise<TurnResult> {
     const speech = ctx.speech;
     const interpretation: VisionInterpretation = {
@@ -528,6 +537,7 @@ export class Orchestrator {
       tools,
       onUsage,
       timeline,
+      learnerName,
     });
 
     // The response is written before the turn that references it, so the

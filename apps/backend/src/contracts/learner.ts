@@ -42,6 +42,11 @@ export const learnerStateSchema = z.object({
   openGaps: z.array(z.string()).default([]),
   questionsAsked: z.array(z.string()).default([]),
   askedConcepts: z.array(askedConceptSchema).optional(),
+  /**
+   * Questions in a row that asked how the teacher's own previous answer works
+   * (agents/learner/learner.depth.ts). Optional: older states carry none.
+   */
+  followUpDepth: z.number().int().optional(),
   updatedAtTurn: z.number().int().default(0),
 });
 export type LearnerState = z.infer<typeof learnerStateSchema>;
