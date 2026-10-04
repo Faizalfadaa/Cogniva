@@ -54,7 +54,11 @@ jobs:
           # Vitest writes its bundled config beside /app/vitest.config.ts.
           # Run only this disposable CI test container as root; the deployed
           # image continues to use USER node from the Dockerfile.
-          docker run --rm --user 0:0 --entrypoint npm "$BACKEND_IMAGE" test
+          # Cross-app tests read ../../frontend/src relative to /app/tests.
+          # Mount the checked-out frontend source only for this test run.
+          docker run --rm --user 0:0 \
+            --mount "type=bind,source=${GITHUB_WORKSPACE}/apps/frontend/src,target=/frontend/src,readonly" \
+            --entrypoint npm "$BACKEND_IMAGE" test
 
       - name: Build frontend
         run: docker build --platform linux/amd64 --build-arg VITE_API_BASE= --tag "$FRONTEND_IMAGE" ./apps/frontend
