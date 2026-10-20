@@ -188,7 +188,7 @@ describe("LLMClient retries", () => {
   });
 
   it("picks a fallback different from the primary", () => {
-    expect(retryingClient("gemini-2.5-flash").fallbackModel).toBe("gemini-2.5-flash-lite");
+    expect(retryingClient("gemini-2.5-flash").fallbackModel).toBe("gemini-3.5-flash");
     process.env.COGNIVA_FALLBACK_MODEL = "gemini-2.0-flash";
     expect(retryingClient().fallbackModel).toBe("gemini-2.0-flash");
   });
