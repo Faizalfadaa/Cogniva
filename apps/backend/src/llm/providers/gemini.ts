@@ -120,7 +120,7 @@ const BASE_DELAY_MS = 1000;
 function fallbackFor(model: string): string {
   const configured = process.env.COGNIVA_FALLBACK_MODEL;
   if (configured && configured !== model) return configured;
-  return model === "gemini-2.5-flash" ? "gemini-2.5-flash-lite" : "gemini-2.5-flash";
+  return model === "gemini-2.5-flash" ? "gemini-3.5-flash" : "gemini-2.5-flash";
 }
 
 /**
