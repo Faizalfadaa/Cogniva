@@ -2,7 +2,7 @@
  * Gemini LLM wrapper (Architecture Document §3.3, §7.3).
  *
  * A thin, centralized layer so every agent calls the model the same way:
- * uniform model id, timeout, retries (handled by the SDK), and structured-JSON
+ * uniform model id, timeout, retries on overload, and structured-JSON
  * output parsing. Agents never import the Google GenAI SDK directly — they go
  * through this wrapper, which keeps the model provider swappable behind one seam.
  *
@@ -99,6 +99,44 @@ export interface LLMClientOptions {
    * stopped varying.
    */
   temperature?: number;
+  /**
+   * Model to try once `model` keeps answering "overloaded". Defaults to
+   * COGNIVA_FALLBACK_MODEL, else a sibling flash model; see fallbackFor().
+   */
+  fallbackModel?: string;
+}
+
+/** Attempts on the primary model, then on the fallback, for transient errors. */
+const PRIMARY_ATTEMPTS = 3;
+const FALLBACK_ATTEMPTS = 2;
+/** Wait before retry n is BASE_DELAY_MS * 2^(n-1): 1s, then 2s. */
+const BASE_DELAY_MS = 1000;
+
+/**
+ * Pick a different model to fall back to. Gemini overloads one model at a
+ * time (a 503 "high demand" on one flash model rarely hits its sibling at the
+ * same moment), so the fallback must differ from the primary to be any use.
+ */
+function fallbackFor(model: string): string {
+  const configured = process.env.COGNIVA_FALLBACK_MODEL;
+  if (configured && configured !== model) return configured;
+  return model === "gemini-2.5-flash" ? "gemini-2.5-flash-lite" : "gemini-2.5-flash";
+}
+
+/**
+ * Whether a failed call is worth repeating. Only server-side overload and
+ * rate limits qualify: 429, 500, 502, 503, 504. A client-side timeout is NOT
+ * retried, because each attempt can already take the full timeout and the
+ * teacher would be left waiting minutes. Bad requests (400) and permission
+ * errors (403) would fail the same way again.
+ */
+export function isTransientLLMError(err: unknown): boolean {
+  const status = (err as { status?: unknown } | null)?.status;
+  if (typeof status === "number") return [429, 500, 502, 503, 504].includes(status);
+  const message = errMsg(err);
+  return /\b(429|500|502|503|504)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand/i.test(
+    message,
+  );
 }
 
 /** Wraps a Gemini client and returns parsed JSON objects. */
@@ -116,8 +154,19 @@ export class LLMClient implements LLM {
   readonly thinkingBudget: number;
   /** Undefined means "do not send one", not "send zero". */
   readonly temperature: number | undefined;
+  readonly fallbackModel: string;
+  /** Public so tests can skip the real backoff delay. */
+  sleep: (ms: number) => Promise<void> = (ms) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
 
-  constructor({ model, maxTokens, timeout, thinkingBudget, temperature }: LLMClientOptions) {
+  constructor({
+    model,
+    maxTokens,
+    timeout,
+    thinkingBudget,
+    temperature,
+    fallbackModel,
+  }: LLMClientOptions) {
     const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
     // httpOptions.timeout is in milliseconds.
     this.client = new GoogleGenAI({
@@ -128,6 +177,41 @@ export class LLMClient implements LLM {
     this.maxTokens = maxTokens;
     this.thinkingBudget = thinkingBudget ?? 0;
     this.temperature = temperature;
+    this.fallbackModel = fallbackModel ?? fallbackFor(model);
+  }
+
+  /**
+   * generateContent with retries. A transient error (see isTransientLLMError)
+   * is retried on the primary model with exponential backoff, then on the
+   * fallback model. Anything else is rethrown at once, so callers see the
+   * same errors they always did, only fewer of them.
+   */
+  private async generate(
+    args: Omit<Parameters<GenAILike["models"]["generateContent"]>[0], "model">,
+  ): Promise<Awaited<ReturnType<GenAILike["models"]["generateContent"]>>> {
+    const plan: Array<{ model: string; attempts: number }> = [
+      { model: this.model, attempts: PRIMARY_ATTEMPTS },
+    ];
+    if (this.fallbackModel !== this.model) {
+      plan.push({ model: this.fallbackModel, attempts: FALLBACK_ATTEMPTS });
+    }
+
+    let lastError: unknown;
+    for (const { model, attempts } of plan) {
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+          return await this.client.models.generateContent({ ...args, model });
+        } catch (err) {
+          if (!isTransientLLMError(err)) throw err;
+          lastError = err;
+          console.warn(
+            `[LLMClient] ${model} attempt ${attempt}/${attempts} failed: ${errMsg(err)}`,
+          );
+          if (attempt < attempts) await this.sleep(BASE_DELAY_MS * 2 ** (attempt - 1));
+        }
+      }
+    }
+    throw lastError;
   }
 
   /**
@@ -150,8 +234,7 @@ export class LLMClient implements LLM {
         ? [{ role: "user", parts: [...mediaParts, { text: user }] }]
         : user;
 
-      response = await this.client.models.generateContent({
-        model: this.model,
+      response = await this.generate({
         contents,
         config: {
           systemInstruction: system,
@@ -207,8 +290,7 @@ export class LLMClient implements LLM {
   async grounded({ system, user, mode }: GroundedArgs): Promise<GroundedResult> {
     let response: Awaited<ReturnType<GenAILike["models"]["generateContent"]>>;
     try {
-      response = await this.client.models.generateContent({
-        model: this.model,
+      response = await this.generate({
         contents: user,
         config: {
           systemInstruction: system,

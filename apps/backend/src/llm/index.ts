@@ -1,6 +1,12 @@
 /** Centralized LLM-call wrapper (Architecture Document §3.3, §7.3). */
 
-export { LLMClient, LLMError, EmbeddingClient, normalize } from "./providers/gemini.js";
+export {
+  LLMClient,
+  LLMError,
+  EmbeddingClient,
+  normalize,
+  isTransientLLMError,
+} from "./providers/gemini.js";
 export type {
   GenAILike,
   LLM,

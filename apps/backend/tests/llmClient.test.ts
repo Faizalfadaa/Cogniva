@@ -8,7 +8,7 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { LLMClient, LLMError, type GenAILike } from "../src/llm/index.js";
+import { LLMClient, LLMError, isTransientLLMError, type GenAILike } from "../src/llm/index.js";
 
 interface StubResponse {
   text?: string;
@@ -107,5 +107,95 @@ describe("LLMClient.structured", () => {
     await expect(
       client.structured({ system: "s", user: "u", schema: {} }),
     ).rejects.toBeInstanceOf(LLMError);
+  });
+});
+
+/** A stub that throws `failures` errors in a row, then answers. */
+function flaky(failures: unknown[], calls: string[]): GenAILike {
+  return {
+    models: {
+      async generateContent(args) {
+        calls.push(args.model);
+        const err = failures.shift();
+        if (err) throw err;
+        return { text: '{"ok": true}' };
+      },
+    },
+  };
+}
+
+function overloaded(): Error {
+  return Object.assign(new Error("The model is overloaded. Please try again later."), {
+    status: 503,
+  });
+}
+
+describe("LLMClient retries", () => {
+  beforeEach(() => {
+    process.env.GEMINI_API_KEY = "test-key-not-used";
+    delete process.env.COGNIVA_FALLBACK_MODEL;
+  });
+
+  function retryingClient(model = "gemini-3.5-flash"): LLMClient {
+    const client = new LLMClient({ model, maxTokens: 128, timeout: 5 });
+    client.sleep = async () => {};
+    return client;
+  }
+
+  it("retries a 503 on the same model and succeeds", async () => {
+    const client = retryingClient();
+    const calls: string[] = [];
+    client.client = flaky([overloaded(), overloaded()], calls);
+
+    const out = await client.structured({ system: "s", user: "u", schema: {} });
+
+    expect(out).toEqual({ ok: true });
+    expect(calls).toEqual(["gemini-3.5-flash", "gemini-3.5-flash", "gemini-3.5-flash"]);
+  });
+
+  it("moves to the fallback model when the primary stays overloaded", async () => {
+    const client = retryingClient();
+    const calls: string[] = [];
+    client.client = flaky([overloaded(), overloaded(), overloaded()], calls);
+
+    const out = await client.structured({ system: "s", user: "u", schema: {} });
+
+    expect(out).toEqual({ ok: true });
+    expect(calls.at(-1)).toBe("gemini-2.5-flash");
+  });
+
+  it("gives up with an LLMError after every attempt fails", async () => {
+    const client = retryingClient();
+    const calls: string[] = [];
+    client.client = flaky(Array.from({ length: 10 }, overloaded), calls);
+
+    await expect(
+      client.structured({ system: "s", user: "u", schema: {} }),
+    ).rejects.toBeInstanceOf(LLMError);
+    expect(calls).toHaveLength(5);
+  });
+
+  it("does not retry a non-transient error", async () => {
+    const client = retryingClient();
+    const calls: string[] = [];
+    const badRequest = Object.assign(new Error("invalid argument"), { status: 400 });
+    client.client = flaky([badRequest], calls);
+
+    await expect(
+      client.structured({ system: "s", user: "u", schema: {} }),
+    ).rejects.toBeInstanceOf(LLMError);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("picks a fallback different from the primary", () => {
+    expect(retryingClient("gemini-2.5-flash").fallbackModel).toBe("gemini-2.5-flash-lite");
+    process.env.COGNIVA_FALLBACK_MODEL = "gemini-2.0-flash";
+    expect(retryingClient().fallbackModel).toBe("gemini-2.0-flash");
+  });
+
+  it("recognises overload errors that carry no status field", () => {
+    expect(isTransientLLMError(new Error('got status: 503 UNAVAILABLE'))).toBe(true);
+    expect(isTransientLLMError(new Error("RESOURCE_EXHAUSTED"))).toBe(true);
+    expect(isTransientLLMError(new Error("request timed out"))).toBe(false);
   });
 });
