@@ -63,6 +63,13 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
     return workspace;
   }
 
+  async saveBoard(id: string, snapshot: unknown, thumbnail?: string): Promise<void> {
+    const workspace = this.workspaces.get(id);
+    if (!workspace) return;
+    workspace.currentWhiteboardSnapshot = snapshot;
+    if (thumbnail) workspace.thumbnailUrl = thumbnail;
+  }
+
   async get(id: string): Promise<Workspace | undefined> {
     return this.workspaces.get(id);
   }

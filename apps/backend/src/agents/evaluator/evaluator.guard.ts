@@ -32,14 +32,19 @@ export function normalizeEvaluation(
   // normalized set. A finding this guard drops (unknown category, empty
   // concept and detail) must not be able to move the number either.
   const findings = normalizeFindings(raw.findings, turns);
+  const depthScore = clampScore(raw.depthScore);
+  // A model that left depth out has not judged it. Counting that as a zero
+  // would cut a fifth off the score for something nobody measured.
+  const depthJudged =
+    raw.depthScore !== undefined && raw.depthScore !== null && Number.isFinite(Number(raw.depthScore));
 
   return {
     evaluationId,
     sessionId,
     // Not read from the model. See scoring.ts for why the arithmetic lives in
     // code while the judgements behind it stay the model's.
-    score: scoreFindings(findings).score,
-    depthScore: clampScore(raw.depthScore),
+    score: scoreFindings(findings, depthJudged ? depthScore : undefined).score,
+    depthScore,
     findings,
     summary: typeof raw.summary === "string" ? raw.summary.trim() : "",
     strengths: normalizeStringArray(raw.strengths),

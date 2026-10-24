@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { addFrame, isSpeech, LEVEL_SAMPLE_MS, NO_VOICE, rms, type VoiceCount } from './voiceActivity'
 
+/** Recording bitrate, in bits per second. Speech only, so low is fine. */
+const AUDIO_BITS_PER_SECOND = 32_000
+
 interface UseAudioRecorderResult {
   isRecording: boolean
   /** true if the user denies mic permission, or there's no device - audio stays optional and doesn't block the flow */
@@ -94,7 +97,9 @@ export function useAudioRecorder(): UseAudioRecorderResult {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
-      const recorder = new MediaRecorder(stream)
+      // 32 kbps is plenty for speech recognition. The browser default is
+      // several times that, which made a long explanation slow to upload.
+      const recorder = new MediaRecorder(stream, { audioBitsPerSecond: AUDIO_BITS_PER_SECOND })
       mimeTypeRef.current = recorder.mimeType || 'audio/webm'
       // Append — do NOT reset chunksRef here.
       recorder.ondataavailable = (e) => {

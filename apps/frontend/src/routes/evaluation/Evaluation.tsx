@@ -292,7 +292,6 @@ export default function EvaluationPage() {
             <TranscriptReview
               transcript={report!.transcript ?? []}
               findings={report!.findings}
-              checkpoints={checkpoints}
             />
           </div>
         )}
