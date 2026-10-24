@@ -141,7 +141,29 @@ describe("submitCheckpoint storage", () => {
 
     expect(checkpoint).toBeDefined();
     expect(checkpoint?.timeline).toBeUndefined();
-    // The rest of the checkpoint is unaffected by the new field.
-    expect(checkpoint?.snapshotImageUrl).toContain("image/png");
+  });
+
+  it("keeps neither the board image nor the recording", async () => {
+    const ws = await service.createWorkspace();
+
+    const checkpoint = await service.submitCheckpoint(ws.id, {
+      snapshotImage,
+      snapshotMime: "image/png",
+      audio: "UklGRg==",
+      audioMime: "audio/webm",
+      whiteboardSnapshot: {
+        elements: [
+          { id: "a", version: 3, type: "text", text: "hello", points: [[0, 0]] },
+          { id: "b", version: 1, isDeleted: true },
+        ],
+        files: { big: { dataURL: "data:image/png;base64,AAAA" } },
+      },
+    });
+
+    // Vision and ASR had them for the turn; the database does not keep them.
+    expect(checkpoint?.snapshotImageUrl).toBe("");
+    expect(checkpoint?.audioUrl).toBeUndefined();
+    // The scene keeps only what is read back: live element ids and versions.
+    expect(checkpoint?.whiteboardSnapshot).toEqual({ elements: [{ id: "a", version: 3 }] });
   });
 });

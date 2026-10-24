@@ -75,7 +75,7 @@ export function mockEvaluator(input: EvaluatorInput, evaluationId: string): Eval
   // reached by keyword matching rather than by judgement. The number then means
   // the same thing in both modes even though the evidence behind it is weaker,
   // which is what makes an offline score comparable to an online one at all.
-  const score = input.turns.length === 0 ? 0 : scoreFindings(findings).score;
+  const score = input.turns.length === 0 ? 0 : scoreFindings(findings, depthScore).score;
 
   return {
     evaluationId,

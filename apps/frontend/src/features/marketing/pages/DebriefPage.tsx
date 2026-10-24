@@ -48,7 +48,7 @@ const EN = {
   scores: {
     eyebrow: 'Two numbers, not one',
     title: 'Being right and going deep are different questions.',
-    body: 'The score asks whether your explanation was correct. The depth score, judged once across the whole session and deliberately separate, asks whether it went past naming things. Keeping them apart is what stops a tidy, shallow session from looking like mastery.',
+    body: 'Accuracy asks whether your explanation was correct. Depth, judged once across the whole session, asks whether it went past naming things. Depth carries its own share of the score, so a tidy but shallow session cannot look like mastery.',
     example: '“Photosynthesis turns light into energy.”',
     correct: 'Correct',
     correctNote: 'scores well',
@@ -131,7 +131,7 @@ const ID: typeof EN = {
   scores: {
     eyebrow: 'Dua angka, bukan satu',
     title: 'Benar dan mendalam adalah dua pertanyaan berbeda.',
-    body: 'Skor menanyakan apakah penjelasanmu benar. Skor kedalaman, dinilai sekali atas seluruh sesi dan sengaja dipisah, menanyakan apakah penjelasanmu melampaui sekadar menyebut istilah. Memisahkan keduanya yang mencegah sesi rapi tapi dangkal terlihat seperti penguasaan.',
+    body: 'Ketepatan menanyakan apakah penjelasanmu benar. Kedalaman, dinilai sekali atas seluruh sesi, menanyakan apakah penjelasanmu melampaui sekadar menyebut istilah. Kedalaman punya bagiannya sendiri dalam skor, jadi sesi yang rapi tapi dangkal tidak bisa terlihat seperti penguasaan.',
     example: '“Fotosintesis mengubah cahaya jadi energi.”',
     correct: 'Benar',
     correctNote: 'skornya bagus',

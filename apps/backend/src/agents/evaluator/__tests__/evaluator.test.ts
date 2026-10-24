@@ -121,8 +121,8 @@ describe("normalizeEvaluation: depthScore", () => {
       "e",
     );
 
-    // One WRONG and nothing else: accuracy 0, completeness 1, clarity 1.
-    // (0 * 0.5) + (1 * 0.3) + (1 * 0.2) = 0.5 -> 50.
+    // One WRONG and nothing else: accuracy 0, completeness 1, clarity 1, and
+    // no depth judged. (0 * 0.4) + (1 * 0.25) + (1 * 0.15) over 0.8 -> 50.
     expect(result.score).toBe(50);
   });
 });
@@ -153,13 +153,40 @@ describe("scoreFindings", () => {
   });
 
   it("renormalises over the axes a session can actually measure", () => {
-    // No CORRECT and no WRONG, so accuracy is unmeasurable and its 0.5 weight
-    // is redistributed rather than counted as a zero.
+    // No CORRECT and no WRONG, so accuracy is unmeasurable and its weight is
+    // redistributed rather than counted as a zero.
     const result = scoreFindings([finding("MISSED", "a"), finding("MISSED", "b")]);
 
     expect(result.accuracy).toBeNull();
-    // completeness 0, clarity 1, over the 0.5 weight that remains -> 40.
-    expect(result.score).toBe(40);
+    // completeness 0, clarity 1, over the 0.4 weight that remains -> 37.5 -> 38.
+    expect(result.score).toBe(38);
+  });
+
+  it("counts depth as the fourth part of the score", () => {
+    const result = scoreFindings(
+      [finding("CORRECT", "a"), finding("CORRECT", "b")],
+      40,
+    );
+
+    // accuracy 1, completeness 1, clarity 1, depth 0.4:
+    // 0.4 + 0.25 + 0.15 + (0.4 * 0.2) = 0.88 -> 88.
+    expect(result.depth).toBe(0.4);
+    expect(result.score).toBe(88);
+  });
+
+  it("leaves depth out when the model did not judge it", () => {
+    const result = normalizeEvaluation(
+      {
+        findings: [
+          { category: "CORRECT", concept: "a", detail: "d", evidenceTurnIndex: 0 },
+        ],
+      },
+      "s",
+      "e",
+    );
+
+    // Not a zero that drags the score down: depth is simply not measured.
+    expect(result.score).toBe(100);
   });
 
   it("scores an empty set at zero rather than dividing by nothing", () => {

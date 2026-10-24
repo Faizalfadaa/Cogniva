@@ -93,6 +93,14 @@ export interface WorkspaceStore {
    */
   create(workspace: Workspace, ownerId: string, sessionId: string): Promise<Workspace>;
   save(workspace: Workspace): Promise<Workspace>;
+  /**
+   * Write the autosaved board, and the thumbnail when one is given.
+   *
+   * Kept out of `save` on purpose. `save` runs on every chat message and
+   * checkpoint, and rewriting a scene of hundreds of kB each time left Postgres
+   * with a dead copy of it per write, which is what filled the database.
+   */
+  saveBoard(id: string, snapshot: unknown, thumbnail?: string): Promise<void>;
   get(id: string): Promise<Workspace | undefined>;
   /** True when `ownerId` owns an existing workspace `id`. */
   isOwner(id: string, ownerId: string): Promise<boolean>;

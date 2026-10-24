@@ -3,7 +3,6 @@ import type {
   EvaluationFindingDTO,
   EvaluationTranscriptTurnDTO,
 } from '../../../dto/EvaluationReportDTO'
-import type { TeachingCheckpointDTO } from '../../../dto/TeachingCheckpointDTO'
 import { findingsForTurn, segmentTextForFindings, type QuoteField } from '../lib/highlightQuote'
 import { CATEGORY_BADGE_CLASS, CATEGORY_LABEL, CATEGORY_MARK_CLASS } from '../lib/findingLabels'
 import { useT, type Translate } from '../../../i18n/LanguageProvider'
@@ -12,8 +11,6 @@ import styles from '../../../styles/Evaluation.module.css'
 interface TranscriptReviewProps {
   transcript: EvaluationTranscriptTurnDTO[]
   findings: EvaluationFindingDTO[]
-  /** Null while the Detail tab's lazy fetch is still in flight. */
-  checkpoints: TeachingCheckpointDTO[] | null
 }
 
 /**
@@ -32,41 +29,14 @@ interface TranscriptReviewProps {
  * Identity is the finding's index in `findings`, so the mark in the text and the
  * panel that opens under it always agree on which note is showing.
  *
- * Each turn can also show what it was taught from: the board that was drawn,
- * the recording that was spoken over it, and the chat that followed. The app is built around a
- * whiteboard and a microphone, and until now the debrief only ever showed what
- * the agents read out of them — never the drawing or the voice itself. Both are
- * matched by position and only when the counts line up exactly (see
- * `capturesByTurn`).
+ * Each turn shows what was read from the board, what was said, and the chat
+ * that followed. The board image and the recording themselves are not shown:
+ * they are no longer stored, because keeping them per Teach filled the
+ * database (see submitCheckpoint).
  */
-export function TranscriptReview({ transcript, findings, checkpoints }: TranscriptReviewProps) {
+export function TranscriptReview({ transcript, findings }: TranscriptReviewProps) {
   const t = useT()
   const [openIndex, setOpenIndex] = useState<number | null>(null)
-
-  /**
-   * Board image per turn, or null when they cannot be matched with certainty.
-   *
-   * Checkpoints and turns are written by the same loop, so position N is turn N
-   * — but a turn that ended in a handled failure leaves a checkpoint without a
-   * transcript entry, and the positions drift. Showing the wrong board under
-   * the wrong words is worse than showing none, so an uneven count shows none.
-   */
-  const capturesByTurn = useMemo(() => {
-    if (!checkpoints || checkpoints.length !== transcript.length) return null
-    const ordered = [...checkpoints].sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-    )
-    const map = new Map<number, { image?: string; audio?: string }>()
-    transcript.forEach((turn, i) => {
-      const checkpoint = ordered[i]
-      if (!checkpoint) return
-      map.set(turn.turnIndex, {
-        image: checkpoint.snapshotImageUrl || undefined,
-        audio: checkpoint.audioUrl,
-      })
-    })
-    return map
-  }, [checkpoints, transcript])
 
   const indexOf = useMemo(() => {
     const map = new Map<EvaluationFindingDTO, number>()
@@ -128,20 +98,6 @@ export function TranscriptReview({ transcript, findings, checkpoints }: Transcri
                   {t('evaluation.turnLabel', { index: turn.turnIndex })}
                 </p>
 
-                {capturesByTurn?.get(turn.turnIndex)?.image && (
-                  <figure className={styles.turnBoard}>
-                    <img
-                      src={capturesByTurn.get(turn.turnIndex)!.image}
-                      alt={t('evaluation.boardAlt', { index: turn.turnIndex })}
-                      className={styles.turnBoardImage}
-                      loading="lazy"
-                    />
-                    <figcaption className={styles.turnBoardCaption}>
-                      {t('evaluation.boardCaption')}
-                    </figcaption>
-                  </figure>
-                )}
-
                 {turn.newBoardText === undefined ? (
                   <p className={styles.turnBody}>
                     {renderChannel(turn.boardText, quoted, 'boardText', indexOf, openIndex, toggle, openAndScroll, t)}
@@ -184,25 +140,6 @@ export function TranscriptReview({ transcript, findings, checkpoints }: Transcri
                     <span className={styles.turnSpeechLabel}>{t('evaluation.spokenLabel')}</span>
                     {renderChannel(turn.speech, quoted, 'speech', indexOf, openIndex, toggle, openAndScroll, t)}
                   </p>
-                )}
-
-                {/* The recording itself, under the words ASR made of it. A
-                    transcript can be read for what was said; only the audio
-                    carries how it was said, which is the half a user wanting to
-                    teach better actually has to hear. Native controls: this is
-                    a short clip played once, not a player worth building. */}
-                {capturesByTurn?.get(turn.turnIndex)?.audio && (
-                  <div className={styles.turnAudio}>
-                    <span className={styles.turnAudioLabel}>
-                      {t('evaluation.recordingLabel')}
-                    </span>
-                    <audio
-                      className={styles.turnAudioPlayer}
-                      src={capturesByTurn.get(turn.turnIndex)!.audio}
-                      controls
-                      preload="none"
-                    />
-                  </div>
                 )}
 
                 {/* The chat that followed this board. It is teaching too: the

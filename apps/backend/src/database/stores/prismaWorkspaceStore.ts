@@ -63,20 +63,30 @@ export class PrismaWorkspaceStore implements WorkspaceStore {
 
   async save(workspace: Workspace): Promise<Workspace> {
     // Only the mutable metadata: the owner and the backing session are set once,
-    // by create(), and the PDF / reference columns have their own writers.
+    // by create(), and the PDF / reference columns have their own writers. So do
+    // the board and its thumbnail (saveBoard), which are far too large to rewrite
+    // on every chat message and checkpoint.
     await prisma.workspace.updateMany({
       where: { id_workspace: workspace.id },
       data: {
         title: workspace.title ?? null,
         description: workspace.description ?? null,
         state: workspace.state,
-        whiteboard_snapshot: toJson(workspace.currentWhiteboardSnapshot),
-        thumbnail_url: workspace.thumbnailUrl ?? null,
         learner_id: workspace.learnerId ?? null,
         updated_at: new Date(workspace.updatedAt),
       },
     });
     return workspace;
+  }
+
+  async saveBoard(id: string, snapshot: unknown, thumbnail?: string): Promise<void> {
+    await prisma.workspace.updateMany({
+      where: { id_workspace: id },
+      data: {
+        whiteboard_snapshot: toJson(snapshot),
+        ...(thumbnail ? { thumbnail_url: thumbnail } : {}),
+      },
+    });
   }
 
   async get(id: string): Promise<Workspace | undefined> {

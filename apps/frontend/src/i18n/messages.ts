@@ -518,15 +518,15 @@ export const messages = {
   // --- the debrief, rebuilt around findings ---------------------------------
   'evaluation.scoreTitle': { en: 'Session Score', id: 'Skor Sesi' },
   'evaluation.scoreCaption': {
-    en: 'How accurate and complete your explanation was against the reference material.',
-    id: 'Ketepatan dan kelengkapan penjelasanmu dibanding materi rujukan.',
+    en: 'How accurate, complete, clear and deep your explanation was.',
+    id: 'Seberapa tepat, lengkap, jelas, dan mendalam penjelasanmu.',
   },
   /* Spelled out on the screen rather than buried in the code: a score nobody
      can reproduce is a score nobody can argue with, and the whole point of
      computing it from the findings was to make it checkable. */
   'evaluation.scoreFormula': {
-    en: 'Counted from the findings below: 50% accuracy, 30% completeness, 20% clarity. Depth is judged separately and is not part of this number.',
-    id: 'Dihitung dari temuan di bawah: 50% ketepatan, 30% kelengkapan, 20% kejelasan. Kedalaman dinilai terpisah dan tidak masuk ke angka ini.',
+    en: 'The average of the four parts below: 40% accuracy, 25% completeness, 15% clarity, 20% depth. A part marked not measured is left out.',
+    id: 'Rata-rata dari empat bagian di bawah: 40% ketepatan, 25% kelengkapan, 15% kejelasan, 20% kedalaman. Bagian yang belum terukur tidak ikut dihitung.',
   },
   'evaluation.notesTitle': { en: 'How This Session Went', id: 'Penilaian Sesi Ini' },
   'evaluation.nothingToAssess': { en: 'Nothing to assess yet.', id: 'Belum ada yang bisa dinilai.' },
@@ -602,7 +602,6 @@ export const messages = {
   'evaluation.trendSame': { en: 'same as last session', id: 'sama seperti sesi lalu' },
   'evaluation.trendAxisY': { en: 'Score', id: 'Skor' },
   'evaluation.trendAxisX': { en: 'Session, oldest first', id: 'Sesi, dari yang terlama' },
-  'evaluation.recordingLabel': { en: 'Your recording', id: 'Rekamanmu' },
   'evaluation.trendCaption': {
     en: 'Each dot is a finished session, scored the same way. Yours is the filled one.',
     id: 'Tiap titik adalah satu sesi selesai, dinilai dengan cara yang sama. Sesi ini yang terisi penuh.',
@@ -612,14 +611,6 @@ export const messages = {
   'evaluation.timingCaveat': {
     en: 'Times are measured between one "Teach" and the next, and are shown as context only. How long someone thinks before explaining is not part of the score.',
     id: 'Waktu dihitung antara satu "Teach" dan berikutnya, dan ditampilkan sebagai konteks saja. Lama berpikir sebelum menjelaskan tidak ikut dinilai.',
-  },
-  'evaluation.boardAlt': {
-    en: 'The whiteboard you taught turn {index} from',
-    id: 'Papan tulis yang kamu pakai mengajar di giliran {index}',
-  },
-  'evaluation.boardCaption': {
-    en: 'What you drew for this turn',
-    id: 'Yang kamu tulis untuk giliran ini',
   },
   'evaluation.practiceConcept': {
     en: 'Practise this concept →',

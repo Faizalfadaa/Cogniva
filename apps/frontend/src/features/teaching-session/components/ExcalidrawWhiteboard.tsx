@@ -32,6 +32,20 @@ const AUTOSAVE_DEBOUNCE_MS = 1500
 // Even during non-stop editing (where the debounce keeps resetting), force a
 // save at least this often so a long session is never left unsaved.
 const AUTOSAVE_MAX_INTERVAL_MS = 8000
+// The Home card's preview does not need to track every stroke. Rendering and
+// uploading it on every autosave cost far more than the board itself.
+const THUMBNAIL_MIN_INTERVAL_MS = 60_000
+
+/**
+ * Changes whenever an element is added, edited or deleted: each of those bumps
+ * the element's version, so the sum only grows. Scrolling, zooming and
+ * selecting leave it alone, which is the point: they are not worth a save.
+ */
+function sceneSignature(elements: readonly { version?: number }[] | undefined): string {
+  let versions = 0
+  for (const element of elements ?? []) versions += element.version ?? 0
+  return `${elements?.length ?? 0}:${versions}`
+}
 
 // Parchment tone to match the app's look.
 const CANVAS_BG = '#f5f0e4'
@@ -243,11 +257,20 @@ const ExcalidrawWhiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(funct
   }, [])
 
   const dirtyRef = useRef(false)
+  /** The elements as last seen, so a change that moved nothing is not saved. */
+  const signatureRef = useRef(
+    sceneSignature((initialData as { elements?: ElementLike[] } | undefined)?.elements)
+  )
+  /** When the last thumbnail was rendered; 0 so the first save makes one. */
+  const thumbnailAtRef = useRef(0)
 
   const runAutosave = useCallback(
-    (withThumbnail: boolean) => {
+    (wantThumbnail: boolean) => {
       const doc = buildDocument()
       if (!doc) return
+      const withThumbnail =
+        wantThumbnail && Date.now() - thumbnailAtRef.current >= THUMBNAIL_MIN_INTERVAL_MS
+      if (withThumbnail) thumbnailAtRef.current = Date.now()
       // Skip empty scenes: nothing to persist yet, and it avoids flipping a fresh
       // Draft into Teaching on Excalidraw's initial onChange (which fires on mount).
       //
@@ -357,6 +380,13 @@ const ExcalidrawWhiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(funct
           onActivePageChange?.(active)
         }
       }
+
+      // Excalidraw also calls this for scrolling, zooming and selecting. Those
+      // leave the elements as they were, and saving the whole scene for them
+      // was most of the writes a session made.
+      const signature = sceneSignature(elements as readonly ElementLike[])
+      if (signature === signatureRef.current) return
+      signatureRef.current = signature
 
       dirtyRef.current = true
       if (debounceRef.current) clearTimeout(debounceRef.current)

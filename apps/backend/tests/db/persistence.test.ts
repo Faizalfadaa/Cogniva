@@ -94,13 +94,12 @@ describe("workspace persistence", () => {
     expect(new Date(loaded!.createdAt).getTime()).toBe(new Date(ws.createdAt).getTime());
 
     const snapshot = { store: "excalidraw", elements: [{ id: "shape:a", x: 1.5 }] };
+    await workspaces.saveBoard(ws.id, snapshot, "data:image/png;base64,iVBORw0KGgo=");
     await workspaces.save({
       ...loaded!,
       title: "Fotosintesis",
       description: "Bab 3",
       state: "Teaching",
-      currentWhiteboardSnapshot: snapshot,
-      thumbnailUrl: "data:image/png;base64,iVBORw0KGgo=",
       updatedAt: utcNowIso(),
     });
 
@@ -108,9 +107,20 @@ describe("workspace persistence", () => {
     expect(updated?.title).toBe("Fotosintesis");
     expect(updated?.description).toBe("Bab 3");
     expect(updated?.state).toBe("Teaching");
-    // The opaque client document comes back structurally identical.
+    // The opaque client document comes back structurally identical, and a
+    // metadata save after it (holding no board) leaves it alone.
     expect(updated?.currentWhiteboardSnapshot).toEqual(snapshot);
     expect(updated?.thumbnailUrl).toContain("base64");
+  });
+
+  it("keeps the old thumbnail when a board is saved without one", async () => {
+    const ws = await makeWorkspace();
+    await workspaces.saveBoard(ws.id, { elements: [] }, "data:image/png;base64,AAAA");
+    await workspaces.saveBoard(ws.id, { elements: [{ id: "b" }] });
+
+    const loaded = await workspaces.get(ws.id);
+    expect(loaded?.currentWhiteboardSnapshot).toEqual({ elements: [{ id: "b" }] });
+    expect(loaded?.thumbnailUrl).toBe("data:image/png;base64,AAAA");
   });
 
   it("isolates workspaces by owner", async () => {

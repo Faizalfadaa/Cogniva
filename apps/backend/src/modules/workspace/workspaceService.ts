@@ -144,6 +144,7 @@ export async function saveDraft(
 ): Promise<Workspace | undefined> {
   const ws = await workspaces.get(id);
   if (!ws) return undefined;
+  await workspaces.saveBoard(id, payload.snapshot, payload.thumbnail);
   ws.currentWhiteboardSnapshot = payload.snapshot;
   if (payload.thumbnail) ws.thumbnailUrl = payload.thumbnail;
   // First real draft flips a blank workspace into Teaching (mirrors the mock).
@@ -390,15 +391,14 @@ export async function submitCheckpoint(
 
   const checkpoint: TeachingCheckpoint = {
     id: newId("chk"),
-    // Empty rather than a data URL with no data in it, which would render as a
-    // broken image wherever the board is shown back.
-    snapshotImageUrl: payload.snapshotImage
-      ? dataUrl(payload.snapshotMime, payload.snapshotImage)
-      : "",
-    whiteboardSnapshot: payload.whiteboardSnapshot,
-    audioUrl: payload.audio
-      ? dataUrl(payload.audioMime ?? "audio/webm", payload.audio)
-      : undefined,
+    // The board image and the recording are not kept. Vision and ASR get them
+    // for this turn below; what they produced (the reading and the transcript)
+    // is what the rest of the session uses. Kept as data URLs they cost about
+    // 1.2 MB per Teach plus ~1 MB per minute of speech, which filled the
+    // database within a few dozen sessions.
+    snapshotImageUrl: "",
+    whiteboardSnapshot: taughtVersions(payload.whiteboardSnapshot),
+    audioUrl: undefined,
     learnerResponse: undefined,
     // Stored with the checkpoint, and also handed to the turn below so the
     // student can match each drawing with what was being said as it was made.
@@ -1058,6 +1058,22 @@ async function bump(id: string, patch: Partial<Workspace> = {}): Promise<void> {
   await touch({ ...fresh, ...patch });
 }
 
-function dataUrl(mime: string, base64: string): string {
-  return `data:${mime};base64,${base64}`;
+/**
+ * The checkpoint's scene, cut down to what is read back: which elements were on
+ * the board, at which version. The client uses exactly that to tell what was
+ * already taught from what is new (useTeachingSession). The full scene stays on
+ * the workspace's autosave, so nothing here is needed to restore the board.
+ */
+function taughtVersions(scene: unknown): { elements: Array<{ id: string; version: number }> } | undefined {
+  const elements = (scene as { elements?: unknown } | null | undefined)?.elements;
+  if (!Array.isArray(elements)) return undefined;
+  return {
+    elements: elements.flatMap((element) => {
+      const { id, version, isDeleted } = (element ?? {}) as Record<string, unknown>;
+      return typeof id === "string" && typeof version === "number" && !isDeleted
+        ? [{ id, version }]
+        : [];
+    }),
+  };
 }
+

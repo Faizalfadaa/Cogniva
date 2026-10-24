@@ -184,11 +184,11 @@ interface StepArgs {
   turnIndex: number;
   previousTurn: TeachingTurn | undefined;
   /**
-   * The previous turn's board image, fetched once at the top of the turn. The
-   * Planner asks "did the board change?" before every step, and that question
-   * must not cost a database read each time it is asked.
+   * A hash of the previous turn's board image, fetched once at the top of the
+   * turn. The Planner asks "did the board change?" before every step, and that
+   * question must not cost a database read each time it is asked.
    */
-  previousImage: string | undefined;
+  previousDigest: string | undefined;
   allowConfirmation: boolean;
   ctx: TurnContext;
   /** Every agent call reports its token cost here (§7.3). */
@@ -254,11 +254,22 @@ export class Orchestrator {
       format: "png",
       capturedAt: utcNowIso(),
     };
-    await sessions.saveSnapshot(snapshot);
+    // Only a hash is persisted. The image itself is used in memory for this
+    // turn; all a later turn needs from it is whether the board changed.
+    await sessions.saveSnapshot({
+      ...snapshot,
+      image: snapshot.image.trim() ? digest(snapshot.image) : "",
+      format: DIGEST_FORMAT,
+    });
 
     const previousTurn = await sessions.lastTurn(session.sessionId);
-    const previousImage = previousTurn
-      ? (await sessions.getSnapshot(previousTurn.snapshotId))?.image
+    const previousSnapshot = previousTurn
+      ? await sessions.getSnapshot(previousTurn.snapshotId)
+      : undefined;
+    const previousDigest = previousSnapshot?.image
+      ? previousSnapshot.format === DIGEST_FORMAT
+        ? previousSnapshot.image
+        : digest(previousSnapshot.image) // a row saved before only hashes were kept
       : undefined;
     const ctx: TurnContext = {
       interpretation: null,
@@ -279,7 +290,7 @@ export class Orchestrator {
       locale,
       turnIndex,
       previousTurn,
-      previousImage,
+      previousDigest,
       allowConfirmation,
       ctx,
       onUsage,
@@ -586,7 +597,7 @@ function buildSituation(
     audio,
     typedText,
     previousTurn,
-    previousImage,
+    previousDigest,
     allowConfirmation,
     ctx,
     snapshot,
@@ -608,7 +619,7 @@ function buildSituation(
       hasImage,
       hasTypedText,
       previousTurn,
-      previousImage,
+      previousDigest,
     }),
     completed: [...ctx.completed],
     boardRead: interpretation !== null,
@@ -634,20 +645,23 @@ function isBoardUnchanged({
   hasImage,
   hasTypedText,
   previousTurn,
-  previousImage,
+  previousDigest,
 }: {
   image: string;
   hasImage: boolean;
   hasTypedText: boolean;
   previousTurn: TeachingTurn | undefined;
-  previousImage: string | undefined;
+  previousDigest: string | undefined;
 }): boolean {
   if (!previousTurn) return false;
   if (hasTypedText) return false; // typed text is new board content by definition
   if (!hasImage) return true; // nothing new arrived on the board channel
-  if (!previousImage) return false;
-  return digest(image) === digest(previousImage);
+  if (!previousDigest) return false;
+  return digest(image) === previousDigest;
 }
+
+/** The `format` of a stored snapshot whose `image` holds a hash, not the image. */
+const DIGEST_FORMAT = "sha1";
 
 /** Hash rather than compare: board images are megabytes of base64. */
 function digest(value: string): string {
