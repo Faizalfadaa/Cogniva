@@ -64,6 +64,22 @@ function setCurrent(url: string | null): void {
 function audioElement(): HTMLAudioElement {
   if (!element) {
     element = new Audio()
+    // Clips must be fetched in CORS mode, or they play SILENTLY once the stage
+    // has wired this element into the analyser (ensureAnalyser). After
+    // createMediaElementSource the sound reaches the speakers only through the
+    // Web Audio graph, and a cross-origin source loaded without CORS is
+    // "tainted": the graph outputs zeros. The element still plays, `ended`
+    // still fires, the words are revealed — the user just hears nothing.
+    //
+    // A blob URL is same-origin and was meant to avoid this, but a sentence
+    // often starts before its prefetch finishes and falls back to the remote
+    // URL. In development that URL is another port, so the first sentence of a
+    // chat reply went quiet while the second (prefetched in time) was heard.
+    // The panel is only open in chat, which is why a Teach reply was unaffected.
+    //
+    // The audio route answers with Access-Control-Allow-Origin, and deployed
+    // behind one origin the URL is relative, so this costs nothing there.
+    element.crossOrigin = 'anonymous'
     element.addEventListener('ended', () => {
       setCurrent(null)
       onClipEnded()
