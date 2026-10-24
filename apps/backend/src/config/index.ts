@@ -338,38 +338,154 @@ export const SESSION_TOKEN_BUDGET: number = num(
  */
 export const DEMO_MODE: boolean = bool(process.env.COGNIVA_DEMO_MODE, false);
 
-// --- Text-to-speech (voice sidecar, services/tts) ---------------------------
+// --- Text-to-speech (ElevenLabs) -------------------------------------------
+//
+// One engine: the hosted API, called over HTTP from modules/tts. There used to
+// be a local Python sidecar (Chatterbox/XTTS) as well; it needed a GPU to be
+// usable, spoke no Indonesian, and was removed. Nothing replaced it, because the
+// contract was always that a voice is optional — with no key, or a failing call,
+// the reply simply arrives as text.
+
+/** The key. Its presence is what turns the voice on. */
+export const ELEVENLABS_API_KEY: string = (
+  process.env.ELEVENLABS_API_KEY ??
+  process.env.COGNIVA_ELEVENLABS_API_KEY ??
+  ""
+).trim();
 
 /**
- * Give the Learner a voice. Off by default: the service is a separate Python
- * process that has to be started deliberately, and the app must run end to end
- * without it.
+ * Give the Learner a voice.
+ *
+ * Follows the key: there is nothing to install or start, so configuring a key is
+ * the intent. `COGNIVA_TTS_ENABLED=false` switches it off anyway — useful for
+ * running a demo in a quiet room without unsetting the key.
  */
-export const TTS_ENABLED: boolean = bool(process.env.COGNIVA_TTS_ENABLED, false);
+export const TTS_ENABLED: boolean = bool(
+  process.env.COGNIVA_TTS_ENABLED,
+  Boolean(ELEVENLABS_API_KEY),
+);
 
-/** Base URL of the voice service. */
-export const TTS_URL: string = (
-  process.env.COGNIVA_TTS_URL ?? "http://localhost:8020"
+/**
+ * A configured string, trimmed.
+ *
+ * dotenv trims values for us locally, so `COGNIVA_ELEVENLABS_MODEL= eleven_v4`
+ * works on a laptop. A container platform's environment variables do not go
+ * through dotenv, and there the leading space reaches the API as part of the
+ * model id. Trimming here makes the two behave the same.
+ */
+function str(value: string | undefined, fallback: string): string {
+  const trimmed = (value ?? "").trim();
+  return trimmed || fallback;
+}
+
+/** Where the hosted API lives. Override for a regional residency endpoint. */
+export const ELEVENLABS_API_BASE: string = str(
+  process.env.COGNIVA_ELEVENLABS_API_BASE,
+  "https://api.elevenlabs.io",
 ).replace(/\/+$/, "");
 
 /**
- * Request timeout in seconds.
+ * The voice model.
  *
- * Deliberately large. Render time on a laptop GPU is far less stable than it
- * looks: the same sentence took 8 s in one run and over three minutes in
- * another, with the GPU parked at idle clocks rather than overheating. 45 s was
- * cutting off renders that would have finished. Nothing on screen waits for
- * this — the reply text is published before synthesis starts and the voice is
- * attached on a later poll.
+ * `eleven_multilingual_v2` is the default because this app is Indonesian-first
+ * and that model handles both languages from one voice. The flash/turbo v2.5
+ * models are cheaper and faster, and unlike multilingual_v2 they accept a
+ * language code (see ELEVENLABS_LANGUAGE_CODE below).
  */
-export const TTS_TIMEOUT: number = num(process.env.COGNIVA_TTS_TIMEOUT, 150);
+export const ELEVENLABS_MODEL: string = str(
+  process.env.COGNIVA_ELEVENLABS_MODEL,
+  "eleven_multilingual_v2",
+);
 
 /**
- * Language handed to the voice model. The Learner answers in English
- * (llm/prompts/learner.prompt.ts), and neither engine speaks Indonesian, so
- * "en" is both the correct and the only sensible default here.
+ * Audio container asked for, which also decides the clip's mime type.
+ *
+ * mp3 at 128 kbps is the API's own default: small enough to poll a reply's clips
+ * over a slow connection, and good enough for a speaking voice. Higher mp3 and
+ * any 44.1 kHz PCM/WAV need a paid tier.
  */
-export const TTS_LANGUAGE: string = process.env.COGNIVA_TTS_LANGUAGE ?? "en";
+export const ELEVENLABS_OUTPUT_FORMAT: string = str(
+  process.env.COGNIVA_ELEVENLABS_OUTPUT_FORMAT,
+  "mp3_44100_128",
+);
+
+/**
+ * Whether to force the session's language on the voice, instead of letting the
+ * model read the language off the text. Off by default.
+ *
+ * It used to be on for every model that accepts it, and that was wrong in a way
+ * that is easy to miss: the language of the SESSION is not always the language
+ * of the TEXT. The student answers in the session's language when the model is
+ * up, but every deterministic stand-in — the offline mock, the fallback when
+ * Gemini is overloaded, the "let's move on" line — is English. Forcing "id" on
+ * those reads English words with Indonesian pronunciation. The text is what is
+ * actually spoken, so the text decides.
+ *
+ * Turn it on only for a deployment where every reply is guaranteed to be in the
+ * session language (and the model honours it; `multilingual_v2` ignores it).
+ */
+export const ELEVENLABS_LANGUAGE_CODE: boolean = bool(
+  process.env.COGNIVA_ELEVENLABS_LANGUAGE_CODE,
+  false,
+);
+
+/**
+ * Which hosted voice each student speaks with.
+ *
+ * No defaults are shipped: voice ids belong to an account, and a guessed id
+ * would either 404 or — worse — bill someone for a voice that is not the
+ * character on screen. `npm run tts:voices` lists the ids on your key.
+ * A single COGNIVA_ELEVENLABS_VOICE_ID covers all three when one voice is
+ * enough (for a demo, say).
+ */
+export const ELEVENLABS_VOICE_IDS: Record<string, string> = {
+  yuzuki: voiceId("YUZUKI"),
+  reina: voiceId("REINA"),
+  akira: voiceId("AKIRA"),
+};
+
+function voiceId(character: string): string {
+  const specific = process.env[`COGNIVA_ELEVENLABS_VOICE_${character}`];
+  const shared = process.env.COGNIVA_ELEVENLABS_VOICE_ID;
+  return (specific ?? shared ?? "").trim();
+}
+
+/**
+ * Voice settings sent with every request, overriding the ones stored on the
+ * voice. Left empty by default: the account's own settings are the ones the user
+ * tuned in ElevenLabs, and silently overriding them would be surprising.
+ */
+export const ELEVENLABS_STABILITY: number | undefined = optionalNum(
+  process.env.COGNIVA_ELEVENLABS_STABILITY,
+);
+
+export const ELEVENLABS_SIMILARITY: number | undefined = optionalNum(
+  process.env.COGNIVA_ELEVENLABS_SIMILARITY,
+);
+
+export const ELEVENLABS_STYLE: number | undefined = optionalNum(
+  process.env.COGNIVA_ELEVENLABS_STYLE,
+);
+
+export const ELEVENLABS_SPEED: number | undefined = optionalNum(
+  process.env.COGNIVA_ELEVENLABS_SPEED,
+);
+
+function optionalNum(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === "") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Request timeout in seconds, per sentence.
+ *
+ * Roomy rather than tight: nothing on screen waits for it — the reply text is
+ * published before synthesis starts and each clip is attached on a later poll —
+ * so a slow render costs a late voice, while a short timeout costs the voice
+ * altogether.
+ */
+export const TTS_TIMEOUT: number = num(process.env.COGNIVA_TTS_TIMEOUT, 60);
 
 // --- Server ----------------------------------------------------------------
 

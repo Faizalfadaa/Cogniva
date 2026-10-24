@@ -973,7 +973,14 @@ async function speakSegments(
 
   let current = speech;
   for (let index = 0; index < current.segments.length; index++) {
-    const clip = await synthesizeSpeech(current.segments[index].text, voice);
+    // The session's language, and the sentences either side of this one. Each
+    // sentence is rendered on its own so the first clip can play sooner; told
+    // what surrounds it, the voice reads it as part of one reply instead of as
+    // a fresh take, so the seams between clips do not reset in pitch and pace.
+    const clip = await synthesizeSpeech(current.segments[index].text, voice, ws?.locale, {
+      previous: current.segments[index - 1]?.text,
+      next: current.segments[index + 1]?.text,
+    });
     // Re-checked after every render: the workspace can be deleted mid-reply.
     if (!(await stillExists(workspaceId))) return;
 

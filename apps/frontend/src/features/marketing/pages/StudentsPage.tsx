@@ -55,7 +55,7 @@ const EN = {
   voice: {
     eyebrow: 'Her voice',
     title: 'Hearing her changes it from operating software to talking to someone.',
-    aside: 'It is also the most operationally demanding part of the system, so it is built to be entirely optional. Nothing in the app breaks when the voice service is off.',
+    aside: 'It is also the one part that depends on an outside service, so it is built to be entirely optional. Nothing in the app breaks when the voice is off.',
     steps: [
       { title: 'Split into sentences', body: 'The reply is cut on punctuation, closing quotes kept with their sentence, fragments under four words merged with a neighbour, and capped at four pieces without dropping a word.' },
       { title: 'Rendered in order', body: 'The first clip is ready after synthesising only the first sentence; the rest render behind it. She starts speaking while she is still being given words.' },
@@ -65,10 +65,10 @@ const EN = {
     bugTag: 'A bug worth admitting',
     bugBody: "The voice the backend speaks in is resolved exactly the way the interface resolves the face on screen (your pick, or a stable hash of the workspace id), and a test now locks the two together. That test exists because they once disagreed: a workspace showing Yuzuki spoke in Akira's voice.",
     specs: [
-      'engine · chatterbox-turbo (MIT), default',
-      'service · Python + FastAPI, its own process',
-      'failure · unreachable, loading, slow or broken all mean “no audio this time”',
-      'settings · per-character decoding in voices.json, editable without a restart',
+      'engine · ElevenLabs, one voice per student',
+      'languages · Indonesian and English, from the same voice',
+      'failure · no key, spent quota, slow or broken all mean “no audio this time”',
+      'context · each sentence is rendered knowing the ones either side of it',
     ],
   },
   honest: {
@@ -126,7 +126,7 @@ const ID: typeof EN = {
   voice: {
     eyebrow: 'Suaranya',
     title: 'Mendengar suaranya mengubah rasa memakai perangkat lunak jadi berbicara dengan seseorang.',
-    aside: 'Bagian ini juga yang paling berat secara operasional, jadi dibangun sepenuhnya opsional. Tidak ada bagian aplikasi yang rusak saat layanan suara mati.',
+    aside: 'Bagian ini juga satu-satunya yang bergantung pada layanan luar, jadi dibangun sepenuhnya opsional. Tidak ada bagian aplikasi yang rusak saat suaranya mati.',
     steps: [
       { title: 'Dipecah per kalimat', body: 'Balasan dipotong di tanda baca, tanda kutip penutup tetap bersama kalimatnya, potongan di bawah empat kata digabung dengan tetangganya, dan dibatasi empat bagian tanpa kehilangan satu kata pun.' },
       { title: 'Diproses berurutan', body: 'Klip pertama siap setelah hanya kalimat pertama yang disintesis; sisanya diproses di belakangnya. Dia mulai bicara saat masih diberi kata-kata.' },
@@ -136,10 +136,10 @@ const ID: typeof EN = {
     bugTag: 'Bug yang layak diakui',
     bugBody: 'Suara yang dipakai backend ditentukan persis dengan cara antarmuka menentukan wajah di layar (pilihanmu, atau hash tetap dari id ruang kerja), dan sebuah tes sekarang mengunci keduanya. Tes itu ada karena keduanya pernah berbeda: ruang kerja yang menampilkan Yuzuki berbicara dengan suara Akira.',
     specs: [
-      'mesin · chatterbox-turbo (MIT), bawaan',
-      'layanan · Python + FastAPI, proses tersendiri',
-      'kegagalan · tidak terjangkau, memuat, lambat, atau rusak semuanya berarti “kali ini tanpa audio”',
-      'pengaturan · decoding per karakter di voices.json, bisa diubah tanpa restart',
+      'mesin · ElevenLabs, satu suara per murid',
+      'bahasa · Indonesia dan Inggris, dari suara yang sama',
+      'kegagalan · tanpa key, kuota habis, lambat, atau rusak semuanya berarti “kali ini tanpa audio”',
+      'konteks · tiap kalimat dirender dengan tahu kalimat sebelum dan sesudahnya',
     ],
   },
   honest: {
@@ -188,7 +188,7 @@ export default function StudentsPage() {
                   </div>
                   <div className={styles.chips}>
                     <span className={styles.chip}>portrait · {learner.id}.png</span>
-                    <span className={styles.chip}>voice · voices/{learner.id}.wav</span>
+                    <span className={styles.chip}>voice · {learner.id} · ElevenLabs</span>
                     <span className={styles.chip}>{extra.pressure}</span>
                   </div>
                 </div>

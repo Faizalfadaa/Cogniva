@@ -1,22 +1,40 @@
 /**
- * Voice synthesis client — talks to the XTTS v2 service in services/tts.
+ * Voice synthesis — the student's replies, spoken through ElevenLabs.
  *
- * The rule the rest of the app follows applies here too: a missing AI dependency
- * must never break the flow. Every function in this module resolves to `null`
- * instead of throwing, so a learner reply always reaches the user — with audio
- * when the service is up, silently without it when it is not.
+ * The call itself lives in ./elevenlabs.ts; this module is the seam the rest of
+ * the app uses, plus the character/voice mapping and the sentence splitting that
+ * decides what gets rendered.
  *
- * The service is a separate Python process because XTTS v2 is a PyTorch model
- * with no usable Node binding. See services/tts/README.md.
+ * There was a second engine here once: a Python sidecar (Chatterbox/XTTS) in
+ * services/tts. It was removed — it needed a GPU to be worth using and spoke no
+ * Indonesian, which made it useless for this app's main audience. Nothing
+ * replaced it, and nothing had to: the rule the rest of the app follows applies
+ * here too. A missing AI dependency must never break the flow. Every function
+ * resolves to `null` instead of throwing, so a learner reply always reaches the
+ * user — with audio when the key, the quota and the network allow, silently
+ * without it when they do not.
  */
 
 import * as config from "../../config/index.js";
+import {
+  elevenLabsHealth,
+  synthesizeWithElevenLabs,
+  type SpeechContext,
+} from "./elevenlabs.js";
+
+export type { SpeechContext } from "./elevenlabs.js";
 
 /** Rendered speech for one learner utterance. */
 export interface SynthesizedSpeech {
   audio: Buffer;
   mime: string;
-  /** True when a cloned reference voice was used, false for the built-in one. */
+  /**
+   * Whether the voice was cloned from a reference recording at render time.
+   *
+   * Always false now: a hosted voice belongs to the account and is not cloned
+   * per request. Kept because the field is stored on clips that predate the
+   * change, and the shape is read back from the database.
+   */
   cloned: boolean;
 }
 
@@ -93,70 +111,31 @@ export function learnerNameForWorkspace(
 }
 
 /**
- * Render `text` in `voice`. Returns null when speech is off, the service is
- * unreachable, still loading, or slow — never throws.
+ * Render `text` in `voice`. Returns null when speech is off, no key or voice is
+ * configured, or the call fails for any reason — never throws.
+ *
+ * `locale` is the session's language and `context` the sentences either side of
+ * this one; both are hints that make the rendering better and neither is
+ * required.
  */
 export async function synthesizeSpeech(
   text: string,
   voice: string,
+  locale?: string,
+  context?: SpeechContext,
 ): Promise<SynthesizedSpeech | null> {
   if (!config.TTS_ENABLED) return null;
 
   const trimmed = text.trim();
   if (!trimmed) return null;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.TTS_TIMEOUT * 1000);
-
-  try {
-    const response = await fetch(`${config.TTS_URL}/synthesize`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text: trimmed,
-        voice,
-        language: config.TTS_LANGUAGE,
-      }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      // 503 is the expected answer while the model warms up, and is not worth
-      // a stack trace on every early request.
-      const level = response.status === 503 ? "log" : "error";
-      console[level](`[tts] service returned ${response.status}; continuing without audio`);
-      return null;
-    }
-
-    const audio = Buffer.from(await response.arrayBuffer());
-    if (audio.length === 0) return null;
-
-    return {
-      audio,
-      mime: response.headers.get("content-type") ?? "audio/wav",
-      cloned: response.headers.get("x-tts-cloned") === "1",
-    };
-  } catch (err) {
-    const reason = err instanceof Error && err.name === "AbortError" ? "timed out" : String(err);
-    console.error(`[tts] synthesis unavailable (${reason}); continuing without audio`);
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  return synthesizeWithElevenLabs(trimmed, voice, locale, context);
 }
 
-/** Probe the service. Used by /health and by the demo script. */
+/** What the key can still do. Null when the voice is off or unreachable. */
 export async function ttsHealth(): Promise<Record<string, unknown> | null> {
   if (!config.TTS_ENABLED) return null;
-  try {
-    const response = await fetch(`${config.TTS_URL}/health`, {
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!response.ok) return null;
-    return (await response.json()) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+  return elevenLabsHealth();
 }
 
 /** A sentence shorter than this is merged into a neighbour before rendering. */

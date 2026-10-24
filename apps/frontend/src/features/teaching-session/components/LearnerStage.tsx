@@ -41,9 +41,8 @@ function isSpeaking(message: ChatMessageDTO | undefined, playingUrl: string | nu
   return message.learnerAudioUrl === playingUrl
 }
 
-/** Availability is passed in: "this language has no voice" is not a fact about the message. */
-function hasAudio(message: ChatMessageDTO, voice: LearnerVoice): boolean {
-  if (!voice.available) return false
+/** Whether there is anything to play for this message. */
+function hasAudio(message: ChatMessageDTO): boolean {
   return message.speech
     ? message.speech.segments.some((s) => Boolean(s.audioUrl))
     : Boolean(message.learnerAudioUrl)
@@ -78,7 +77,7 @@ function TranscriptBubble({
       }`}
     >
       {waiting ? <TypingIndicator name={learnerName} /> : spokenText(message.content, message.speech, progress)}
-      {!waiting && hasAudio(message, voice) && (
+      {!waiting && hasAudio(message) && (
         <button
           className={styles.chatBubbleSpeak}
           onClick={() => replayOrStop(message, speaking, voice)}

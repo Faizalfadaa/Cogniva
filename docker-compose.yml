@@ -51,45 +51,20 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-dev}
       COGNIVA_LEARNER_MODEL: ${COGNIVA_LEARNER_MODEL:-gemini-2.5-flash}
-      # Learner voice. Only has an effect when the `voice` profile is running.
-      COGNIVA_TTS_ENABLED: ${COGNIVA_TTS_ENABLED:-false}
-      COGNIVA_TTS_URL: http://tts:8020
+      # Learner voice (ElevenLabs). A key is all it takes -- there is no voice
+      # container to run. Without one the session is silent and nothing else
+      # changes; COGNIVA_TTS_ENABLED=false silences it even with a key.
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      COGNIVA_TTS_ENABLED: ${COGNIVA_TTS_ENABLED:-}
+      COGNIVA_ELEVENLABS_VOICE_ID: ${COGNIVA_ELEVENLABS_VOICE_ID:-}
+      COGNIVA_ELEVENLABS_VOICE_YUZUKI: ${COGNIVA_ELEVENLABS_VOICE_YUZUKI:-}
+      COGNIVA_ELEVENLABS_VOICE_REINA: ${COGNIVA_ELEVENLABS_VOICE_REINA:-}
+      COGNIVA_ELEVENLABS_VOICE_AKIRA: ${COGNIVA_ELEVENLABS_VOICE_AKIRA:-}
+      COGNIVA_ELEVENLABS_MODEL: ${COGNIVA_ELEVENLABS_MODEL:-eleven_multilingual_v2}
       PORT: "8000"
       NODE_ENV: production
     expose:
       - "8000"
-    networks:
-      - cogniva
-
-  # Learner voice (Chatterbox Turbo, MIT). Opt-in: it adds a ~2.9 GB model
-  # download and, on CPU, 10-30s per reply. Start it explicitly with a profile:
-  #
-  #   docker compose --profile voice up -d --build
-  #
-  # The backend degrades to silence when it is absent, so the default stack is
-  # unaffected. The XTTS v2 engine is still selectable with TTS_ENGINE=xtts, but
-  # it is licensed for NON-COMMERCIAL use only (CPML) — the MIT-licensed
-  # Chatterbox engines are the default for that reason.
-  tts:
-    profiles: ["voice"]
-    build:
-      context: ./services/tts
-    image: cogniva-tts:latest
-    restart: unless-stopped
-    environment:
-      # "chatterbox-turbo" (default, fastest), "chatterbox", or "xtts".
-      TTS_ENGINE: ${TTS_ENGINE:-chatterbox-turbo}
-      TTS_DEVICE: ${TTS_DEVICE:-cpu}
-      TTS_DEFAULT_LANGUAGE: ${TTS_DEFAULT_LANGUAGE:-en}
-    volumes:
-      # Reference recordings stay on the host — personal data, never in an image.
-      - ./services/tts/voices:/app/voices:ro
-      - tts_cache:/app/.cache
-      # Coqui's model cache, which only the xtts engine uses. The Chatterbox
-      # engines download into the container's own filesystem — see the Dockerfile.
-      - tts_models:/root/.local/share/tts
-    expose:
-      - "8020"
     networks:
       - cogniva
 
@@ -128,8 +103,6 @@ volumes:
   db_data:
   caddy_data:
   caddy_config:
-  tts_cache:
-  tts_models:
 
 networks:
   cogniva:

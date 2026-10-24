@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import type { LearnerSpeechDTO } from '../../../dto/LearnerSpeechDTO'
 
 /**
- * Playback for the learner's synthesized voice (Chatterbox, see services/tts).
+ * Playback for the learner's synthesized voice (rendered by ElevenLabs).
  *
  * What this handles that a bare <audio> tag would not:
  *
@@ -117,42 +117,19 @@ function setMutedFlag(next: boolean): void {
   notifyUtterances()
 }
 
-// --- is there a voice at all -----------------------------------------------
+// --- silence ---------------------------------------------------------------
+//
+// There used to be a second reason for silence beside the mute switch: the voice
+// could only speak English, so an Indonesian session ran mute whatever the user
+// wanted. The voice speaks both languages now, and that whole notion is gone.
+//
+// A session with no voice configured at all needs nothing here either: the
+// backend attaches no speech plan to a reply, and a reply without one has always
+// been shown in full the moment it arrives.
 
-/**
- * Whether a voice exists for the language this session is running in.
- *
- * Only English has one: every cloning model that could speak in a chosen
- * character's voice covers 23-odd languages and Indonesian is not among them
- * (see services/tts/README.md). So an Indonesian session is silent rather than
- * being read out in an English accent.
- *
- * This is deliberately NOT the mute flag. Mute is the user's choice and is
- * remembered for them; this is the app admitting it has nothing to play, and it
- * follows the interface language instead. They converge on the same behaviour —
- * no audio, and every reply shown in full the moment it arrives rather than
- * revealed sentence by sentence.
- */
-let voiceAvailable = true
-const availableListeners = new Set<(available: boolean) => void>()
-
-/** True when nothing should be played, for either reason. */
+/** True when nothing should be played. */
 function silenced(): boolean {
-  return mutedFlag || !voiceAvailable
-}
-
-/** Called when the interface language changes. Idempotent. */
-export function setVoiceAvailable(available: boolean): void {
-  if (available === voiceAvailable) return
-  voiceAvailable = available
-  if (!available) {
-    audioElement().pause()
-    setCurrent(null)
-    // Nothing is coming to reveal the held-back words, so show them all now.
-    interruptUtterances(true)
-  }
-  for (const listener of availableListeners) listener(available)
-  notifyUtterances()
+  return mutedFlag
 }
 
 // --- utterances: a reply spoken sentence by sentence ------------------------
@@ -596,12 +573,6 @@ function readMuted(): boolean {
 export interface LearnerVoice {
   muted: boolean
   toggleMuted: () => void
-  /**
-   * False when this language has no voice at all. Distinct from `muted`: there
-   * is nothing to unmute, so the UI should say so rather than offer a switch,
-   * and replay controls have nothing to replay.
-   */
-  available: boolean
   /** Currently playing URL, or null. Use it to render a "speaking" state. */
   playingUrl: string | null
   /** Play a single clip now, regardless of how many times it has played before. */
@@ -627,17 +598,14 @@ export interface LearnerVoice {
 
 export function useLearnerVoice(): LearnerVoice {
   const [muted, setMuted] = useState(mutedFlag)
-  const [available, setAvailable] = useState(voiceAvailable)
   const [playingUrl, setPlayingUrl] = useState<string | null>(currentUrl)
 
   useEffect(() => {
     listeners.add(setPlayingUrl)
     mutedListeners.add(setMuted)
-    availableListeners.add(setAvailable)
     return () => {
       listeners.delete(setPlayingUrl)
       mutedListeners.delete(setMuted)
-      availableListeners.delete(setAvailable)
     }
   }, [])
 
@@ -681,7 +649,6 @@ export function useLearnerVoice(): LearnerVoice {
 
   return {
     muted,
-    available,
     toggleMuted,
     playingUrl,
     play,
