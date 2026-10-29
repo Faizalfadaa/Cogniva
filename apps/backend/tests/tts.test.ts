@@ -110,7 +110,7 @@ describe("ttsVoiceForWorkspace", () => {
   });
 });
 
-describe("synthesizeSpeech degradation", () => {
+describe("synthesizeSpeech degradation (no voice configured)", () => {
   const realFetch = globalThis.fetch;
 
   beforeEach(() => {
@@ -132,23 +132,6 @@ describe("synthesizeSpeech degradation", () => {
     return import("../src/modules/tts/index.js");
   }
 
-  it("returns null when the service is unreachable", async () => {
-    globalThis.fetch = vi.fn().mockRejectedValue(new Error("ECONNREFUSED")) as never;
-    const { synthesizeSpeech: synth } = await loadTts();
-
-    expect(await synth("Hello there", "yuzuki")).toBeNull();
-  });
-
-  it("returns null when the model is still warming up (503)", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 503,
-    }) as never;
-    const { synthesizeSpeech: synth } = await loadTts();
-
-    expect(await synth("Hello there", "yuzuki")).toBeNull();
-  });
-
   it("returns null for empty text without calling the service", async () => {
     const fetchSpy = vi.fn();
     globalThis.fetch = fetchSpy as never;
@@ -158,22 +141,13 @@ describe("synthesizeSpeech degradation", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("returns the rendered audio on success", async () => {
-    const wav = new Uint8Array([82, 73, 70, 70, 1, 2, 3, 4]);
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      arrayBuffer: async () => wav.buffer,
-      headers: new Headers({ "content-type": "audio/wav", "x-tts-cloned": "1" }),
-    }) as never;
+  it("makes no request at all with no key, however loudly speech is enabled", async () => {
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as never;
     const { synthesizeSpeech: synth } = await loadTts();
 
-    const speech = await synth("Wait, where does the oxygen come from?", "reina");
-
-    expect(speech).not.toBeNull();
-    expect(speech!.mime).toBe("audio/wav");
-    expect(speech!.cloned).toBe(true);
-    expect(speech!.audio.length).toBe(wav.length);
+    expect(await synth("Wait, where does the oxygen come from?", "reina")).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("stays silent when speech is switched off, without any request", async () => {
@@ -204,5 +178,217 @@ describe("synthesizeSpeech (module default state)", () => {
 
   it("is a no-op with speech disabled in the ambient environment", async () => {
     expect(await synthesizeSpeech("anything", "yuzuki")).toBeNull();
+  });
+});
+
+/**
+ * The hosted engine (modules/tts/elevenlabs.ts).
+ *
+ * Same contract as the local one: never throws, falls silent instead. On top of
+ * that, these pin the three things a wrong call would get subtly wrong — the
+ * voice id in the path, the key in the header, and the session's language.
+ */
+describe("ElevenLabs engine", () => {
+  const realFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    vi.stubEnv("ELEVENLABS_API_KEY", "sk_test_key");
+    vi.stubEnv("COGNIVA_ELEVENLABS_VOICE_REINA", "voice_reina");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+    vi.resetModules();
+  });
+
+  async function loadTts() {
+    vi.resetModules();
+    return import("../src/modules/tts/index.js");
+  }
+
+  /** An mp3-shaped answer, as the API sends one. */
+  function okAudio() {
+    const mp3 = new Uint8Array([255, 251, 144, 68, 0, 0, 0, 0]);
+    return vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => mp3.buffer,
+      headers: new Headers({ "content-type": "audio/mpeg" }),
+    });
+  }
+
+  function requestOf(fetchSpy: ReturnType<typeof vi.fn>) {
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    return {
+      url,
+      headers: init.headers as Record<string, string>,
+      body: JSON.parse(init.body as string) as Record<string, unknown>,
+    };
+  }
+
+  it("turns the voice on by itself once a key is configured", async () => {
+    const fetchSpy = okAudio();
+    globalThis.fetch = fetchSpy as never;
+    const { synthesizeSpeech: synth } = await loadTts();
+
+    // No COGNIVA_TTS_ENABLED anywhere: the key is the intent.
+    const speech = await synth("Wait, where does the oxygen come from?", "reina");
+
+    expect(speech).not.toBeNull();
+    expect(speech!.mime).toBe("audio/mpeg");
+    expect(speech!.cloned).toBe(false);
+  });
+
+  it("calls the voice the character was assigned, with the key in the header", async () => {
+    const fetchSpy = okAudio();
+    globalThis.fetch = fetchSpy as never;
+    const { synthesizeSpeech: synth } = await loadTts();
+
+    await synth("Hmm, so how come?", "reina");
+    const { url, headers, body } = requestOf(fetchSpy);
+
+    expect(url).toContain("/v1/text-to-speech/voice_reina");
+    expect(url).toContain("output_format=mp3_44100_128");
+    expect(headers["xi-api-key"]).toBe("sk_test_key");
+    expect(body.model_id).toBe("eleven_multilingual_v2");
+    expect(body.text).toBe("Hmm, so how come?");
+  });
+
+  it("sends the neighbouring sentences so the clips do not read as separate takes", async () => {
+    const fetchSpy = okAudio();
+    globalThis.fetch = fetchSpy as never;
+    const { synthesizeSpeech: synth } = await loadTts();
+
+    await synth("And the second part?", "reina", "en", {
+      previous: "Okay, I follow the first part.",
+      next: "That is what I am stuck on.",
+    });
+    const { body } = requestOf(fetchSpy);
+
+    expect(body.previous_text).toBe("Okay, I follow the first part.");
+    expect(body.next_text).toBe("That is what I am stuck on.");
+  });
+
+  it("lets the model read the language off the text by default, on any model", async () => {
+    // The session can be Indonesian while the text is English (every fallback
+    // line is): forcing "id" would read English words with Indonesian sounds.
+    for (const model of ["eleven_multilingual_v2", "eleven_flash_v2_5", "eleven_v4"]) {
+      vi.stubEnv("COGNIVA_ELEVENLABS_MODEL", model);
+      const fetchSpy = okAudio();
+      globalThis.fetch = fetchSpy as never;
+      const { synthesizeSpeech: synth } = await loadTts();
+
+      await synth("I'm still a bit confused. Could you explain that part again?", "reina", "id");
+
+      expect(requestOf(fetchSpy).body).not.toHaveProperty("language_code");
+    }
+  });
+
+  it("forces the session's language only when that is switched on", async () => {
+    vi.stubEnv("COGNIVA_ELEVENLABS_MODEL", "eleven_flash_v2_5");
+    vi.stubEnv("COGNIVA_ELEVENLABS_LANGUAGE_CODE", "true");
+    const fetchSpy = okAudio();
+    globalThis.fetch = fetchSpy as never;
+    const { synthesizeSpeech: synth } = await loadTts();
+
+    await synth("Jadi oksigennya dari mana?", "reina", "id");
+    const { body } = requestOf(fetchSpy);
+
+    expect(body.model_id).toBe("eleven_flash_v2_5");
+    expect(body.language_code).toBe("id");
+  });
+
+  it("trims configured values, as a container's env vars are not trimmed for us", async () => {
+    vi.stubEnv("COGNIVA_ELEVENLABS_MODEL", "  eleven_v4 ");
+    vi.stubEnv("COGNIVA_ELEVENLABS_OUTPUT_FORMAT", " mp3_44100_128 ");
+    const fetchSpy = okAudio();
+    globalThis.fetch = fetchSpy as never;
+    const { synthesizeSpeech: synth } = await loadTts();
+
+    await synth("Hmm, so how come?", "reina");
+    const { url, body } = requestOf(fetchSpy);
+
+    expect(body.model_id).toBe("eleven_v4");
+    expect(url).toContain("output_format=mp3_44100_128");
+  });
+
+  it("names the missing permission of a restricted key instead of calling it rejected", async () => {
+    const errors: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((message: unknown) => {
+      errors.push(String(message));
+    });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: async () =>
+        JSON.stringify({
+          detail: {
+            status: "missing_permissions",
+            message: "The API key you used is missing the permission text_to_speech to execute this operation.",
+          },
+        }),
+    }) as never;
+    const { synthesizeSpeech: synth } = await loadTts();
+
+    expect(await synth("Hello there", "reina")).toBeNull();
+    const logged = errors.join(" | ");
+    expect(logged).toContain('lacks the "text_to_speech" permission');
+    expect(logged).not.toContain("rejected");
+  });
+
+  it("falls back to the one shared voice id when a character has none", async () => {
+    vi.stubEnv("COGNIVA_ELEVENLABS_VOICE_ID", "voice_everyone");
+    const fetchSpy = okAudio();
+    globalThis.fetch = fetchSpy as never;
+    const { synthesizeSpeech: synth } = await loadTts();
+
+    await synth("Okay okay, go on.", "akira");
+
+    expect(requestOf(fetchSpy).url).toContain("/v1/text-to-speech/voice_everyone");
+  });
+
+  it("stays silent, without a request, when no voice id is configured", async () => {
+    vi.stubEnv("COGNIVA_ELEVENLABS_VOICE_REINA", "");
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as never;
+    const { synthesizeSpeech: synth } = await loadTts();
+
+    expect(await synth("Hello there", "yuzuki")).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("falls silent on a rejected key or a spent quota, rather than failing the turn", async () => {
+    for (const status of [401, 402, 429, 422, 500]) {
+      vi.resetModules();
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status,
+        text: async () => '{"detail":"nope"}',
+      }) as never;
+      const { synthesizeSpeech: synth } = await loadTts();
+
+      expect(await synth("Hello there", "reina")).toBeNull();
+    }
+  });
+
+  it("falls silent when the network never answers", async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error("ENOTFOUND")) as never;
+    const { synthesizeSpeech: synth } = await loadTts();
+
+    expect(await synth("Hello there", "reina")).toBeNull();
+  });
+
+  it("is still silent with no key at all, so the app never depends on a voice", async () => {
+    vi.unstubAllEnvs();
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as never;
+    const { synthesizeSpeech: synth } = await loadTts();
+
+    expect(await synth("Hello there", "reina")).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

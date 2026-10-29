@@ -84,8 +84,9 @@ export interface Workspace {
 /**
  * The two languages the product ships in.
  *
- * Indonesian is first because that is the audience; English exists because the
- * learner's synthesized voice only speaks it (see services/tts/README.md).
+ * Indonesian is first because that is the audience. English was once the only
+ * one the student could be heard in — the local voice engine spoke nothing else —
+ * and the voice now follows the session's language either way (modules/tts).
  */
 export const LOCALES = ["id", "en"] as const;
 

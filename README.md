@@ -22,7 +22,7 @@ offline development and testing.
 - Teaching checkpoint submission with whiteboard and optional audio input
 - Reference material for the evaluation — upload a PDF, paste your own notes, or
   let the reference agent search for sources and offer you a few options
-- Spoken learner replies through a separate voice service (optional)
+- Spoken learner replies through ElevenLabs (optional)
 - Session evaluation report after the learning session is completed
 - Mock AI fallback when no Gemini API key is configured
 
@@ -32,7 +32,7 @@ offline development and testing.
 - Backend: Node.js, TypeScript, Fastify, Zod
 - Database: PostgreSQL via Prisma
 - AI provider: Gemini via `@google/genai`
-- Voice: Chatterbox (Python, FastAPI) in `services/tts` — optional
+- Voice: ElevenLabs over HTTP — optional
 - Testing: Vitest
 
 ## Project Structure
@@ -65,12 +65,6 @@ Cogniva/
 |       `-- package.json
 |-- caddy/
 |   `-- Caddyfile                # Reverse proxy and HTTPS configuration
-|-- services/
-|   `-- tts/                     # Learner voice service (Python, optional)
-|       |-- app/                 # FastAPI service and the Chatterbox engine
-|       |-- voices/              # Reference recordings (not in git — personal data)
-|       |-- fetch_model.py       # Downloads the model weights
-|       `-- README.md            # Full setup, tuning and troubleshooting
 |-- packages/
 |-- scripts/
 `-- README.md
@@ -84,8 +78,6 @@ Install these before running the project:
 - npm
 - PostgreSQL 14 or newer — or Docker, which brings its own (see [Database](#database))
 - A Gemini API key, if you want to use real AI responses
-- Python 3.11 or 3.12 — only for the learner voice, and only if you want to hear
-  it. Not 3.13; see [`services/tts/README.md`](services/tts/README.md).
 
 You can still run the project without an API key. In that case, the backend uses
 mock AI responses. A database, however, is required.
@@ -146,11 +138,14 @@ Important environment variables:
 - `USE_MOCK_AI`: Set to `false` to use Gemini, or `true` to force mock AI.
 - `COGNIVA_LEARNER_MODEL`: Gemini model used by the learner agent.
 - `PORT`: Backend server port. The frontend expects `8000` by default.
-- `COGNIVA_TTS_ENABLED`: Set to `true` to speak the learner's replies. Defaults
-  to `false`, and needs the voice service running — see
-  [Running the Application](#3-learner-voice-optional).
-- `COGNIVA_TTS_URL`: Where that service listens. Defaults to
-  `http://localhost:8020`.
+- `ELEVENLABS_API_KEY`: Speak the learner's replies. Setting it turns the voice
+  on; there is nothing else to run. See
+  [Learner voice](#3-learner-voice-optional).
+- `COGNIVA_ELEVENLABS_VOICE_ID`: One voice for all three students, or
+  `COGNIVA_ELEVENLABS_VOICE_YUZUKI` / `_REINA` / `_AKIRA` for one each. List the
+  ids on your key with `npm run tts:voices` in `apps/backend`.
+- `COGNIVA_TTS_ENABLED`: Follows the key above. Set it to `false` to silence the
+  voice without unsetting the key.
 
 Every other knob is listed with a comment in `apps/backend/.env.example`, and
 they are all read in one place, `apps/backend/src/config/index.ts`.
@@ -174,8 +169,8 @@ VITE_USE_MOCK=false
 
 ## Running the Application
 
-Two terminals are enough for the whole app. A third one adds the learner's
-voice, which is optional.
+Two terminals are enough for the whole app. The learner's voice is an API key,
+not a third process.
 
 There is no root `package.json` and no workspace tooling, so every `npm` command
 has to run from inside `apps/backend` or `apps/frontend`.
@@ -227,49 +222,50 @@ http://localhost:5173
 ```
 
 That is the app, fully working — whiteboard, learner, chat, reference material
-and the evaluation report. The learner is silent until you also start the voice
-service below.
+and the evaluation report. The learner is silent until you add a voice key
+below.
 
 ### 3. Learner voice (optional)
 
-The voice lives in a separate Python service, because it needs a GPU-sized model
-that has no business inside the Node process. The backend treats it as
-best-effort: if it is missing, slow or broken, the reply still arrives as text.
+The student speaks through the ElevenLabs API. There is nothing to install and
+nothing to start: the backend calls it over HTTP, and the voice is best-effort —
+no key, a spent quota, a slow or broken call all mean "no audio this time" while
+the reply still arrives as text.
 
-First-time setup (virtualenv, torch, ~3.2 GB of model weights) is in
-[`services/tts/README.md`](services/tts/README.md). Once that is done, starting
-it is one command:
-
-```powershell
-cd services/tts
-.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8020
-```
-
-Then turn it on in `apps/backend/.env` and restart the backend:
+Put the key in `apps/backend/.env`:
 
 ```env
-COGNIVA_TTS_ENABLED=true
-COGNIVA_TTS_URL=http://localhost:8020
+ELEVENLABS_API_KEY=sk_...
 ```
 
-The model loads in a background thread, so the service answers before it is
-ready. Wait for `ready` to turn true:
+Voice ids belong to your account, so there is no default to ship. List the ones
+on your key — it prints each id next to the variable it goes in:
 
 ```powershell
-curl http://localhost:8020/health
+cd apps/backend
+npm run tts:voices
 ```
 
-```json
-{"status":"ok","ready":true,"engine":"chatterbox","device":"cuda",
- "language":"en","voices":["akira","reina","yuzuki"],"error":null}
+Then assign one per student (or `COGNIVA_ELEVENLABS_VOICE_ID` for all three) and
+restart the backend:
+
+```env
+COGNIVA_ELEVENLABS_VOICE_YUZUKI=...
+COGNIVA_ELEVENLABS_VOICE_REINA=...
+COGNIVA_ELEVENLABS_VOICE_AKIRA=...
 ```
 
-`device` reads `cpu` on a machine without a usable NVIDIA GPU. It still works
-there, just slowly enough that you will notice.
+That is the whole setup: with a key present the voice switches itself on, in
+whichever language the session runs in. `COGNIVA_TTS_ENABLED=false` silences it
+without unsetting the key, and every other knob (model, audio format, delivery
+settings) is commented in `apps/backend/.env.example`.
 
-Until then it returns `503`, which the backend reads as "no audio this time" and
-carries on. With the voice on, a reply is spoken one sentence at a time and its
-text appears in step: each sentence shows up as its clip starts playing, with
+There used to be a local voice service here (`services/tts`: Chatterbox and XTTS
+behind FastAPI). It was removed — it needed a GPU to be worth using and could not
+speak Indonesian, so the audience this product is built for could never hear it.
+
+With the voice on, a reply is spoken one sentence at a time and its text
+appears in step: each sentence shows up as its clip starts playing, with
 nothing to press. If a clip takes longer than 8 seconds, the text is shown anyway.
 
 ### Everything at once, with Docker
@@ -282,21 +278,9 @@ Copy-Item .env.example .env
 docker compose up -d --build
 ```
 
-The voice service is behind a profile, since it adds a large model download.
-Starting the profile is not enough on its own — the backend still needs to be
-told to use it, so set `COGNIVA_TTS_ENABLED=true` in the root `.env` first:
-
-```powershell
-docker compose --profile voice up -d --build
-```
-
-The compose service has no GPU passthrough configured, so in Docker it runs on
-CPU: 10–30 seconds per reply. If you want the GPU, run it outside Docker as in
-[step 3](#3-learner-voice-optional) above.
-
-Reference recordings are mounted from `services/tts/voices` rather than baked
-into the image; they are personal data and are deliberately kept out of git.
-Without them the service still runs, using the engine's own built-in voice.
+For the learner's voice, put `ELEVENLABS_API_KEY` and a voice id in the root
+`.env` before bringing the stack up. There is no voice container: the backend
+calls the API directly, so a host with no GPU is no obstacle.
 
 ## Using Real AI
 
@@ -359,14 +343,6 @@ npm run demo:learner
 npm run demo:vision -- ./gambar-uji/papan1.jpeg "Photosynthesis"
 npm run demo:asr -- ./path-to-audio.wav "Photosynthesis"
 npm run demo:referencer -- "Photosynthesis"
-```
-
-The voice service has its own smoke test, which writes sample WAV files you can
-listen to without starting the rest of the app:
-
-```powershell
-cd services/tts
-.venv\Scripts\python.exe smoketest.py
 ```
 
 Some demos default to mock mode so they can run without an API key. Set
@@ -438,19 +414,16 @@ npm run db:migrate
 
 Work through these in order:
 
-1. `curl http://localhost:8020/health` — if nothing answers, the voice service
-   is not running (see [Running the Application](#3-learner-voice-optional)).
-2. If it answers with `"ready": false`, the model is still loading. Give it
-   another minute.
-3. `COGNIVA_TTS_ENABLED=true` must be in `apps/backend/.env`, and the backend
-   restarted since you set it. It defaults to `false`.
-4. Check the mute toggle in the workspace header — it is remembered per browser.
+1. `ELEVENLABS_API_KEY` must be in `apps/backend/.env`, with the backend
+   restarted since you set it.
+2. A voice id must be set for the student on screen — run `npm run tts:voices`
+   in `apps/backend` to list the ids on your key and the variables they go in.
+   Without one the backend logs exactly which variable is missing.
+3. Check the mute toggle in the workspace header — it is remembered per browser.
+4. Out of characters on your plan is a 402 from the API; `npm run tts:voices`
+   prints what the plan has left.
 
 Silence is the designed failure mode: the backend never lets a voice problem
 cost you the reply, so nothing here shows up as an error in the UI. The backend
-log is where a failed synthesis is reported.
-
-Deeper problems — unclear pronunciation, very slow generation, the model
-download stalling — are covered in
-[`services/tts/README.md`](services/tts/README.md).
+log is where a failed synthesis is reported, with the reason.
 

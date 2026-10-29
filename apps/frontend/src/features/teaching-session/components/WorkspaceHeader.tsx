@@ -131,18 +131,11 @@ export function WorkspaceHeader({
         <button
           className={voice.muted ? styles.deafenBtnOn : styles.deafenBtn}
           onClick={voice.toggleMuted}
-          disabled={!voice.available}
           aria-label={voice.muted ? t('header.undeafen') : t('header.deafen')}
           aria-pressed={voice.muted}
-          title={
-            !voice.available
-              ? t('header.voiceUnavailable')
-              : voice.muted
-                ? t('header.undeafen')
-                : t('header.deafen')
-          }
+          title={voice.muted ? t('header.undeafen') : t('header.deafen')}
         >
-          <HeadphonesIcon deafened={voice.muted || !voice.available} />
+          <HeadphonesIcon deafened={voice.muted} />
         </button>
 
         {mode === 'editing' && !pending && !micPermissionDenied && (

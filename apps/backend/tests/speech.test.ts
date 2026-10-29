@@ -71,19 +71,19 @@ describe("speechSegments", () => {
 
 /** A 1x1 PNG is enough — the turn runs on mocks. */
 const SNAPSHOT = "iVBORw0KGgo=";
-const WAV = new Uint8Array([82, 73, 70, 70, 36, 0, 0, 0, 87, 65, 86, 69]);
+const MP3 = new Uint8Array([255, 251, 144, 68, 0, 0, 0, 0, 0, 0, 0, 0]);
 
 const renderedClip = () => ({
   ok: true,
   status: 200,
-  arrayBuffer: async () => WAV.buffer.slice(0),
-  headers: new Headers({ "content-type": "audio/wav", "x-tts-cloned": "1" }),
+  arrayBuffer: async () => MP3.buffer.slice(0),
+  headers: new Headers({ "content-type": "audio/mpeg" }),
 });
 
-/** Answer /synthesize from a fake voice service; fail every other request fast. */
+/** Answer the voice API; fail every other request fast. */
 function fakeVoiceService(respond: () => unknown) {
   const fetchMock = vi.fn(async (input: unknown) => {
-    if (String(input).includes("/synthesize")) return respond();
+    if (String(input).includes("/v1/text-to-speech/")) return respond();
     throw new Error("network disabled in this test");
   });
   globalThis.fetch = fetchMock as never;
@@ -114,6 +114,9 @@ describe("learner speech pipeline", () => {
 
   beforeEach(() => {
     vi.stubEnv("COGNIVA_DEMO_MODE", "false");
+    // A voice now means a key and a voice id, not a sidecar on localhost:8020.
+    vi.stubEnv("ELEVENLABS_API_KEY", "sk_test_key");
+    vi.stubEnv("COGNIVA_ELEVENLABS_VOICE_ID", "voice_test");
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(console, "log").mockImplementation(() => {});
   });

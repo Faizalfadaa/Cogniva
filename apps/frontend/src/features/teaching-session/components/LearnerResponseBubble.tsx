@@ -64,13 +64,11 @@ export function LearnerResponseBubble({
   if (hidden || dismissed || (!pending && !text)) return null
 
   const waiting = pending || progress?.phase === 'waiting'
-  const clips = !voice.available
-    ? []
-    : speech
-      ? speech.segments.flatMap((segment) => (segment.audioUrl ? [segment.audioUrl] : []))
-      : audioUrl
-        ? [audioUrl]
-        : []
+  const clips = speech
+    ? speech.segments.flatMap((segment) => (segment.audioUrl ? [segment.audioUrl] : []))
+    : audioUrl
+      ? [audioUrl]
+      : []
   const speaking = voice.playingUrl !== null && clips.includes(voice.playingUrl)
 
   function replayOrStop() {
