@@ -51,8 +51,8 @@ export async function runEvaluator(
       options.llm ??
       new LLMClient({
         model: config.EVALUATOR_MODEL,
-        maxTokens: config.LLM_MAX_TOKENS,
-        timeout: config.LLM_TIMEOUT,
+        maxTokens: config.EVALUATOR_MAX_TOKENS,
+        timeout: config.EVALUATOR_TIMEOUT,
         thinkingBudget: config.LLM_THINKING_BUDGET,
         temperature: config.EVALUATOR_TEMPERATURE,
       });

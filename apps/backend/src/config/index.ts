@@ -141,6 +141,19 @@ export const EVALUATOR_TEMPERATURE: number = num(
   0,
 );
 
+/**
+ * Output ceiling for the Evaluator only.
+ *
+ * The shared LLM_MAX_TOKENS (2048) is sized for one short student reply. The
+ * Evaluator writes a finding per concept for every round taught so far, and on
+ * a resumed workspace that ran past 2048: the JSON was cut off, the call
+ * failed, and the debrief fell back to a report with no findings and a score of 0.
+ */
+export const EVALUATOR_MAX_TOKENS: number = num(process.env.COGNIVA_EVALUATOR_MAX_TOKENS, 8192);
+
+/** Request timeout in seconds for the Evaluator. It runs once, in the background. */
+export const EVALUATOR_TIMEOUT: number = num(process.env.COGNIVA_EVALUATOR_TIMEOUT, 120);
+
 // --- Retrieval / RAG for the Evaluator (§3.7) ------------------------------
 
 /**
@@ -325,10 +338,15 @@ export const ASR_CONFIDENCE_THRESHOLD: number = num(
  * Ceiling on the tokens one session may spend across all its turns. Once a
  * session is at or over this, the orchestrator refuses the turn instead of
  * calling any model, so a runaway session can't drain the shared quota.
+ *
+ * A Teach spends several thousand tokens (board reading, planning and the
+ * student's reply), and the count carries over when a finished workspace is
+ * resumed. The old 50,000 ran out inside a normal 30 minute session, and the
+ * student then asked to stop.
  */
 export const SESSION_TOKEN_BUDGET: number = num(
   process.env.COGNIVA_SESSION_TOKEN_BUDGET,
-  50000,
+  250000,
 );
 
 /**

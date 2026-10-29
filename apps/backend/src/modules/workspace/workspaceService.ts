@@ -755,19 +755,28 @@ async function runEvaluation(ws: Workspace): Promise<void> {
     topic,
   );
 
-  const result = await getEvaluator().evaluate(
-    {
-      sessionId: session.sessionId,
-      turns: transcript,
-      // Only sent when retrieval produced nothing; excerpts take precedence.
-      referenceMaterial: referenceExcerpts.length ? "" : topic.referenceMaterial,
-      keyConcepts: topic.keyConcepts,
-      commonMisconceptions: topic.commonMisconceptions,
-      referenceExcerpts,
-      referenceOutline,
-    },
-    newId("ev"),
-  );
+  // A synthesized workspace Topic has no key concepts, so the deterministic
+  // offline evaluator can't produce a meaningful score — only a real LLM can.
+  const usedMock = process.env.USE_MOCK_AI === "true" || !config.llmAvailable();
+
+  const evaluationInput = {
+    sessionId: session.sessionId,
+    turns: transcript,
+    // Only sent when retrieval produced nothing; excerpts take precedence.
+    referenceMaterial: referenceExcerpts.length ? "" : topic.referenceMaterial,
+    keyConcepts: topic.keyConcepts,
+    commonMisconceptions: topic.commonMisconceptions,
+    referenceExcerpts,
+    referenceOutline,
+  };
+  let result = await getEvaluator().evaluate(evaluationInput, newId("ev"));
+  // A failed model call falls back to the offline evaluator, which finds
+  // nothing in a workspace topic and so scores 0. One more attempt is cheap
+  // next to handing the user a 0 for a session they actually taught.
+  if (!usedMock && transcript.length > 0 && result.findings.length === 0) {
+    console.warn("[workspace] evaluation came back empty, retrying once");
+    result = await getEvaluator().evaluate(evaluationInput, newId("ev"));
+  }
   await sessions.saveEvaluation(result);
   session.evaluationId = result.evaluationId;
   session.evaluationIds = (await sessions.listEvaluations(session.sessionId)).map(
@@ -775,10 +784,6 @@ async function runEvaluation(ws: Workspace): Promise<void> {
   );
   session.status = "EVALUATED";
   await sessions.saveSession(session);
-
-  // A synthesized workspace Topic has no key concepts, so the deterministic
-  // offline evaluator can't produce a meaningful score — only a real LLM can.
-  const usedMock = process.env.USE_MOCK_AI === "true" || !config.llmAvailable();
 
   await workspaces.saveReport(
     ws.id,
