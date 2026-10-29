@@ -380,7 +380,8 @@ function str(value: string | undefined, fallback: string): string {
 
 /** Where the hosted API lives. Override for a regional residency endpoint. */
 export const ELEVENLABS_API_BASE: string = str(
-  process.env.COGNIVA_ELEVENLABS_API_BASE,
+  process.env.COGNIVA_ELEVENLABS_API_BASE?.trim() ||
+    process.env.COGNIVA_ELEVENLABS_API_BASE_URL,
   "https://api.elevenlabs.io",
 ).replace(/\/+$/, "");
 

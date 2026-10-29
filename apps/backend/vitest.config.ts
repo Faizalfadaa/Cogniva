@@ -16,6 +16,9 @@ export default defineConfig({
       // set, so blanking them here keeps every agent on its offline path.
       GEMINI_API_KEY: "",
       GOOGLE_API_KEY: "",
+      ELEVENLABS_API_KEY: "",
+      COGNIVA_ELEVENLABS_API_KEY: "",
+      COGNIVA_TTS_ENABLED: "",
     },
   },
 });

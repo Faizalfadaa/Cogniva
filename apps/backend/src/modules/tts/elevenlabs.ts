@@ -167,7 +167,10 @@ export async function synthesizeWithElevenLabs(
     }
 
     const audio = Buffer.from(await response.arrayBuffer());
-    if (audio.length === 0) return null;
+    if (audio.length === 0) {
+      console.error("[tts] ElevenLabs returned empty audio (HTTP 200); continuing without audio");
+      return null;
+    }
 
     return {
       audio,
@@ -179,7 +182,7 @@ export async function synthesizeWithElevenLabs(
       cloned: false,
     };
   } catch (err) {
-    const reason = err instanceof Error && err.name === "AbortError" ? "timed out" : String(err);
+    const reason = controller.signal.aborted ? "timed out" : transportFailure(err);
     console.error(`[tts] ElevenLabs unavailable (${reason}); continuing without audio`);
     return null;
   } finally {
@@ -192,8 +195,8 @@ export async function synthesizeWithElevenLabs(
  *
  * The status alone does not say enough to act on: 401 is a bad key, 402 and 429
  * are a spent quota or too many calls at once, and 422 is usually an unknown
- * voice id or model. The body carries that detail, so a slice of it is logged —
- * trimmed, because an error page can be a whole document.
+ * voice id or model. Only structured status codes are logged: provider messages
+ * can echo private request data.
  */
 async function explain(response: Response): Promise<string> {
   let body = "";
@@ -222,8 +225,40 @@ async function explain(response: Response): Promise<string> {
       ? "the voice id or model was not accepted"
       : "see the body";
 
-  const detail = body.replace(/\s+/g, " ").trim().slice(0, 200);
+  // Do not log provider messages: they may echo text, credentials or account data.
+  let detail = "";
+  try {
+    const status: unknown = JSON.parse(body)?.detail?.status;
+    if (typeof status === "string" && /^[a-z_]{1,64}$/.test(status) &&
+        !status.includes(config.ELEVENLABS_API_KEY)) detail = status;
+  } catch { /* Non-JSON errors are represented by the HTTP status and hint. */ }
   return detail ? `${hint} — ${detail}` : hint;
+}
+
+/** Only structural transport diagnostics, never arbitrary messages or URLs. */
+export function transportFailure(error: unknown): string {
+  const seen = new Set<object>();
+  const visit = (value: unknown, depth: number): string => {
+    if (!value || typeof value !== "object" || depth > 4 || seen.has(value)) return "";
+    seen.add(value);
+    const e = value as { name?: unknown; code?: unknown; syscall?: unknown; cause?: unknown; errors?: unknown };
+    const fields = ["name", "code", "syscall"] as const;
+    const parts = fields.flatMap((field) => {
+      const v = e[field];
+      return typeof v === "string" && /^[a-zA-Z0-9_]{1,64}$/.test(v) &&
+        (!config.ELEVENLABS_API_KEY || !v.includes(config.ELEVENLABS_API_KEY)) ? [`${field}=${v}`] : [];
+    });
+    const cause = visit(e.cause, depth + 1);
+    if (cause) parts.push(`cause={${cause}}`);
+    if (Array.isArray(e.errors)) {
+      for (const child of e.errors.slice(0, 4)) {
+        const detail = visit(child, depth + 1);
+        if (detail) parts.push(`error={${detail}}`);
+      }
+    }
+    return parts.join(" ");
+  };
+  return visit(error, 0) || "unknown transport error";
 }
 
 /**
