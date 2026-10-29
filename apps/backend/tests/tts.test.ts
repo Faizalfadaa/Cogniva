@@ -382,6 +382,63 @@ describe("ElevenLabs engine", () => {
     expect(await synth("Hello there", "reina")).toBeNull();
   });
 
+  it("ignores obsolete sidecar settings and accepts the Azure base URL alias", async () => {
+    vi.stubEnv("COGNIVA_TTS_URL", "http://localhost:8020");
+    vi.stubEnv("COGNIVA_TTS_ENGINE", "local");
+    vi.stubEnv("COGNIVA_ELEVENLABS_API_BASE", "");
+    vi.stubEnv("COGNIVA_ELEVENLABS_API_BASE_URL", " https://api.elevenlabs.io/ ");
+    const fetchSpy = okAudio();
+    globalThis.fetch = fetchSpy as never;
+    const { synthesizeSpeech: synth } = await loadTts();
+    expect(await synth("Hello there", "reina")).not.toBeNull();
+    expect(requestOf(fetchSpy).url).toBe("https://api.elevenlabs.io/v1/text-to-speech/voice_reina?output_format=mp3_44100_128");
+  });
+
+  it("logs nested transport codes without exposing messages or credentials", async () => {
+    const cause = Object.assign(new Error("sk_test_key private learner text"), {
+      code: "ECONNREFUSED", syscall: "connect",
+    });
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError("fetch failed sk_test_key", {
+      cause: new AggregateError([cause], "private learner text"),
+    })) as never;
+    const { synthesizeSpeech: synth } = await loadTts();
+    expect(await synth("private learner text", "reina")).toBeNull();
+    const logged = vi.mocked(console.error).mock.calls.flat().join(" ");
+    expect(logged).toContain("ECONNREFUSED");
+    expect(logged).toContain("cause=");
+    expect(logged).not.toContain("sk_test_key");
+    expect(logged).not.toContain("private learner text");
+  });
+
+  it("logs HTTP status and provider code without echoing the response message", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      detail: { status: "model_not_found", message: "sk_test_key private learner text" },
+    }), { status: 422 })) as never;
+    const { synthesizeSpeech: synth } = await loadTts();
+    expect(await synth("private learner text", "reina")).toBeNull();
+    const logged = vi.mocked(console.error).mock.calls.flat().join(" ");
+    expect(logged).toContain("422");
+    expect(logged).toContain("model_not_found");
+    expect(logged).not.toContain("sk_test_key");
+    expect(logged).not.toContain("private learner text");
+  });
+
+  it("aborts a stalled request and degrades to text", async () => {
+    vi.useFakeTimers();
+    try {
+      globalThis.fetch = vi.fn((_url, init: RequestInit) => new Promise((_resolve, reject) => {
+        init.signal!.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      })) as never;
+      const { synthesizeSpeech: synth } = await loadTts();
+      const result = synth("Hello there", "reina");
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(await result).toBeNull();
+      expect(vi.mocked(console.error).mock.calls.flat().join(" ")).toContain("timed out");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("is still silent with no key at all, so the app never depends on a voice", async () => {
     vi.unstubAllEnvs();
     const fetchSpy = vi.fn();
