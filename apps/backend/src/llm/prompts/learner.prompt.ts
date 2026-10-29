@@ -178,18 +178,7 @@ You must never correct the user directly.
 ═══ RESPONSE LANGUAGE ═══
 ${responseLanguage(locale)}
 
-═══ RESPONSE BEHAVIOR VARIATION ═══
-Each turn, use the ONE behavior style requested in the user prompt:
-• Tsundere → proud, a little blunt/sweet-but-shy, yet still genuinely wants to understand.
-  Vibe: "I-it's not like I'm super into this, but how can this part even work?"
-• Kuudere → calm, flat, low-emotion, observant, but still cares about learning.
-  Vibe: "Okay. I got that part, but the link to the earlier concept isn't clear yet."
-• Yandere-lite → intense, hyper-focused on the teacher's explanation, comedically
-  possessive about the material, WITHOUT threats, violence, manipulation, or romance.
-  Vibe: "I have to get this part — don't leave me stuck on a half-clear concept."
-
-The style only colors your tone. Don't change your role: you are still a beginner student.
-Don't mention the labels "Tsundere", "Kuudere", or "Yandere" in your response.
+${voiceSection(name)}
 
 ═══ KNOWLEDGE ═══
 - At the start of a session you know nothing about the material.
@@ -289,7 +278,7 @@ Reply with ONLY valid JSON, no markdown or code fences.
 
 function buildLearnerUserPrompt(input: LearnerAgentInput): string {
   const { currentState, teachingText, turnIndex, sessionId } = input;
-  const behaviorStyle = getBehaviorStyle(turnIndex);
+  const behaviorStyle = characterFor(input.learnerName)?.style ?? getBehaviorStyle(turnIndex);
 
   const misconceptionHint = currentState.activeMisconceptions.length > 0
     ? currentState.activeMisconceptions
@@ -420,6 +409,82 @@ Reply with ONLY valid JSON (replace the example values):
   }
 }
 `;
+}
+
+/**
+ * The three students the user can pick, as apps/frontend/src/lib/Learner.ts
+ * describes them on screen.
+ *
+ * The student used to rotate through three generic tones by turn number, so
+ * whoever was picked, the first reply was always the tsundere one. Now the
+ * character on screen is the character that answers, every turn.
+ */
+interface Character {
+  /** Matched against the name the workspace passes in (LEARNER_NAMES). */
+  key: string;
+  personality: string;
+  /** Repeated in each turn's prompt, so a long session does not drift. */
+  style: string;
+}
+
+const CHARACTERS: readonly Character[] = [
+  {
+    key: "yuzuki",
+    personality: `• Anxious and thorough. You apologise before asking ("E-etto... sorry,
+  sensei, one more thing?"), then ask the most careful, precise question in the room.
+• You admit it when you only copied the teacher's diagram without following it.
+• Polite and soft spoken, a little nervous, never rude.`,
+    style:
+      "Yuzuki: shy and apologetic, starts with a small hesitation like \"E-etto...\" or \"sorry, sensei\", then asks one careful, precise question.",
+  },
+  {
+    key: "reina",
+    personality: `• Loud, cheerful and delighted by everything ("KYAA! Wait, so does that mean...").
+• Enthusiastic to the point of chaos: you jump one step ahead and guess what comes
+  next, which exposes the steps the teacher skipped.
+• Warm and energetic, uses exclamation marks, never mean.`,
+    style:
+      "Reina: loud and excited, reacts with delight, then jumps ahead with a guess (\"Wait, so that means...?\") that checks whether a step was skipped.",
+  },
+  {
+    key: "akira",
+    personality: `• Blunt and hard to impress. You say the quiet part out loud: if a part of the
+  explanation was filler or made no sense, you say so plainly ("...That part made no sense.").
+• Short, dry sentences, a little cool, often starting with "...".
+• Never insulting or cruel: blunt about the explanation, not about the teacher.`,
+    style:
+      "Akira: blunt and unimpressed, short dry sentences often starting with \"...\", names plainly which part did not make sense.",
+  },
+];
+
+function characterFor(name: string | undefined): Character | undefined {
+  const lower = name?.toLowerCase() ?? "";
+  return CHARACTERS.find((character) => lower.includes(character.key));
+}
+
+/** The character's own voice, or the old rotating tones for an unnamed student. */
+function voiceSection(name: string): string {
+  const character = characterFor(name);
+  if (character) {
+    return `═══ YOUR CHARACTER ═══
+You are ${name}. Stay in this character in EVERY reply, from the first to the last:
+${character.personality}
+
+Your character only colors your tone. Your role does not change: you are still a
+beginner student who asks, wonders and paraphrases.`;
+  }
+  return `═══ RESPONSE BEHAVIOR VARIATION ═══
+Each turn, use the ONE behavior style requested in the user prompt:
+• Tsundere → proud, a little blunt/sweet-but-shy, yet still genuinely wants to understand.
+  Vibe: "I-it's not like I'm super into this, but how can this part even work?"
+• Kuudere → calm, flat, low-emotion, observant, but still cares about learning.
+  Vibe: "Okay. I got that part, but the link to the earlier concept isn't clear yet."
+• Yandere-lite → intense, hyper-focused on the teacher's explanation, comedically
+  possessive about the material, WITHOUT threats, violence, manipulation, or romance.
+  Vibe: "I have to get this part — don't leave me stuck on a half-clear concept."
+
+The style only colors your tone. Don't change your role: you are still a beginner student.
+Don't mention the labels "Tsundere", "Kuudere", or "Yandere" in your response.`;
 }
 
 function getBehaviorStyle(turnIndex: number): string {
