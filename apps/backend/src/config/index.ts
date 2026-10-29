@@ -341,12 +341,13 @@ export const ASR_CONFIDENCE_THRESHOLD: number = num(
  *
  * A Teach spends several thousand tokens (board reading, planning and the
  * student's reply), and the count carries over when a finished workspace is
- * resumed. The old 50,000 ran out inside a normal 30 minute session, and the
- * student then asked to stop.
+ * resumed. Kept low on purpose, so one account cannot run up the shared quota;
+ * raise it with COGNIVA_SESSION_TOKEN_BUDGET, or set COGNIVA_DEMO_MODE for a
+ * live demo.
  */
 export const SESSION_TOKEN_BUDGET: number = num(
   process.env.COGNIVA_SESSION_TOKEN_BUDGET,
-  250000,
+  60000,
 );
 
 /**
